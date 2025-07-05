@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Glasses, Drone, MapPin, Crosshair } from "lucide-react";
+import { Glasses, Plane, MapPin, Crosshair } from "lucide-react";
 
 interface AROverlay {
   id: string;
@@ -187,7 +186,7 @@ export const AugmentedRealityOverwatch = () => {
         {/* Drone Swarms */}
         <div className="space-y-2">
           <div className="text-xs font-semibold text-cyber-green/80 mb-2 flex items-center space-x-2">
-            <Drone className="w-3 h-3" />
+            <Plane className="w-3 h-3" />
             <span>Projection Drone Swarms</span>
           </div>
           

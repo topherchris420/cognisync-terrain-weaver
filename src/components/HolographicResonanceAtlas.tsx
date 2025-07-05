@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Cube, RotateCcw, Maximize, Eye } from "lucide-react";
+import { Box, RotateCcw, Maximize, Eye } from "lucide-react";
 
 interface DimensionControl {
   name: string;
@@ -59,7 +58,7 @@ export const HolographicResonanceAtlas = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-cyber-purple text-sm flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Cube className="w-4 h-4 animate-cognitive-pulse" />
+            <Box className="w-4 h-4 animate-cognitive-pulse" />
             <span>Holographic Resonance Atlas (6D)</span>
           </div>
           <Badge variant="outline" className="border-cyber-purple text-cyber-purple">
