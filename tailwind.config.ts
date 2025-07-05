@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,15 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				cyber: {
+					blue: '#00d4ff',
+					purple: '#b84dff',
+					green: '#00ff88',
+					red: '#ff3366',
+					orange: '#ff8800',
+					dark: '#0a0a0f',
+					darker: '#050508'
 				}
 			},
 			borderRadius: {
@@ -84,11 +94,54 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'pulse-glow': {
+					'0%': {
+						boxShadow: '0 0 0 0 rgba(0, 212, 255, 0.7)'
+					},
+					'70%': {
+						boxShadow: '0 0 0 10px rgba(0, 212, 255, 0)'
+					},
+					'100%': {
+						boxShadow: '0 0 0 0 rgba(0, 212, 255, 0)'
+					}
+				},
+				'field-ripple': {
+					'0%': {
+						transform: 'scale(0.8)',
+						opacity: '1'
+					},
+					'100%': {
+						transform: 'scale(2.4)',
+						opacity: '0'
+					}
+				},
+				'data-flow': {
+					'0%': {
+						transform: 'translateX(-100%)'
+					},
+					'100%': {
+						transform: 'translateX(100%)'
+					}
+				},
+				'cognitive-pulse': {
+					'0%, 100%': {
+						transform: 'scale(1)',
+						opacity: '0.8'
+					},
+					'50%': {
+						transform: 'scale(1.1)',
+						opacity: '1'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-glow': 'pulse-glow 2s infinite',
+				'field-ripple': 'field-ripple 3s ease-out infinite',
+				'data-flow': 'data-flow 2s linear infinite',
+				'cognitive-pulse': 'cognitive-pulse 4s ease-in-out infinite'
 			}
 		}
 	},
