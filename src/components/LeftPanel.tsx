@@ -9,6 +9,8 @@ import { DreamStateCaptureLayer } from "@/components/DreamStateCaptureLayer";
 import { CounterResonanceSynthesizer } from "@/components/CounterResonanceSynthesizer";
 import { TimelineConvergenceController } from "@/components/TimelineConvergenceController";
 import { AugmentedRealityOverwatch } from "@/components/AugmentedRealityOverwatch";
+import { NeuralNetworkGrid } from "@/components/NeuralNetworkGrid";
+import { AdvancedVisualization } from "@/components/AdvancedVisualization";
 
 interface LeftPanelProps {
   activeTab: string;
@@ -36,9 +38,11 @@ export const LeftPanel = ({ activeTab, activeMode, onTabChange }: LeftPanelProps
         <TabsContent value="quantum" className="p-2 md:p-4 space-y-3 md:space-y-4">
           <QuantumEdgeMesh />
           <HolographicResonanceAtlas />
+          <AdvancedVisualization />
         </TabsContent>
         
         <TabsContent value="neural" className="p-2 md:p-4 space-y-3 md:space-y-4">
+          <NeuralNetworkGrid />
           <DreamStateCaptureLayer />
           <CounterResonanceSynthesizer />
         </TabsContent>

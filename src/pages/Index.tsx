@@ -6,13 +6,15 @@ import { LeftPanel } from "@/components/LeftPanel";
 import { RightPanel } from "@/components/RightPanel";
 import { SystemIndicators } from "@/components/SystemIndicators";
 import { StatusStrip } from "@/components/StatusStrip";
+import { BiometricAuth } from "@/components/BiometricAuth";
 
 const Index = () => {
-  const [activeMode, setActiveMode] = useState<'civilian' | 'strategic'>('strategic');
-  const [isSecureSession, setIsSecureSession] = useState(true);
+  const [activeMode, setActiveMode] = useState<'civilian' | 'strategic'>('civilian');
+  const [isSecureSession, setIsSecureSession] = useState(false);
   const [fieldActivity, setFieldActivity] = useState(87.3);
   const [activeTab, setActiveTab] = useState('core');
   const [systemsOnline, setSystemsOnline] = useState(false);
+  const [showBiometricAuth, setShowBiometricAuth] = useState(false);
 
   // Real-time system activation
   useEffect(() => {
@@ -23,21 +25,40 @@ const Index = () => {
     return () => clearTimeout(initSequence);
   }, []);
 
-  // Live field activity simulation
+  // Live field activity simulation with more realistic patterns
   useEffect(() => {
     const interval = setInterval(() => {
       setFieldActivity(prev => {
-        const variation = (Math.random() - 0.5) * 15;
-        return Math.max(70, Math.min(100, prev + variation));
+        // Create more realistic field fluctuations
+        const baseActivity = 85;
+        const time = Date.now() / 1000;
+        const wave1 = Math.sin(time * 0.1) * 10;
+        const wave2 = Math.sin(time * 0.3) * 5;
+        const noise = (Math.random() - 0.5) * 8;
+        const newActivity = baseActivity + wave1 + wave2 + noise;
+        return Math.max(70, Math.min(100, newActivity));
       });
-    }, 800);
+    }, 500); // Faster updates for more realistic feel
 
     return () => clearInterval(interval);
   }, []);
 
   const handleSecureAccess = () => {
+    setShowBiometricAuth(true);
+  };
+
+  const handleAuthSuccess = () => {
     setIsSecureSession(true);
     setActiveMode('strategic');
+    setShowBiometricAuth(false);
+  };
+
+  const handleModeChange = (mode: 'civilian' | 'strategic') => {
+    if (mode === 'strategic' && !isSecureSession) {
+      handleSecureAccess();
+    } else {
+      setActiveMode(mode);
+    }
   };
 
   return (
@@ -46,7 +67,7 @@ const Index = () => {
         activeMode={activeMode}
         isSecureSession={isSecureSession}
         fieldActivity={fieldActivity}
-        onModeChange={setActiveMode}
+        onModeChange={handleModeChange}
         onSecureAccess={handleSecureAccess}
       />
 
@@ -75,11 +96,16 @@ const Index = () => {
         <RightPanel 
           activeMode={activeMode}
           isSecureSession={isSecureSession}
-          onModeChange={setActiveMode}
+          onModeChange={handleModeChange}
         />
       </div>
 
       <StatusStrip fieldActivity={fieldActivity} />
+      
+      <BiometricAuth 
+        onAuthSuccess={handleAuthSuccess}
+        isVisible={showBiometricAuth}
+      />
     </div>
   );
 };
