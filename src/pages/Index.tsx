@@ -26,7 +26,7 @@ const Index = () => {
   } = useAuthentication();
 
   return (
-    <div className="min-h-screen bg-cyber-darker neural-bg overflow-hidden">
+    <div className="min-h-screen bg-cyber-darker neural-bg overflow-hidden touch-manipulation">
       <Header 
         activeMode={activeMode}
         isSecureSession={isSecureSession}
@@ -35,16 +35,28 @@ const Index = () => {
         onSecureAccess={handleSecureAccess}
       />
 
-      {/* Mobile-first responsive layout */}
-      <div className="flex flex-col md:flex-row h-[calc(100vh-60px)] md:h-[calc(100vh-80px)]">
-        <LeftPanel 
-          activeTab={activeTab}
-          activeMode={activeMode}
-          onTabChange={setActiveTab}
-        />
+      {/* Mobile-optimized responsive layout */}
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-60px)] md:h-[calc(100vh-80px)]">
+        {/* Mobile: Collapsible panels */}
+        <div className="lg:hidden">
+          <LeftPanel 
+            activeTab={activeTab}
+            activeMode={activeMode}
+            onTabChange={setActiveTab}
+          />
+        </div>
+        
+        {/* Desktop: Side panel */}
+        <div className="hidden lg:block">
+          <LeftPanel 
+            activeTab={activeTab}
+            activeMode={activeMode}
+            onTabChange={setActiveTab}
+          />
+        </div>
 
-        {/* Center - Field Visualization */}
-        <div className="flex-1 relative min-h-[300px]">
+        {/* Center - Field Visualization - Full width on mobile */}
+        <div className="flex-1 relative min-h-[50vh] lg:min-h-[300px]">
           <CognitiveFieldVisualization 
             fieldActivity={fieldActivity}
             activeMode={activeMode}
@@ -57,11 +69,14 @@ const Index = () => {
           />
         </div>
 
-        <RightPanel 
-          activeMode={activeMode}
-          isSecureSession={isSecureSession}
-          onModeChange={handleModeChange}
-        />
+        {/* Mobile: Bottom panel, Desktop: Right panel */}
+        <div className="lg:block">
+          <RightPanel 
+            activeMode={activeMode}
+            isSecureSession={isSecureSession}
+            onModeChange={handleModeChange}
+          />
+        </div>
       </div>
 
       <StatusStrip fieldActivity={fieldActivity} />

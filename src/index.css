@@ -93,7 +93,7 @@
     border-image: linear-gradient(45deg, #00d4ff, #b84dff, #00ff88) 1;
   }
 
-  /* Modern glass effects */
+  /* Modern glass effects - Optimized for mobile */
   .glass-card {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
@@ -101,12 +101,30 @@
     -webkit-backdrop-filter: blur(20px);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Mobile touch optimization */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   .glass-card:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.15);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Mobile-first touch interactions */
+  @media (hover: none) and (pointer: coarse) {
+    .glass-card:hover {
+      background: var(--glass-bg);
+      border-color: var(--glass-border);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .glass-card:active {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+      transform: scale(0.98);
+    }
   }
 
   /* Pre-interference field - Pure potential state */
@@ -213,4 +231,35 @@
 .data-stream {
   background: linear-gradient(90deg, transparent, #00d4ff, transparent);
   animation: data-flow 3s linear infinite;
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
+  /* Larger touch targets for mobile */
+  button, .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent zoom on input focus */
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* Safe area for notched devices */
+@supports (padding: max(0px)) {
+  .safe-area-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
