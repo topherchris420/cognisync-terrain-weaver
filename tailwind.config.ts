@@ -133,6 +133,24 @@ export default {
 						transform: 'scale(1.1)',
 						opacity: '1'
 					}
+				},
+				'quantum-fluctuation': {
+					'0%': {
+						transform: 'scale(1) rotate(0deg)',
+						opacity: '0.1'
+					},
+					'33%': {
+						transform: 'scale(1.002) rotate(0.1deg)',
+						opacity: '0.08'
+					},
+					'66%': {
+						transform: 'scale(0.998) rotate(-0.1deg)',
+						opacity: '0.12'
+					},
+					'100%': {
+						transform: 'scale(1) rotate(0deg)',
+						opacity: '0.1'
+					}
 				}
 			},
 			animation: {
@@ -141,7 +159,8 @@ export default {
 				'pulse-glow': 'pulse-glow 2s infinite',
 				'field-ripple': 'field-ripple 3s ease-out infinite',
 				'data-flow': 'data-flow 2s linear infinite',
-				'cognitive-pulse': 'cognitive-pulse 4s ease-in-out infinite'
+				'cognitive-pulse': 'cognitive-pulse 4s ease-in-out infinite',
+				'quantum-fluctuation': 'quantum-fluctuation 120s ease-in-out infinite'
 			}
 		}
 	},
