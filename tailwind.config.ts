@@ -64,13 +64,13 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				cyber: {
-					blue: '#00d4ff',
-					purple: '#b84dff',
-					green: '#00ff88',
-					red: '#ff3366',
-					orange: '#ff8800',
-					dark: '#0a0a0f',
-					darker: '#050508'
+					blue: 'hsl(200, 100%, 50%)',
+					purple: 'hsl(280, 60%, 65%)',
+					green: 'hsl(150, 100%, 50%)',
+					red: 'hsl(350, 100%, 60%)',
+					orange: 'hsl(30, 100%, 50%)',
+					dark: 'hsl(220, 15%, 6%)',
+					darker: 'hsl(220, 15%, 3%)'
 				}
 			},
 			borderRadius: {
