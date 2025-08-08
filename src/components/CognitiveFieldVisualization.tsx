@@ -14,13 +14,14 @@ export const CognitiveFieldVisualization = ({
   isSecureSession 
 }: CognitiveFieldVisualizationProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [thoughtforms, setThoughtforms] = useState<Array<{
+  const thoughtformsRef = useRef<Array<{
     x: number;
     y: number;
     intensity: number;
     type: 'positive' | 'negative' | 'neutral' | 'threat';
     age: number;
   }>>([]);
+  const [thoughtCount, setThoughtCount] = useState(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,10 +30,18 @@ export const CognitiveFieldVisualization = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+
+    let rafId = 0;
+    let running = true;
 
     const animate = () => {
+      if (!running) return;
+
       // Clear canvas with fade effect
       ctx.fillStyle = 'rgba(10, 10, 15, 0.1)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -53,14 +62,15 @@ export const CognitiveFieldVisualization = ({
         ctx.stroke();
       }
 
-      // Draw thoughtforms
-      thoughtforms.forEach((form, index) => {
+      // Draw and update thoughtforms from ref
+      const arr = thoughtformsRef.current;
+      for (let i = 0; i < arr.length; i++) {
+        const form = arr[i];
         const opacity = Math.max(0, 1 - form.age / 1000);
-        
+
         // Main particle
         ctx.beginPath();
         ctx.arc(form.x, form.y, form.intensity / 10, 0, Math.PI * 2);
-        
         switch (form.type) {
           case 'positive':
             ctx.fillStyle = `rgba(0, 255, 136, ${opacity})`;
@@ -74,7 +84,6 @@ export const CognitiveFieldVisualization = ({
           default:
             ctx.fillStyle = `rgba(0, 212, 255, ${opacity})`;
         }
-        
         ctx.fill();
 
         // Glow effect
@@ -84,24 +93,31 @@ export const CognitiveFieldVisualization = ({
         );
         gradient.addColorStop(0, `rgba(0, 212, 255, ${opacity * 0.5})`);
         gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
-        
         ctx.beginPath();
         ctx.arc(form.x, form.y, form.intensity / 5, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
 
         // Update age
-        thoughtforms[index].age += 16;
-      });
+        form.age += 16;
+      }
 
       // Remove old thoughtforms
-      setThoughtforms(prev => prev.filter(form => form.age < 1000));
+      thoughtformsRef.current = arr.filter(form => form.age < 1000);
 
-      requestAnimationFrame(animate);
+      rafId = requestAnimationFrame(animate);
     };
 
-    animate();
-  }, [thoughtforms]);
+    rafId = requestAnimationFrame(animate);
+    window.addEventListener('resize', resize);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
 
   // Generate new thoughtforms based on field activity
   useEffect(() => {
@@ -116,13 +132,25 @@ export const CognitiveFieldVisualization = ({
                 Math.random() < 0.3 ? 'negative' as const : 'neutral' as const,
           age: 0
         };
-        
-        setThoughtforms(prev => [...prev, newThoughtform]);
+        thoughtformsRef.current.push(newThoughtform);
+        // Cap to prevent unbounded growth
+        if (thoughtformsRef.current.length > 500) {
+          thoughtformsRef.current.splice(0, thoughtformsRef.current.length - 500);
+        }
       }
     }, 100);
 
     return () => clearInterval(interval);
   }, [fieldActivity, isSecureSession]);
+
+  // Sync count to UI at a gentle cadence
+  useEffect(() => {
+    const id = setInterval(() => {
+      setThoughtCount(thoughtformsRef.current.length);
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
+
 
   return (
     <div className="relative h-full">
@@ -141,7 +169,7 @@ export const CognitiveFieldVisualization = ({
           <div className="text-xs space-y-1">
             <div className="flex justify-between">
               <span>Thoughtforms Active:</span>
-              <span className="text-cyber-green">{thoughtforms.length}</span>
+              <span className="text-cyber-green">{thoughtCount}</span>
             </div>
             <div className="flex justify-between">
               <span>Field Intensity:</span>
