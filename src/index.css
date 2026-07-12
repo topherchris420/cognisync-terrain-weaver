@@ -71,6 +71,10 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   html, body, #root {
     height: 100%;
   }
@@ -83,6 +87,12 @@
 
   .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  /* Consistent, keyboard-friendly focus ring across the app */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 
@@ -105,6 +115,51 @@
 
   .glow-primary {
     box-shadow: var(--shadow-glow);
+  }
+
+  /* Scroll-reveal: elements start hidden, fade/rise in once observed */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Slow ambient drift for the hero grid */
+  .terrain-grid-animated {
+    animation: grid-drift 24s linear infinite;
+  }
+}
+
+@keyframes grid-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 40px 40px;
+  }
+}
+
+/* Honour users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .terrain-grid-animated {
+    animation: none;
   }
 }
 

@@ -2,6 +2,7 @@ import { Link, NavLink } from "react-router-dom";
 import { Layers, Map as MapIcon, LineChart, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
+import { SITE } from "@/lib/site";
 
 const links = [
   { to: "/", label: "Overview", icon: Layers, end: true },
@@ -40,7 +41,7 @@ export function AppNav() {
 
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com"
+            href={SITE.repoUrl}
             target="_blank"
             rel="noreferrer"
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
