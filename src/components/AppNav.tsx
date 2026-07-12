@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import { Layers, Map as MapIcon, LineChart, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "./Logo";
 
 const links = [
   { to: "/", label: "Overview", icon: Layers, end: true },
@@ -13,17 +14,7 @@ export function AppNav() {
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="relative flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 border border-primary/30">
-            <div className="h-3 w-3 rounded-sm bg-primary group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-tight">
-              Vers3Dynamics
-            </div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              Urban Resilience
-            </div>
-          </div>
+          <Logo size="md" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">

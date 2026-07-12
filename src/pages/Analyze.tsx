@@ -7,10 +7,11 @@ import { RecommendationsList } from "@/components/RecommendationsList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Play, Sparkles, MapPin, Info } from "lucide-react";
+import { Loader2, Play, Sparkles, MapPin, Info, Download, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
 import { toast } from "sonner";
+import { downloadPDFReport } from "@/lib/pdf-export";
 
 const PRESETS: Array<{ label: string; lat: number; lng: number; zoom: number }> = [
   { label: "Manhattan, NY", lat: 40.758, lng: -73.985, zoom: 15 },
@@ -191,7 +192,22 @@ export default function Analyze() {
             {result && (
               <>
                 <section>
+                  <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Resilience score
+                  </h2>
                   <AbsorptionScoreGauge score={Number(result.absorption_score)} />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-3 gap-2"
+                    onClick={() => {
+                      downloadPDFReport(result);
+                      toast.success("PDF report downloaded");
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Export PDF Report
+                  </Button>
                   {result.ai_notes && (
                     <p className="mt-3 text-sm text-muted-foreground">
                       {result.ai_notes}
