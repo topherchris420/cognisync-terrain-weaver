@@ -18,10 +18,10 @@ twins.
 |---|---|
 | Interactive satellite map (MapLibre GL + free ESRI imagery) | Frontend |
 | Capture the visible map tile as an image | Frontend |
-| Classify the tile into 5 land-cover classes via a vision LLM | Lovable AI Gateway (Gemini 2.5 Flash) |
+| Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
 | Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
-| Generate 4 adaptation strategies (green / blue / gray infrastructure) | Lovable AI Gateway |
-| Persist and browse a public feed of analyses | Postgres (Lovable Cloud) |
+| Generate 4 adaptation strategies (green / blue / gray infrastructure) 
+| Persist and browse a public feed of analyses | Postgres
 
 ## Architecture
 
