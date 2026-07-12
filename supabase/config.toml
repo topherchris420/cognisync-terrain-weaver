@@ -1,0 +1,4 @@
+project_id = "vrdazimblhnfddijtxsc"
+
+[functions.analyze-terrain]
+verify_jwt = false

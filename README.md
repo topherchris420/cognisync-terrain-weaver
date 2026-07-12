@@ -1,157 +1,186 @@
+# Vers3Dynamics — Urban Resilience Intelligence Platform
 
-# Vers3Dynamics - Cognisync Platform
+An open-source, AI-powered analytics platform that turns any satellite view of
+a city into a **quantitative resilience report**: land-cover breakdown, an
+**Urban Absorption Score**, a flood-risk band, and prioritized
+climate-adaptation recommendations.
 
-**Cognisync** is a cognitive terrain mapping and psychoenergetic influence platform. Built for advanced strategic simulation, resonance analytics, and symbolic operations, Cognisync-Ω renders real-time psychospatial landscapes derived from biometric, linguistic, geospatial, and subconscious input streams.
+Built as a modular foundation for climate-adaptation tooling — future modules
+plug in hydrological simulation, IoT sensor fusion, and city-scale digital
+twins.
 
-## 🧠 Core Functionality
+![status](https://img.shields.io/badge/status-v0.1_MVP-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-blue)
 
-Cognisync-Ω ingests multi-modal data—natural language, EEG/HRV telemetry, geo-tagged signal patterns—and converts them into structured **chrono-spatial displacement vectors**. These vectors are processed through the **Dynamic Resonance Rooting (DRR)** engine, which identifies and tracks evolving **resonance roots** across cultural, ideological, and symbolic domains.
+## What the platform does today
 
-The app visualizes this data as a **Holographic Resonance Atlas**, mapping collective belief morphologies, memetic drift fields, and destabilization corridors in real time.
+| Capability | Where it runs |
+|---|---|
+| Interactive satellite map (MapLibre GL + free ESRI imagery) | Frontend |
+| Capture the visible map tile as an image | Frontend |
+| Classify the tile into 5 land-cover classes via a vision LLM | Lovable AI Gateway (Gemini 2.5 Flash) |
+| Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
+| Generate 4 adaptation strategies (green / blue / gray infrastructure) | Lovable AI Gateway |
+| Persist and browse a public feed of analyses | Postgres (Lovable Cloud) |
 
-## ✨ Key Features
+## Architecture
 
-### 🎯 4D Cognitive Terrain Visualizer
-Real-time rendering of belief fields, narrative clusters, and emotional topology with interactive particle systems
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                              Frontend (React)                           │
+│   MapLibre GL  ▸  captureImage()  ▸  supabase.functions.invoke(...)     │
+└─────────────────────────┬──────────────────────────────────────────────┘
+                          │  POST { image_data_url, lat, lng, zoom, bbox }
+                          ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               Edge function: analyze-terrain (Deno / TS)                │
+│   1. Gemini 2.5 Flash  → land-cover JSON (5 classes)                    │
+│   2. Weighted score    → Urban Absorption Score + flood risk            │
+│   3. Gemini 2.5 Flash  → 4 adaptation recommendations                   │
+│   4. INSERT INTO analyses                                               │
+└─────────────────────────┬──────────────────────────────────────────────┘
+                          ▼
+                    Postgres (Lovable Cloud)
+```
 
-### 🔮 Dynamic Resonance Rooting (DRR) Phase Kernel
-Detects resonance roots, bifurcation points, and coherence collapse structures using advanced algorithms
+An **alternative Python backend** lives in [`backend/`](./backend) with a real
+FastAPI service that runs a CV segmentation model locally instead of calling
+an LLM. Deploy it separately (Render / Railway / Fly / Cloud Run) if you want
+full model control.
 
-### 🛡️ Counter-Resonance Synthesizer
-Neutralizes destabilizing meme clusters through adaptive symbolic payloads
+## Tech stack
 
-### 💭 Dream-State Capture Layer
-Integrates REM-phase biometric telemetry to forecast latent ideological emergence
+**Frontend**
+- React 18 + TypeScript + Vite
+- Tailwind CSS with a semantic HSL design system (`src/index.css`)
+- MapLibre GL JS with free ESRI World Imagery tiles (no API key)
+- shadcn/ui primitives + Radix UI
+- TanStack Query, React Router, Sonner
 
-### 🌐 Quantum-Entangled Edge Mesh
-Enables zero-latency distributed data capture and symbolic convergence inference
+**Backend (Lovable Cloud)**
+- Supabase Postgres for persistence
+- Supabase Edge Functions (Deno) for the analysis pipeline
+- Lovable AI Gateway (Google Gemini 2.5 Flash)
 
-### ⏰ Timeline Convergence Controller
-Identifies and shapes bifurcating narrative timelines using predictive influence modeling
+**Reference Python backend (`backend/`)**
+- FastAPI + Pydantic
+- Pillow + NumPy heuristic segmenter (swap for DeepLabV3 / U-Net / SAM)
+- Dockerfile for one-command deploy
 
-### 🥽 Augmented Reality Overwatch Interface
-Projects live symbolic threat fields and resonance vectors into physical environments
+## The Urban Absorption Score
 
-### 🔐 Ontological Cryptography Layer
-Encrypts all operations using resonance-derived symbolic keys requiring phase-aligned access
+A single 0–100 number derived from land-cover percentages, weighted by
+simplified runoff coefficients from urban hydrology:
 
-## 🚀 Novel Enhancements
+| Class       | Weight | Rationale                                    |
+|-------------|:------:|----------------------------------------------|
+| Vegetation  | 1.00   | Highest infiltration and evapotranspiration  |
+| Bare soil   | 0.85   | Permeable, variable                          |
+| Water       | 0.50   | Existing hydro capacity, not new absorption  |
+| Buildings   | 0.05   | Effectively impervious                       |
+| Pavement    | 0.05   | Effectively impervious                       |
 
-### Real-Time Data Streaming
-- Live biometric sensor integration
-- Multi-modal data ingestion (voice, text, environmental)
-- Adaptive threat detection algorithms
+**Flood-risk bands**
 
-### Advanced Visualization
-- Interactive 3D cognitive field mapping
-- Particle-based thoughtform rendering
-- Dynamic resonance pattern analysis
+- **65+ · Low** — resilient
+- **40–64 · Moderate** — vulnerable
+- **< 40 · High** — critical
 
-### Strategic Intelligence
-- Dual-mode operation (Civilian/Strategic)
-- Secure session management
-- Classified data source integration
+Weights are intentionally simple and transparent. Calibrate them against local
+runoff data in `src/lib/absorption.ts` (frontend) and
+`backend/app/services/scoring.py` (Python backend).
 
-### Mobile-First Design
-- Responsive interface optimized for all devices
-- Touch-friendly controls
-- Adaptive layout system
-
-## 🛠️ Technology Stack
-
-- **Frontend**: React 18 + TypeScript
-- **Styling**: Tailwind CSS with custom cyberpunk theme
-- **Charts**: Recharts for data visualization
-- **Icons**: Lucide React
-- **UI Components**: Radix UI + shadcn/ui
-- **Build Tool**: Vite
-- **State Management**: React hooks + TanStack Query
-
-## 📱 Installation & Setup
+## Getting started
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/vers3dynamics-cognisync.git
-
-# Navigate to project directory
-cd vers3dynamics-cognisync
-
-# Install dependencies
+git clone <this-repo>
+cd <this-repo>
 npm install
-
-# Start development server
 npm run dev
-
-# Build for production
-npm run build
 ```
 
-## 🎮 Usage
+Cloud is preconfigured — the edge function and Postgres schema are already
+deployed. The frontend reads `VITE_SUPABASE_*` from `.env` (managed by Lovable
+Cloud, do not commit changes).
 
-### Basic Operation
-1. Launch the application
-2. System automatically initializes all neural networks
-3. Begin monitoring through the 4D Cognitive Terrain Visualizer
-4. Switch between Civilian and Strategic modes as needed
+### Running the reference Python backend
 
-### Strategic Mode
-- Requires secure session authentication
-- Provides access to classified data streams
-- Enables advanced threat detection capabilities
-- Activates counter-resonance synthesis protocols
-
-### Data Ingestion
-- Configure multi-modal data streams in the left panel
-- Monitor ingestion rates and stream health
-- Adjust parameters for optimal cognitive mapping
-
-### Resonance Analysis
-- Track dynamic resonance patterns in real-time
-- Monitor stability anchors and drift rates
-- Analyze coherence levels across belief systems
-
-## 🔧 Configuration
-
-### Environment Variables
-```env
-VITE_SECURE_MODE_ENABLED=true
-VITE_STRATEGIC_ACCESS_LEVEL=CLASSIFIED
-VITE_DRR_ENGINE_VERSION=3.2.1
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-### Customization
-- Modify theme colors in `src/index.css`
-- Adjust particle system parameters in `CognitiveFieldVisualization.tsx`
-- Configure data stream sources in `DataIngestionPanel.tsx`
+See [`backend/README.md`](./backend/README.md) for deployment and for how to
+swap the naive HSV-based segmenter for DeepLabV3, U-Net, or SAM.
 
-## 🚨 Security Considerations
+## Project structure
 
-- All strategic operations are encrypted using ontological cryptography
-- Biometric authentication required for classified access
-- Zero-knowledge architecture protects sensitive cognitive data
-- Quantum-entangled communication channels prevent interception
+```
+src/
+├── pages/
+│   ├── Index.tsx          Landing page
+│   ├── Analyze.tsx        Map + analysis workflow
+│   └── Dashboard.tsx      Public feed of analyses
+├── components/
+│   ├── AppNav.tsx
+│   ├── MapView.tsx        MapLibre wrapper + image capture
+│   ├── AbsorptionScoreGauge.tsx
+│   ├── LandCoverBreakdown.tsx
+│   └── RecommendationsList.tsx
+├── lib/
+│   ├── types.ts           LandCover, Recommendation, Analysis
+│   └── absorption.ts      Score + risk classification
+└── integrations/
+    └── supabase/          Auto-generated Cloud client
 
-## 📊 Performance Metrics
+supabase/
+├── functions/analyze-terrain/index.ts
+├── migrations/            Schema history
+└── config.toml
 
-- Real-time field activity monitoring
-- Quantum coherence measurements
-- Dream-state capture efficiency
-- Timeline convergence accuracy
+backend/                   Reference FastAPI service (not run by Lovable)
+```
 
-## 🤝 Contributing
+## Data model
 
-This is a classified research project. Contributions require appropriate security clearance and must follow established protocols for cognitive terrain research.
+`public.analyses` — one row per resilience scan. Publicly readable and
+insertable (this is a public demo dataset — swap in auth-scoped RLS if you
+fork it for a private deployment).
 
-## 📜 License
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| name | text | user-supplied |
+| location_label | text | optional |
+| center_lat, center_lng, zoom | float | map viewport |
+| bbox | jsonb | `[[west,south],[east,north]]` |
+| land_cover | jsonb | `{ pavement, buildings, vegetation, water, soil }` |
+| absorption_score | numeric(5,2) | 0–100 |
+| flood_risk | text | `low` / `moderate` / `high` |
+| recommendations | jsonb | array of `{ title, description, priority, category }` |
+| ai_notes | text | short LLM description of the tile |
+| status | text | `complete`, `pending`, etc. |
+| created_at | timestamptz | |
 
-This project operates under classified research guidelines. Unauthorized access, use, or distribution is prohibited.
+## Roadmap
 
-## 🆘 Support
+- **v0.1** ✅ — Land cover classification, absorption scoring, adaptation LLM
+- **v0.2** — Hydrological runoff simulation (SWMM integration)
+- **v0.3** — IoT sensor fusion (rain gauges, soil moisture over MQTT)
+- **v1.0** — Digital twin export + public REST/GraphQL API
 
-For technical support or security clearance inquiries, contact the Vers3Dynamics research division through secure channels only.
+## Contributing
+
+This is an open, community-driven project. PRs welcome — especially for
+better segmentation models, calibrated runoff weights per climate zone, and
+new adaptation-strategy templates.
+
+## License
+
+MIT.
 
 ---
 
-**⚠️ CLASSIFIED NOTICE**: This system is designed for authorized personnel only. Unauthorized access may result in cognitive dissonance, temporal displacement, or worse. Use at your own risk.
-
-*Built with 🧠 by Vers3Dynamics Research Division*
+Built with [Lovable](https://lovable.dev) · Powered by Lovable Cloud + Lovable AI
