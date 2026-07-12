@@ -1,43 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Cognisync Dark Cyberpunk Theme */
+/* Vers3Dynamics — Urban Resilience Intelligence
+   Design system: earthy, scientific, mission-console.
+   All colors are HSL semantic tokens. Never hardcode colors in components. */
 
 @layer base {
   :root {
-    --background: 220 15% 8%;
-    --foreground: 210 40% 98%;
+    --background: 155 18% 7%;
+    --foreground: 60 15% 92%;
 
-    --card: 220 15% 10%;
-    --card-foreground: 210 40% 98%;
+    --card: 158 16% 10%;
+    --card-foreground: 60 15% 94%;
 
-    --popover: 220 15% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 158 18% 9%;
+    --popover-foreground: 60 15% 94%;
 
-    --primary: 200 100% 60%;
-    --primary-foreground: 220 15% 8%;
+    --primary: 158 55% 45%;
+    --primary-foreground: 155 30% 6%;
 
-    --secondary: 280 60% 65%;
-    --secondary-foreground: 220 15% 8%;
+    --secondary: 155 10% 15%;
+    --secondary-foreground: 60 15% 92%;
 
-    --muted: 220 15% 15%;
-    --muted-foreground: 215 20% 70%;
+    --muted: 155 10% 14%;
+    --muted-foreground: 60 8% 65%;
 
-    --accent: 320 80% 70%;
-    --accent-foreground: 220 15% 8%;
+    --accent: 190 75% 55%;
+    --accent-foreground: 200 40% 8%;
 
-    --destructive: 0 75% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 15 75% 55%;
+    --destructive-foreground: 60 15% 96%;
 
-    --border: 220 15% 20%;
-    --input: 220 15% 15%;
-    --ring: 200 100% 60%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 30 40% 8%;
 
-    --radius: 0.75rem;
+    --border: 155 12% 18%;
+    --input: 155 12% 14%;
+    --ring: 158 55% 45%;
 
-    /* Modern gradient colors inspired by the logo */
+    --radius: 0.5rem;
+
+    /* Land cover surface tokens */
+    --surface-pavement: 30 4% 55%;
+    --surface-building: 20 12% 42%;
+    --surface-vegetation: 130 45% 45%;
+    --surface-water: 200 75% 55%;
+    --surface-soil: 30 40% 45%;
+
+    /* Gradients & shadows */
+    --gradient-hero: radial-gradient(circle at 20% 20%, hsl(158 55% 45% / 0.22), transparent 55%),
+                     radial-gradient(circle at 80% 30%, hsl(190 75% 55% / 0.14), transparent 55%),
+                     radial-gradient(circle at 50% 90%, hsl(15 75% 55% / 0.08), transparent 60%);
+    --gradient-panel: linear-gradient(180deg, hsl(158 16% 11%), hsl(158 16% 9%));
+    --shadow-glow: 0 0 40px -8px hsl(158 55% 45% / 0.35);
+    --shadow-panel: 0 8px 32px -12px hsl(155 30% 3% / 0.6);
+
+    --sidebar-background: 158 18% 8%;
+    --sidebar-foreground: 60 15% 92%;
+    --sidebar-primary: 158 55% 45%;
+    --sidebar-primary-foreground: 155 30% 6%;
+    --sidebar-accent: 158 15% 12%;
+    --sidebar-accent-foreground: 60 15% 92%;
+    --sidebar-border: 155 12% 16%;
+    --sidebar-ring: 158 55% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+}
+
+@layer components {
+  .terrain-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .hero-glow {
+    background: var(--gradient-hero);
+  }
+
+  .panel {
+    background: var(--gradient-panel);
+    box-shadow: var(--shadow-panel);
+  }
+}
+
+/* MapLibre overrides — keep controls consistent with theme */
+.maplibregl-ctrl-group {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: var(--shadow-panel) !important;
+}
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid hsl(var(--border)) !important;
+}
+.maplibregl-ctrl-attrib {
+  background: hsl(var(--card) / 0.75) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: hsl(var(--muted-foreground)) !important;
+}
     --gradient-primary: linear-gradient(135deg, hsl(320, 80%, 70%) 0%, hsl(200, 100%, 60%) 50%, hsl(280, 60%, 65%) 100%);
     --gradient-secondary: linear-gradient(45deg, hsl(200, 100%, 60%) 0%, hsl(180, 100%, 50%) 100%);
     --gradient-accent: linear-gradient(90deg, hsl(280, 60%, 65%) 0%, hsl(320, 80%, 70%) 100%);
