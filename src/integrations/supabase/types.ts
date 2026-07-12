@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analyses: {
+        Row: {
+          absorption_score: number
+          ai_notes: string | null
+          bbox: Json | null
+          center_lat: number
+          center_lng: number
+          created_at: string
+          flood_risk: string
+          id: string
+          image_data_url: string | null
+          land_cover: Json
+          location_label: string | null
+          name: string
+          recommendations: Json
+          status: string
+          zoom: number
+        }
+        Insert: {
+          absorption_score?: number
+          ai_notes?: string | null
+          bbox?: Json | null
+          center_lat: number
+          center_lng: number
+          created_at?: string
+          flood_risk?: string
+          id?: string
+          image_data_url?: string | null
+          land_cover?: Json
+          location_label?: string | null
+          name: string
+          recommendations?: Json
+          status?: string
+          zoom: number
+        }
+        Update: {
+          absorption_score?: number
+          ai_notes?: string | null
+          bbox?: Json | null
+          center_lat?: number
+          center_lng?: number
+          created_at?: string
+          flood_risk?: string
+          id?: string
+          image_data_url?: string | null
+          land_cover?: Json
+          location_label?: string | null
+          name?: string
+          recommendations?: Json
+          status?: string
+          zoom?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
