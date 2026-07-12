@@ -5,8 +5,7 @@
 @tailwind utilities;
 
 /* Vers3Dynamics — Urban Resilience Intelligence
-   Design system: earthy, scientific, mission-console.
-   All colors are HSL semantic tokens. Never hardcode colors in components. */
+   Earthy scientific mission-console. All colors HSL semantic tokens. */
 
 @layer base {
   :root {
@@ -43,14 +42,12 @@
 
     --radius: 0.5rem;
 
-    /* Land cover surface tokens */
     --surface-pavement: 30 4% 55%;
     --surface-building: 20 12% 42%;
     --surface-vegetation: 130 45% 45%;
     --surface-water: 200 75% 55%;
     --surface-soil: 30 40% 45%;
 
-    /* Gradients & shadows */
     --gradient-hero: radial-gradient(circle at 20% 20%, hsl(158 55% 45% / 0.22), transparent 55%),
                      radial-gradient(circle at 80% 30%, hsl(190 75% 55% / 0.14), transparent 55%),
                      radial-gradient(circle at 50% 90%, hsl(15 75% 55% / 0.08), transparent 60%);
@@ -105,6 +102,10 @@
     background: var(--gradient-panel);
     box-shadow: var(--shadow-panel);
   }
+
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
 }
 
 /* MapLibre overrides — keep controls consistent with theme */
@@ -122,232 +123,11 @@
 .maplibregl-ctrl-attrib {
   background: hsl(var(--card) / 0.75) !important;
   color: hsl(var(--muted-foreground)) !important;
+  font-size: 10px;
 }
 .maplibregl-ctrl-attrib a {
   color: hsl(var(--muted-foreground)) !important;
 }
-    --gradient-primary: linear-gradient(135deg, hsl(320, 80%, 70%) 0%, hsl(200, 100%, 60%) 50%, hsl(280, 60%, 65%) 100%);
-    --gradient-secondary: linear-gradient(45deg, hsl(200, 100%, 60%) 0%, hsl(180, 100%, 50%) 100%);
-    --gradient-accent: linear-gradient(90deg, hsl(280, 60%, 65%) 0%, hsl(320, 80%, 70%) 100%);
-    
-    /* Glass effects */
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-border: rgba(255, 255, 255, 0.1);
-
-    --sidebar-background: 220 15% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 200 100% 60%;
-    --sidebar-primary-foreground: 220 15% 6%;
-    --sidebar-accent: 220 15% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 200 100% 60%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    background: 
-      /* Quantum field fluctuations - barely perceptible */
-      radial-gradient(ellipse at 12% 15%, rgba(0, 0, 0, 0.02) 0%, transparent 35%),
-      radial-gradient(ellipse at 88% 85%, rgba(0, 0, 0, 0.015) 0%, transparent 40%),
-      radial-gradient(ellipse at 35% 75%, rgba(0, 0, 0, 0.01) 0%, transparent 45%),
-      radial-gradient(ellipse at 65% 25%, rgba(0, 0, 0, 0.01) 0%, transparent 35%),
-      /* Pure potential field - infinite void without absence */
-      linear-gradient(180deg, 
-        hsl(240, 8%, 2%) 0%,     /* Deepest void */
-        hsl(240, 6%, 1.5%) 25%,  /* Ontological zero-point */
-        hsl(240, 4%, 1%) 50%,    /* Null vector space */
-        hsl(240, 6%, 1.5%) 75%,  /* Pre-manifestation */
-        hsl(240, 8%, 2%) 100%    /* Return to potential */
-      );
-    font-family: 'Inter', system-ui, sans-serif;
-    position: relative;
-    overflow: hidden;
-  }
-
-  /* Cyberpunk glow effects */
-  .cyber-glow {
-    text-shadow: 0 0 10px currentColor;
-  }
-
-  .cyber-border {
-    border: 1px solid;
-    border-image: linear-gradient(45deg, #00d4ff, #b84dff, #00ff88) 1;
-  }
-
-  /* Modern glass effects - Optimized for mobile */
-  .glass-card {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    /* Mobile touch optimization */
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
-
-  .glass-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  }
-
-  /* Mobile-first touch interactions */
-  @media (hover: none) and (pointer: coarse) {
-    .glass-card:hover {
-      background: var(--glass-bg);
-      border-color: var(--glass-border);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    }
-    
-    .glass-card:active {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.15);
-      transform: scale(0.98);
-    }
-  }
-
-  /* Pre-interference field - Pure potential state */
-  .neural-bg {
-    position: relative;
-  }
-
-  .neural-bg::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-      /* Uncollapsed potential - subtle field variations */
-      radial-gradient(ellipse 150% 50% at 10% 20%, rgba(0, 0, 0, 0.005) 0%, transparent 70%),
-      radial-gradient(ellipse 100% 200% at 90% 80%, rgba(0, 0, 0, 0.003) 0%, transparent 60%),
-      radial-gradient(ellipse 200% 100% at 50% 50%, rgba(0, 0, 0, 0.002) 0%, transparent 80%);
-    pointer-events: none;
-    animation: quantum-fluctuation 120s ease-in-out infinite;
-  }
-
-  .neural-bg::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-      /* Phase space differentials - barely perceptible */
-      repeating-linear-gradient(
-        0deg,
-        transparent 0px,
-        rgba(0, 0, 0, 0.001) 1px,
-        transparent 2px,
-        transparent 100px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0px,
-        rgba(0, 0, 0, 0.0008) 1px,
-        transparent 2px,
-        transparent 120px
-      );
-    pointer-events: none;
-    opacity: 0.3;
-  }
-
-  /* Scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.3);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #00d4ff, #b84dff);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #00b8e6, #9933e6);
-  }
-}
-
-/* Field visualization particles */
-@keyframes particle-float {
-  0% {
-    transform: translateY(0px) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-100px) rotate(360deg);
-    opacity: 0;
-  }
-}
-
-.particle {
-  animation: particle-float 4s ease-out infinite;
-}
-
-/* Threat detection pulse */
-@keyframes threat-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(255, 51, 102, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 51, 102, 0);
-  }
-}
-
-.threat-indicator {
-  animation: threat-pulse 1.5s infinite;
-}
-
-/* Data stream effects */
-.data-stream {
-  background: linear-gradient(90deg, transparent, #00d4ff, transparent);
-  animation: data-flow 3s linear infinite;
-}
-
-/* Mobile-specific optimizations */
-@media (max-width: 768px) {
-  body {
-    font-size: 14px;
-    -webkit-text-size-adjust: 100%;
-    -ms-text-size-adjust: 100%;
-  }
-  
-  /* Larger touch targets for mobile */
-  button, .clickable {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
-  /* Prevent zoom on input focus */
-  input, select, textarea {
-    font-size: 16px;
-  }
-}
-
-/* Safe area for notched devices */
-@supports (padding: max(0px)) {
-  .safe-area-top {
-    padding-top: max(1rem, env(safe-area-inset-top));
-  }
-  
-  .safe-area-bottom {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
+.maplibregl-canvas {
+  outline: none !important;
 }
