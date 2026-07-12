@@ -6,5 +6,6 @@
 export const SITE = {
   name: "Vers3Dynamics",
   tagline: "Urban Resilience Intelligence",
+  url: "https://vers3dynamics.com",
   repoUrl: "https://github.com/topherchris420/cognisync-terrain-weaver",
 } as const;
