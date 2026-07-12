@@ -62,7 +62,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
       minZoom: 2,
       maxZoom: 19,
       // Required so we can read pixels off the canvas for AI analysis.
-      preserveDrawingBuffer: true,
+      canvasContextAttributes: { preserveDrawingBuffer: true },
       attributionControl: { compact: true },
     });
 
