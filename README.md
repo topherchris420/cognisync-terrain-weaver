@@ -183,4 +183,4 @@ MIT.
 
 ---
 
-Built with [Lovable](https://lovable.dev) · Powered by Lovable Cloud + Lovable AI
+Built by [Vers3Dynamics](https://vers3dynamics.com)
