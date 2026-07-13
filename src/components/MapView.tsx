@@ -78,9 +78,20 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
     );
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
 
-    map.on("load", () => {
+    // "load" waits for the initial tiles; if the tile server is slow or
+    // unreachable it may never fire, so fall back after a grace period
+    // rather than leaving the map (and anything gated on it) stuck.
+    let notified = false;
+    const markReady = () => {
+      if (notified) return;
+      notified = true;
       setReady(true);
       onReady?.();
+    };
+    const readyFallback = window.setTimeout(markReady, 8000);
+    map.on("load", () => {
+      clearTimeout(readyFallback);
+      markReady();
     });
     map.on("moveend", () => {
       const c = map.getCenter();
@@ -89,6 +100,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
 
     mapRef.current = map;
     return () => {
+      clearTimeout(readyFallback);
       map.remove();
       mapRef.current = null;
     };

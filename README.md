@@ -11,17 +11,20 @@ twins.
 
 ![status](https://img.shields.io/badge/status-v0.1_MVP-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-blue)
+![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)
 
 ## What the platform does today
 
 | Capability | Where it runs |
 |---|---|
 | Interactive satellite map (MapLibre GL + free ESRI imagery) | Frontend |
+| Shareable deep links — every map view is a restorable URL | Frontend |
 | Capture the visible map tile as an image | Frontend |
 | Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
 | Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
 | Generate 4 adaptation strategies (green / blue / gray infrastructure) 
-| Persist and browse a public feed of analyses | Postgres
+| Persist and browse a public feed with stats, search, and sorting | Postgres
+| Export any analysis as a PDF report | Frontend
 
 ## Architecture
 
@@ -103,6 +106,19 @@ Cloud is preconfigured — the edge function and Postgres schema are already
 deployed. The frontend reads `VITE_SUPABASE_*` from `.env` (managed by Lovable
 Cloud, do not commit changes).
 
+### Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Vite dev server on port 8080 |
+| `npm run build` | Production build (route-level code splitting) |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Vitest unit tests (scoring logic) |
+
+All four checks run in CI on every push and pull request
+(`.github/workflows/ci.yml`).
+
 ### Running the reference Python backend
 
 ```bash
@@ -131,7 +147,9 @@ src/
 │   └── RecommendationsList.tsx
 ├── lib/
 │   ├── types.ts           LandCover, Recommendation, Analysis
-│   └── absorption.ts      Score + risk classification
+│   ├── absorption.ts      Score + risk classification
+│   ├── absorption.test.ts Unit tests for scoring + risk bands
+│   └── pdf-export.ts      PDF report generation (lazy-loaded)
 └── integrations/
     └── supabase/          Auto-generated Cloud client
 
