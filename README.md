@@ -1,4 +1,4 @@
-# Vers3Dynamics — Urban Resilience Intelligence Platform
+# Vers3Dynamics — Urban Resilience Platform
 
 An open-source, AI-powered analytics platform that turns any satellite view of
 a city into a **quantitative resilience report**: land-cover breakdown, an
@@ -43,7 +43,7 @@ twins.
 │   4. INSERT INTO analyses                                               │
 └─────────────────────────┬──────────────────────────────────────────────┘
                           ▼
-                    Postgres (Lovable Cloud)
+                    Postgres
 ```
 
 An **alternative Python backend** lives in [`backend/`](./backend) with a real
@@ -71,15 +71,6 @@ full model control.
 - FastAPI + Pydantic
 - Pillow + NumPy heuristic segmenter (swap for DeepLabV3 / U-Net / SAM)
 - Dockerfile for one-command deploy
-
-**Landing-page directions.** The overview
-screen (flagship city: Copenhagen · audience: funders & policymakers) in
-[`Urban Resilience - Landing.dc.html`](./design/urban-resilience-platform-screens/project/Urban%20Resilience%20-%20Landing.dc.html).
-The prototypes below are rendered straight from that file in the Classical
-system (screenshots in [`design/screens/`](./design/screens)):
-
-**1a · The Manifesto** — editorial, text-forward: a book-page argument for
-giving the rain somewhere to go, anchored by a single honest number.
 
 ![Landing direction 1a — The Manifesto](./design/screens/landing-manifesto.png)
 
