@@ -72,6 +72,45 @@ full model control.
 - Pillow + NumPy heuristic segmenter (swap for DeepLabV3 / U-Net / SAM)
 - Dockerfile for one-command deploy
 
+## Design
+
+The interface is being explored in a **Classical** design system — an editorial,
+book-like language on a soft near-white ground: Cormorant Garamond headings over
+Lora body copy, justified columns, hairline rules, and color applied as stroke
+rather than fill. Surfaces stay quiet (bordered cards, outlined buttons) and
+satellite tiles sit matted like tipped-in book plates.
+
+A design handoff bundle from [Claude Design](https://claude.ai/design) lives in
+[`design/urban-resilience-platform-screens/`](./design/urban-resilience-platform-screens),
+with the full design-system guide and tokens in
+[`design/.../_ds/.../readme.md`](./design/urban-resilience-platform-screens/project/_ds/classical-41e9adfe-24b3-4e08-b46b-f5c3c274fd46/readme.md).
+
+**Landing-page directions.** The handoff mocks three takes on the overview
+screen (flagship city: Copenhagen · audience: funders & policymakers) in
+[`Urban Resilience - Landing.dc.html`](./design/urban-resilience-platform-screens/project/Urban%20Resilience%20-%20Landing.dc.html):
+
+| # | Direction | Idea |
+|---|---|---|
+| 1a | **The Manifesto** | Editorial, text-forward — a book-page argument for giving the rain somewhere to go |
+| 1b | **The Field Report** | Data-forward — a stroke gauge, a matted plate, land-cover as a hairline ledger |
+| 1c | **The Index** | A catalogue of cities with a running margin argument and a rising waterline |
+
+**Design tokens** (see [`styles.css`](./design/urban-resilience-platform-screens/project/_ds/classical-41e9adfe-24b3-4e08-b46b-f5c3c274fd46/styles.css)):
+
+| Token | Value | Role |
+|---|---|---|
+| `--color-bg` | `#f3f2f2` | Soft near-white ground |
+| `--color-text` | `#201f1d` | Warm near-black text |
+| `--color-accent` | `#b68235` | Single gold accent (mono scheme, used as stroke) |
+| `--color-divider` | `#201f1d` @ 16% | Hairline rules |
+| `--font-heading` | Cormorant Garamond | Headings, capped at semibold |
+| `--font-body` | Lora | Justified body copy |
+| `--radius-md` | `4px` | Baked-in corner radius |
+
+These are prototypes, not production code — the intent is to recreate the visual
+output in the React frontend, not to copy the prototype markup. Icons throughout
+use [Lucide](https://lucide.dev).
+
 ## The Urban Absorption Score
 
 A single 0–100 number derived from land-cover percentages, weighted by
