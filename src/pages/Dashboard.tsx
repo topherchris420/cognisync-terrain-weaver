@@ -1,11 +1,33 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { AppNav } from "@/components/AppNav";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
 import { classifyFloodRisk, riskColor, riskLabel } from "@/lib/absorption";
-import { Loader2, MapPin, ArrowRight, GaugeCircle, Sparkles } from "lucide-react";
+import {
+  MapPin,
+  ArrowRight,
+  ArrowUpRight,
+  GaugeCircle,
+  Sparkles,
+  Search,
+  AlertTriangle,
+  RotateCcw,
+  Activity,
+  Droplets,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { LAND_COVER_META, type LandCoverKey } from "@/lib/types";
 
@@ -17,25 +39,68 @@ const ORDER: LandCoverKey[] = [
   "pavement",
 ];
 
-export default function Dashboard() {
-  const [rows, setRows] = useState<AnalysisRecord[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+type SortKey = "newest" | "score-desc" | "score-asc";
 
-  useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from("analyses")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) {
-        setError(error.message);
-        setRows([]);
-        return;
-      }
-      setRows((data ?? []) as unknown as AnalysisRecord[]);
-    })();
-  }, []);
+const SORTERS: Record<SortKey, (a: AnalysisRecord, b: AnalysisRecord) => number> = {
+  newest: (a, b) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  "score-desc": (a, b) => Number(b.absorption_score) - Number(a.absorption_score),
+  "score-asc": (a, b) => Number(a.absorption_score) - Number(b.absorption_score),
+};
+
+async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
+  // Bound each attempt so a stalled connection surfaces the error/retry UI
+  // instead of leaving the feed on skeletons forever.
+  const { data, error } = await supabase
+    .from("analyses")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50)
+    .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(15_000)]));
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as AnalysisRecord[];
+}
+
+export default function Dashboard() {
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("newest");
+
+  const {
+    data: rows,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["analyses"],
+    queryFn: ({ signal }) => fetchAnalyses(signal),
+  });
+
+  const stats = useMemo(() => {
+    if (!rows || rows.length === 0) return null;
+    const scores = rows.map((r) => Number(r.absorption_score));
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const highRisk = rows.filter(
+      (r) => classifyFloodRisk(Number(r.absorption_score)) === "high"
+    ).length;
+    const lowRisk = rows.filter(
+      (r) => classifyFloodRisk(Number(r.absorption_score)) === "low"
+    ).length;
+    return { total: rows.length, avg, highRisk, lowRisk };
+  }, [rows]);
+
+  const visible = useMemo(() => {
+    if (!rows) return [];
+    const q = query.trim().toLowerCase();
+    const filtered = q
+      ? rows.filter(
+          (r) =>
+            r.name.toLowerCase().includes(q) ||
+            (r.location_label ?? "").toLowerCase().includes(q)
+        )
+      : rows;
+    return [...filtered].sort(SORTERS[sort]);
+  }, [rows, query, sort]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -58,13 +123,118 @@ export default function Dashboard() {
           </Button>
         </header>
 
-        {rows === null && (
-          <div className="flex items-center justify-center py-24 text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading analyses…
+        {/* Summary stats */}
+        {stats && (
+          <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              {
+                icon: Activity,
+                label: "Total scans",
+                value: String(stats.total),
+                tint: "text-accent",
+              },
+              {
+                icon: GaugeCircle,
+                label: "Avg absorption",
+                value: stats.avg.toFixed(1),
+                tint: "text-primary",
+              },
+              {
+                icon: Droplets,
+                label: "High flood risk",
+                value: String(stats.highRisk),
+                tint: "text-destructive",
+              },
+              {
+                icon: ShieldCheck,
+                label: "Low flood risk",
+                value: String(stats.lowRisk),
+                tint: "text-primary",
+              },
+            ].map(({ icon: Icon, label, value, tint }) => (
+              <div
+                key={label}
+                className="panel rounded-xl border border-border p-4"
+              >
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Icon className={cn("h-3.5 w-3.5", tint)} aria-hidden="true" />
+                  {label}
+                </div>
+                <div className="mt-1.5 font-mono text-2xl font-semibold">
+                  {value}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
+        {/* Controls */}
+        {rows && rows.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by site name or location…"
+                className="pl-9"
+                aria-label="Search analyses"
+              />
+            </div>
+            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <SelectTrigger className="w-[190px]" aria-label="Sort analyses">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="score-desc">Highest score</SelectItem>
+                <SelectItem value="score-asc">Lowest score</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Loading skeletons */}
+        {isPending && (
+          <div
+            className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            role="status"
+            aria-label="Loading analyses"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border p-5">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="mt-2 h-3.5 w-1/2" />
+                <Skeleton className="mt-5 h-2 w-full rounded-full" />
+                <div className="mt-4 flex justify-between">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error state */}
+        {isError && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-12 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-6 w-6 text-destructive" />
+            <h2 className="text-lg font-semibold">Couldn't load the feed</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : "Unknown error"}
+            </p>
+            <Button
+              variant="outline"
+              className="mt-6 gap-2"
+              onClick={() => refetch()}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {/* Empty feed */}
         {rows && rows.length === 0 && (
           <div className="rounded-xl border border-dashed border-border p-12 text-center">
             <Sparkles className="mx-auto mb-3 h-6 w-6 text-primary" />
@@ -75,20 +245,29 @@ export default function Dashboard() {
             <Button asChild className="mt-6">
               <Link to="/analyze">Run first analysis</Link>
             </Button>
-            {error && (
-              <p className="mt-4 text-xs text-destructive">Error: {error}</p>
-            )}
           </div>
         )}
 
-        {rows && rows.length > 0 && (
+        {/* No matches for the current filter */}
+        {rows && rows.length > 0 && visible.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+            No analyses match “{query}”.
+          </div>
+        )}
+
+        {visible.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {rows.map((r) => {
+            {visible.map((r) => {
               const risk = classifyFloodRisk(Number(r.absorption_score));
+              const mapHref = `/analyze?lat=${Number(r.center_lat).toFixed(
+                5
+              )}&lng=${Number(r.center_lng).toFixed(5)}&zoom=${Number(
+                r.zoom
+              ).toFixed(1)}`;
               return (
                 <article
                   key={r.id}
-                  className="panel rounded-xl border border-border p-5 transition-colors hover:border-primary/40"
+                  className="group panel rounded-xl border border-border p-5 transition-colors hover:border-primary/40"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -106,9 +285,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <GaugeCircle
-                        className={cn("h-4 w-4", riskColor(risk))}
-                      />
+                      <GaugeCircle className={cn("h-4 w-4", riskColor(risk))} />
                       <span className="font-mono text-lg font-semibold">
                         {Number(r.absorption_score).toFixed(0)}
                       </span>
@@ -146,9 +323,19 @@ export default function Dashboard() {
                     >
                       {riskLabel(risk)} risk
                     </span>
-                    <span className="text-muted-foreground">
-                      {new Date(r.created_at).toLocaleDateString()}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </span>
+                      <Link
+                        to={mapHref}
+                        className="flex items-center gap-0.5 font-medium text-muted-foreground opacity-70 transition-all hover:text-primary group-hover:opacity-100"
+                        aria-label={`Open ${r.name} in the map`}
+                      >
+                        View area
+                        <ArrowUpRight className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </div>
                 </article>
               );
