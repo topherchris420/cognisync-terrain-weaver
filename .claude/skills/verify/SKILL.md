@@ -32,10 +32,15 @@ Flows worth driving:
 
 ## Environment gotchas
 
-- The sandbox proxy black-holes `server.arcgisonline.com` (tiles) and the
-  Supabase host: expect AJAXError console spam, the map never fires `load`
-  (an 8s fallback enables the Analyze button anyway), and the dashboard
+- The headless browser has no external egress here (tile hosts and the
+  Supabase host get ERR_CONNECTION_RESET; hung requests are also possible):
+  MapView tries Esri for 10s, fails over to EOX Sentinel-2 for 10s, then
+  shows "Satellite imagery is unreachable" with a Reconnect button. The
+  Analyze button stays disabled until real imagery arrives. The dashboard
   reaches its error state only after ~48s (15s abort timeout × 3 attempts).
   None of this reproduces on a real network.
+- To verify actual tile rendering in this sandbox, intercept tile requests
+  with `page.route` and fulfill them from Node `fetch` (Node ≥22 with
+  `NODE_USE_ENV_PROXY=1` goes through the working proxy).
 - Run analysis end-to-end (edge function → Gemini) is NOT verifiable here;
   verify around it.

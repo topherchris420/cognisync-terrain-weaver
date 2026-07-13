@@ -17,7 +17,7 @@ twins.
 
 | Capability | Where it runs |
 |---|---|
-| Interactive satellite map (MapLibre GL + free ESRI imagery) | Frontend |
+| Interactive satellite map (MapLibre GL + free ESRI imagery, automatic Sentinel-2 fallback) | Frontend |
 | Shareable deep links — every map view is a restorable URL | Frontend |
 | Capture the visible map tile as an image | Frontend |
 | Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
@@ -56,7 +56,9 @@ full model control.
 **Frontend**
 - React 18 + TypeScript + Vite
 - Tailwind CSS with a semantic HSL design system (`src/index.css`)
-- MapLibre GL JS with free ESRI World Imagery tiles (no API key)
+- MapLibre GL JS with free ESRI World Imagery tiles (no API key), with
+  automatic failover to EOX Sentinel-2 cloudless imagery and an explicit
+  reconnect UI if no provider is reachable
 - shadcn/ui primitives + Radix UI
 - TanStack Query, React Router, Sonner
 
