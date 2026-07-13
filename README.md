@@ -72,20 +72,7 @@ full model control.
 - Pillow + NumPy heuristic segmenter (swap for DeepLabV3 / U-Net / SAM)
 - Dockerfile for one-command deploy
 
-## Design
-
-The interface is being explored in a **Classical** design system — an editorial,
-book-like language on a soft near-white ground: Cormorant Garamond headings over
-Lora body copy, justified columns, hairline rules, and color applied as stroke
-rather than fill. Surfaces stay quiet (bordered cards, outlined buttons) and
-satellite tiles sit matted like tipped-in book plates.
-
-A design handoff bundle from [Claude Design](https://claude.ai/design) lives in
-[`design/urban-resilience-platform-screens/`](./design/urban-resilience-platform-screens),
-with the full design-system guide and tokens in
-[`design/.../_ds/.../readme.md`](./design/urban-resilience-platform-screens/project/_ds/classical-41e9adfe-24b3-4e08-b46b-f5c3c274fd46/readme.md).
-
-**Landing-page directions.** The handoff mocks three takes on the overview
+**Landing-page directions.** The overview
 screen (flagship city: Copenhagen · audience: funders & policymakers) in
 [`Urban Resilience - Landing.dc.html`](./design/urban-resilience-platform-screens/project/Urban%20Resilience%20-%20Landing.dc.html).
 The prototypes below are rendered straight from that file in the Classical
