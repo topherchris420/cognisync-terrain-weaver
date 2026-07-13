@@ -87,13 +87,24 @@ with the full design-system guide and tokens in
 
 **Landing-page directions.** The handoff mocks three takes on the overview
 screen (flagship city: Copenhagen · audience: funders & policymakers) in
-[`Urban Resilience - Landing.dc.html`](./design/urban-resilience-platform-screens/project/Urban%20Resilience%20-%20Landing.dc.html):
+[`Urban Resilience - Landing.dc.html`](./design/urban-resilience-platform-screens/project/Urban%20Resilience%20-%20Landing.dc.html).
+The prototypes below are rendered straight from that file in the Classical
+system (screenshots in [`design/screens/`](./design/screens)):
 
-| # | Direction | Idea |
-|---|---|---|
-| 1a | **The Manifesto** | Editorial, text-forward — a book-page argument for giving the rain somewhere to go |
-| 1b | **The Field Report** | Data-forward — a stroke gauge, a matted plate, land-cover as a hairline ledger |
-| 1c | **The Index** | A catalogue of cities with a running margin argument and a rising waterline |
+**1a · The Manifesto** — editorial, text-forward: a book-page argument for
+giving the rain somewhere to go, anchored by a single honest number.
+
+![Landing direction 1a — The Manifesto](./design/screens/landing-manifesto.png)
+
+**1b · The Field Report** — data-forward: a stroke gauge, a matted satellite
+plate, and land-cover as a hairline ledger over the runoff weights.
+
+![Landing direction 1b — The Field Report](./design/screens/landing-field-report.png)
+
+**1c · The Index** — a catalogue of cities with a running argument in the
+margin, a rising-waterline featured card, and the roadmap as a timeline.
+
+![Landing direction 1c — The Index](./design/screens/landing-index.png)
 
 **Design tokens** (see [`styles.css`](./design/urban-resilience-platform-screens/project/_ds/classical-41e9adfe-24b3-4e08-b46b-f5c3c274fd46/styles.css)):
 
