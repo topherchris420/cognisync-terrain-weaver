@@ -90,22 +90,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
             fill="none"
           />
 
-          {/* Progress arc with gradient */}
-          <defs>
-            <linearGradient id="score-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(158 55% 45%)" />
-              <stop
-                offset="100%"
-                stopColor={
-                  risk === "low"
-                    ? "hsl(158 55% 45%)"
-                    : risk === "moderate"
-                    ? "hsl(38 90% 55%)"
-                    : "hsl(15 75% 55%)"
-                }
-              />
-            </linearGradient>
-          </defs>
+          {/* Progress arc */}
           <circle
             cx="60"
             cy="60"
@@ -180,20 +165,11 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
           Flood risk level
         </div>
 
-        {/* Risk meter bar */}
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
-          <div
-            className={cn(
-              "h-full transition-all duration-1000 ease-out",
-              risk === "low" && "bg-primary",
-              risk === "moderate" && "bg-warning",
-              risk === "high" && "bg-destructive"
-            )}
-            style={{
-              width: `${Math.max(5, (100 - targetClamped))}%`,
-            }}
-          />
-        </div>
+        {/* No second bar here. There used to be one, filling to (100 - score) --
+            so a resilient site scoring 90 rendered a 10% bar, directly beneath an
+            arc that had just filled to 90%. Two unlabelled indicators, both
+            coloured by risk band, moving in opposite directions. The arc already
+            encodes the score and the pill already names the band. */}
       </div>
     </div>
   );
