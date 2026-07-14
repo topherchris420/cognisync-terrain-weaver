@@ -97,8 +97,7 @@ margin, a rising-waterline featured card, and the roadmap as a timeline.
 | `--radius-md` | `4px` | Baked-in corner radius |
 
 These are prototypes, not production code — the intent is to recreate the visual
-output in the React frontend, not to copy the prototype markup. Icons throughout
-use [Lucide](https://lucide.dev).
+output in the React frontend, not to copy the prototype markup. Inspired by my favorite version of [NYC](https://www.welikia.org/).
 
 ## The Urban Absorption Score
 
