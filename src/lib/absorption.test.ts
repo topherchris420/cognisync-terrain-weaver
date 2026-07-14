@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   ABSORPTION_WEIGHTS,
+  RISK_BANDS,
   computeAbsorptionScore,
   classifyFloodRisk,
   riskColor,
@@ -18,74 +21,137 @@ const cover = (partial: Partial<LandCover>): LandCover => ({
 });
 
 describe("computeAbsorptionScore", () => {
-  it("scores a fully vegetated tile at 100", () => {
-    expect(computeAbsorptionScore(cover({ vegetation: 100 }))).toBe(100);
+  it("scores all-vegetation land at its runoff coefficient, not at 100", () => {
+    // No surface absorbs every drop that falls on it. Woodland on sandy soil
+    // still sheds 5-25% (Rational Method C). A model that says 100 is wrong.
+    expect(computeAbsorptionScore(cover({ vegetation: 100 }))).toBe(80);
   });
 
-  it("scores fully impervious tiles at the impervious floor", () => {
-    expect(computeAbsorptionScore(cover({ pavement: 50, buildings: 50 }))).toBe(5);
+  it("scores fully paved land near zero", () => {
+    expect(computeAbsorptionScore(cover({ pavement: 100 }))).toBe(12);
   });
 
-  it("weights a balanced mix correctly", () => {
-    // 40% vegetation (1.0) + 60% pavement (0.05) => 40 + 3 = 43
-    expect(
-      computeAbsorptionScore(cover({ vegetation: 40, pavement: 60 }))
-    ).toBe(43);
+  it("scores an all-roof tile near zero", () => {
+    expect(computeAbsorptionScore(cover({ buildings: 100 }))).toBe(10);
   });
 
-  it("normalizes covers that do not sum to 100", () => {
-    // Same ratio as 40/60 above, expressed as 20/30.
-    expect(
-      computeAbsorptionScore(cover({ vegetation: 20, pavement: 30 }))
-    ).toBe(43);
-  });
-
-  it("handles an all-zero cover without dividing by zero", () => {
+  it("returns 0 for an empty cover rather than dividing by zero", () => {
     expect(computeAbsorptionScore(cover({}))).toBe(0);
   });
 
-  it("caps water weighting at existing-capacity, not absorption", () => {
-    expect(computeAbsorptionScore(cover({ water: 100 }))).toBe(
-      ABSORPTION_WEIGHTS.water * 100
-    );
+  describe("open water is not absorption capacity", () => {
+    it("gives a harbour no credit -- water is where runoff GOES", () => {
+      // Half harbour, half pavement. The pavement is what has to absorb the
+      // rain, and pavement absorbs almost nothing. The harbour must not rescue
+      // the score, so this must equal the all-pavement case exactly.
+      expect(computeAbsorptionScore(cover({ water: 50, pavement: 50 }))).toBe(12);
+    });
+
+    it("no longer flatters flood-exposed waterfront", () => {
+      // The defect the calibration found. Under the old model the Port of
+      // Rotterdam scored 45.8 ("moderate") against Kreuzberg's 36.5 ("high") --
+      // a container terminal rated more flood-resilient than a leafy Berlin
+      // residential district, purely because 45% of its frame was harbour.
+      const rotterdam = cover({
+        vegetation: 10.5, soil: 13, water: 45.5, buildings: 10.5, pavement: 20.5,
+      });
+      expect(computeAbsorptionScore(rotterdam)).toBeLessThan(45.8);
+    });
+
+    it("scores an all-water tile as zero, not as half-absorbent", () => {
+      expect(computeAbsorptionScore(cover({ water: 100 }))).toBe(0);
+    });
   });
 
-  it("rounds to one decimal place", () => {
-    const score = computeAbsorptionScore(
-      cover({ vegetation: 33, pavement: 33, soil: 34 })
-    );
-    expect(score).toBe(Math.round(score * 10) / 10);
-    expect(score).toBeGreaterThan(0);
-    expect(score).toBeLessThan(100);
+  it("scores a real dense core low (Midtown Manhattan)", () => {
+    const midtown = cover({
+      vegetation: 3, soil: 2, water: 0, buildings: 60, pavement: 35,
+    });
+    const score = computeAbsorptionScore(midtown);
+    expect(score).toBeCloseTo(14, 0);
+    expect(classifyFloodRisk(score)).toBe("high");
+  });
+
+  it("scores real parkland high (Bois de Boulogne)", () => {
+    const bois = cover({
+      vegetation: 85, soil: 1, water: 7, buildings: 2, pavement: 5,
+    });
+    const score = computeAbsorptionScore(bois);
+    expect(score).toBeCloseTo(74.7, 0);
+    expect(classifyFloodRisk(score)).toBe("low");
   });
 });
 
 describe("classifyFloodRisk", () => {
-  it("classifies band boundaries per the documented thresholds", () => {
-    expect(classifyFloodRisk(100)).toBe("low");
-    expect(classifyFloodRisk(65)).toBe("low");
-    expect(classifyFloodRisk(64.9)).toBe("moderate");
-    expect(classifyFloodRisk(40)).toBe("moderate");
-    expect(classifyFloodRisk(39.9)).toBe("high");
+  it("bands on the calibrated thresholds", () => {
+    expect(classifyFloodRisk(RISK_BANDS.low)).toBe("low");
+    expect(classifyFloodRisk(RISK_BANDS.low - 0.1)).toBe("moderate");
+    expect(classifyFloodRisk(RISK_BANDS.moderate)).toBe("moderate");
+    expect(classifyFloodRisk(RISK_BANDS.moderate - 0.1)).toBe("high");
     expect(classifyFloodRisk(0)).toBe("high");
-  });
-
-  it("returns unknown for out-of-range scores", () => {
-    expect(classifyFloodRisk(-1)).toBe("unknown");
   });
 });
 
-describe("risk presentation helpers", () => {
-  it("maps each risk band to a distinct semantic color", () => {
-    const colors = ["low", "moderate", "high", "unknown"].map((r) =>
-      riskColor(r as Parameters<typeof riskColor>[0])
-    );
-    expect(new Set(colors).size).toBe(4);
+describe("riskColor / riskLabel", () => {
+  it("maps each band to a semantic token", () => {
+    expect(riskColor("low")).toBe("text-primary");
+    expect(riskColor("moderate")).toBe("text-warning");
+    expect(riskColor("high")).toBe("text-destructive");
   });
 
-  it("capitalizes labels", () => {
-    expect(riskLabel("low")).toBe("Low");
+  it("capitalises the band name", () => {
     expect(riskLabel("moderate")).toBe("Moderate");
-    expect(riskLabel("high")).toBe("High");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The scoring model exists in THREE places: here, the Deno edge function (which
+// cannot import from src/), and the reference Python backend. They will drift --
+// and the edge function is the one that actually computes and stores every
+// score, so a drift means the site publishes one methodology and applies
+// another. These tests read the other two implementations and fail on
+// disagreement.
+describe("all three copies of the scoring model agree", () => {
+  const repoRoot = resolve(__dirname, "../..");
+
+  it("the analyze-terrain edge function matches", () => {
+    const src = readFileSync(
+      resolve(repoRoot, "supabase/functions/analyze-terrain/index.ts"),
+      "utf8"
+    );
+
+    for (const [key, weight] of Object.entries(ABSORPTION_WEIGHTS)) {
+      expect(src, `edge function must weight ${key} at ${weight}`).toMatch(
+        new RegExp(`${key}:\\s*${weight}\\b`)
+      );
+    }
+
+    const weightsBlock = src.match(/const WEIGHTS[\s\S]*?\};/)?.[0] ?? "";
+    expect(
+      weightsBlock,
+      "edge function must not weight water -- it is not absorption capacity"
+    ).not.toMatch(/water/);
+
+    expect(src).toMatch(new RegExp(`moderate:\\s*${RISK_BANDS.moderate}\\b`));
+    expect(src).toMatch(new RegExp(`low:\\s*${RISK_BANDS.low}\\b`));
+  });
+
+  it("the python reference backend matches", () => {
+    const src = readFileSync(
+      resolve(repoRoot, "backend/app/services/scoring.py"),
+      "utf8"
+    );
+
+    for (const [key, weight] of Object.entries(ABSORPTION_WEIGHTS)) {
+      expect(src, `scoring.py must weight ${key} at ${weight}`).toMatch(
+        new RegExp(`"${key}":\\s*${weight.toFixed(2)}`)
+      );
+    }
+
+    const weightsBlock = src.match(/WEIGHTS: dict\[str, float\] = \{[\s\S]*?\}/)?.[0] ?? "";
+    expect(weightsBlock, "scoring.py must not weight water").not.toMatch(/water/);
+
+    expect(src).toMatch(new RegExp(`"moderate":\\s*${RISK_BANDS.moderate}`));
+    expect(src).toMatch(new RegExp(`"low":\\s*${RISK_BANDS.low}`));
   });
 });

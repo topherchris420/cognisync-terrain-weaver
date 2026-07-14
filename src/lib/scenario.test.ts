@@ -62,15 +62,20 @@ describe("projectScore", () => {
     expect(projectScore(c, EMPTY_SCENARIO)).toBe(computeAbsorptionScore(c));
   });
 
-  it("lifts an all-pavement tile to 100 with full depaving", () => {
+  it("lifts an all-pavement tile to 80 with full depaving, not to 100", () => {
+    // Depaving everything and planting it gets you vegetation, and vegetation
+    // absorbs 80% of the rain that lands on it -- not all of it. A model that
+    // says 100 here is claiming a surface with zero runoff, which does not
+    // exist. (The old model did exactly that: vegetation was weighted 1.00.)
     const c = cover({ pavement: 100 });
-    expect(projectScore(c, scenario({ street_trees: 1 }))).toBe(100);
+    expect(projectScore(c, scenario({ street_trees: 1 }))).toBe(80);
   });
 
   it("applies the documented delta: share × fraction × weight gap", () => {
-    // 100% pavement, 50% converted to trees: 5 + 0.5 × (1.0 − 0.05) × 100 = 52.5
+    // 100% pavement, half converted to trees:
+    //   12 + 0.5 × (0.80 − 0.12) × 100 = 46
     const c = cover({ pavement: 100 });
-    expect(projectScore(c, scenario({ street_trees: 0.5 }))).toBe(52.5);
+    expect(projectScore(c, scenario({ street_trees: 0.5 }))).toBe(46);
   });
 
   it("only affects the intervention's source class", () => {
@@ -99,8 +104,11 @@ describe("projectScore", () => {
       c,
       scenario({ street_trees: 1, bioswales: 1 })
     );
-    // Half trees (1.0), half bioswales (0.9) → 95.
-    expect(capped).toBe(95);
+    // Both maxed → normalized to half each.
+    //   12 + 0.5 × (0.80 − 0.12) × 100 + 0.5 × (0.90 − 0.12) × 100 = 85
+    // Engineered bioswales (0.90) out-absorb plain vegetation (0.80): they are
+    // built to infiltrate, which is the point of building them.
+    expect(capped).toBe(85);
   });
 });
 
@@ -113,18 +121,19 @@ describe("assessScenario", () => {
       1_000_000,
       { annualRainfallMm: 1000, benefitPerM3USD: 2.5 }
     );
-    expect(impact.baseScore).toBe(5);
-    expect(impact.projectedScore).toBe(52.5);
-    expect(impact.scoreDelta).toBe(47.5);
+    // Pavement absorbs 12% (Rational-Method C ≈ 0.88), not 5%.
+    expect(impact.baseScore).toBe(12);
+    expect(impact.projectedScore).toBe(46);
+    expect(impact.scoreDelta).toBe(34);
     expect(impact.baseRisk).toBe("high");
     expect(impact.projectedRisk).toBe("moderate");
     // 500,000 m² converted at $45/m².
     expect(impact.convertedAreaM2.street_trees).toBeCloseTo(500_000, 3);
     expect(impact.capexUSD).toBeCloseTo(22_500_000, 0);
-    // 1e6 m² × 1000 mm × 0.475 = 475,000 m³/yr.
-    expect(impact.addedRetentionM3).toBeCloseTo(475_000, 0);
-    expect(impact.annualBenefitUSD).toBeCloseTo(1_187_500, 0);
-    expect(impact.paybackYears).toBeCloseTo(22_500_000 / 1_187_500, 6);
+    // 1e6 m² × 1000 mm × 0.34 = 340,000 m³/yr.
+    expect(impact.addedRetentionM3).toBeCloseTo(340_000, 0);
+    expect(impact.annualBenefitUSD).toBeCloseTo(850_000, 0);
+    expect(impact.paybackYears).toBeCloseTo(22_500_000 / 850_000, 6);
   });
 
   it("still projects scores when the site area is unknown", () => {
@@ -133,7 +142,7 @@ describe("assessScenario", () => {
       scenario({ street_trees: 1 }),
       0
     );
-    expect(impact.projectedScore).toBe(100);
+    expect(impact.projectedScore).toBe(80);
     expect(impact.capexUSD).toBe(0);
     expect(impact.addedRetentionM3).toBe(0);
     expect(impact.paybackYears).toBeNull();

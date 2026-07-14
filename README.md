@@ -167,26 +167,47 @@ Inspired by my favorite version of [NYC](https://www.welikia.org/); Kintecoying,
 
 ## The Urban Absorption Score
 
-A single 0–100 number derived from land-cover percentages, weighted by
-simplified runoff coefficients from urban hydrology:
+A single 0–100 number: **the share of rainfall the land in a tile can absorb.**
 
-| Class       | Weight | Rationale                                    |
-|-------------|:------:|----------------------------------------------|
-| Vegetation  | 1.00   | Highest infiltration and evapotranspiration  |
-| Bare soil   | 0.85   | Permeable, variable                          |
-| Water       | 0.50   | Existing hydro capacity, not new absorption  |
-| Buildings   | 0.05   | Effectively impervious                       |
-| Pavement    | 0.05   | Effectively impervious                       |
+Each weight is `1 − C`, where `C` is the Rational Method runoff coefficient
+(`Q = CiA`) used in real stormwater drainage design. Mid-range values for urban
+land cover, after ASCE and Chow, Maidment & Mays, *Applied Hydrology*:
+
+| Class       | `C` range   | Weight | Rationale                             |
+|-------------|-------------|:------:|---------------------------------------|
+| Vegetation  | 0.05 – 0.25 | 0.80   | Lawns and woodland still shed 5–25%   |
+| Bare soil   | 0.20 – 0.40 | 0.70   | Permeable, but urban soil is compacted|
+| Buildings   | 0.75 – 0.95 | 0.10   | Roofs — effectively impervious        |
+| Pavement    | 0.70 – 0.95 | 0.12   | Asphalt and concrete                  |
+| **Water**   | —           | **excluded** | Not a sponge — see below        |
+
+**Vegetation is not 1.00.** No surface absorbs every drop that falls on it.
+
+**Open water is excluded from the model, and from the denominator.** A river is
+not absorption capacity; it is the body that *receives* the runoff. Scoring it as
+a half-strength sponge rewards a site for being flood-exposed — under the old
+model the Port of Rotterdam scored 45.8 ("moderate") against 36.5 ("high") for a
+leafy Berlin residential district, purely because 45% of its frame was harbour.
+The score now asks: *of the land here, how much rain can it take?*
 
 **Flood-risk bands**
 
-- **65+ · Low** — resilient
-- **40–64 · Moderate** — vulnerable
-- **< 40 · High** — critical
+- **55+ · Low** — the land takes most of the rain that falls on it
+- **35–54 · Moderate** — roughly half runs off; drainage carries the rest
+- **< 35 · High** — two thirds or more runs off; the site depends on drainage
 
-Weights are intentionally simple and transparent. Calibrate them against local
-runoff data in `src/lib/absorption.ts` (frontend) and
-`backend/app/services/scoring.py` (Python backend).
+These are calibrated against 18 real scans spanning the density spectrum, from
+Bois de Boulogne (74.7) to Midtown Manhattan (14.0). They are deliberately not
+tuned to give a flattering spread — most urban land really is mostly impervious.
+
+**Full methodology, calibration set, and known limits:
+[`docs/absorption-calibration.md`](docs/absorption-calibration.md).**
+
+The model lives in three places — `src/lib/absorption.ts`,
+`supabase/functions/analyze-terrain/index.ts` (which computes and stores every
+score), and `backend/app/services/scoring.py`. A test in
+`src/lib/absorption.test.ts` parses the latter two and fails if they drift.
+Recalibrate them against local runoff data for your climate zone.
 
 ## Getting started
 

@@ -127,24 +127,34 @@ export function normalizeScenario(scenario: Scenario): Scenario {
 }
 
 /** Share (0–1) of the tile occupied by each land-cover class. */
-function shares(cover: LandCover): Record<LandCoverKey, number> {
-  const total = Object.values(cover).reduce((a, b) => a + b, 0) || 1;
+/** The classes that carry absorption. Water is excluded from the model -- it is
+ *  the body that receives runoff, not capacity. See lib/absorption.ts. */
+const ABSORBING = ["vegetation", "soil", "buildings", "pavement"] as const;
+type AbsorbingKey = (typeof ABSORBING)[number];
+
+/**
+ * Share of the LAND (not the tile) held by each absorbing class.
+ *
+ * The denominator excludes open water, matching computeAbsorptionScore. An
+ * intervention converts land, and its effect must be measured against the land
+ * it can actually act on -- depaving 20% of a waterfront site's pavement is a
+ * bigger intervention than depaving 20% of an inland site's, if half the
+ * waterfront frame is harbour.
+ */
+function shares(cover: LandCover): Record<AbsorbingKey, number> {
+  const land = ABSORBING.reduce((a, k) => a + (Number(cover[k]) || 0), 0) || 1;
   return {
-    pavement: (cover.pavement || 0) / total,
-    buildings: (cover.buildings || 0) / total,
-    vegetation: (cover.vegetation || 0) / total,
-    water: (cover.water || 0) / total,
-    soil: (cover.soil || 0) / total,
+    pavement: (cover.pavement || 0) / land,
+    buildings: (cover.buildings || 0) / land,
+    vegetation: (cover.vegetation || 0) / land,
+    soil: (cover.soil || 0) / land,
   };
 }
 
-/** Weighted absorption (0–1) of the unmodified cover. */
+/** Weighted absorption (0–1) of the unmodified land. */
 function baseRaw(cover: LandCover): number {
   const s = shares(cover);
-  return (Object.keys(s) as LandCoverKey[]).reduce(
-    (sum, key) => sum + s[key] * ABSORPTION_WEIGHTS[key],
-    0
-  );
+  return ABSORBING.reduce((sum, key) => sum + s[key] * ABSORPTION_WEIGHTS[key], 0);
 }
 
 /** Projected Urban Absorption Score (0–100) after applying a scenario. */

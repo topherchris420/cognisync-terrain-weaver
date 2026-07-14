@@ -13,6 +13,7 @@ import { Reveal } from "@/components/Reveal";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { RecentScans } from "@/components/RecentScans";
+import { ABSORPTION_WEIGHTS, RISK_BANDS } from "@/lib/absorption";
 import { SITE } from "@/lib/site";
 
 // A fixed composition used to demonstrate the two real components in the hero.
@@ -43,18 +44,35 @@ const steps = [
   },
 ];
 
+// Read live from the scoring model. This table is the page's credibility claim
+// -- "here are the weights, all of them" -- so it must not be a hand-copied set
+// of numbers that can drift from the ones actually applied.
 const weights = [
-  { label: "Vegetation", weight: 1.0, note: "Highest infiltration and cooling", cls: "bg-surface-vegetation" },
-  { label: "Bare soil", weight: 0.85, note: "Permeable, variable", cls: "bg-surface-soil" },
-  { label: "Water", weight: 0.5, note: "Existing hydro capacity", cls: "bg-surface-water" },
-  { label: "Buildings", weight: 0.05, note: "Effectively impervious", cls: "bg-surface-building" },
-  { label: "Pavement", weight: 0.05, note: "Effectively impervious", cls: "bg-surface-pavement" },
-];
+  { key: "vegetation", label: "Vegetation", note: "Runoff coefficient C ≈ 0.20", cls: "bg-surface-vegetation" },
+  { key: "soil", label: "Bare soil", note: "Compacted urban soil, C ≈ 0.30", cls: "bg-surface-soil" },
+  { key: "buildings", label: "Buildings", note: "Roofs, C ≈ 0.90", cls: "bg-surface-building" },
+  { key: "pavement", label: "Pavement", note: "Asphalt & concrete, C ≈ 0.88", cls: "bg-surface-pavement" },
+] as const;
 
 const riskBands = [
-  { range: "65 – 100", label: "Low", desc: "Resilient", cls: "border-primary/30 bg-primary/10 text-primary" },
-  { range: "40 – 64", label: "Moderate", desc: "Vulnerable", cls: "border-warning/30 bg-warning/10 text-warning" },
-  { range: "0 – 39", label: "High", desc: "Critical", cls: "border-destructive/30 bg-destructive/10 text-destructive" },
+  {
+    range: `${RISK_BANDS.low} – 100`,
+    label: "Low",
+    desc: "The land takes most of the rain",
+    cls: "border-primary/30 bg-primary/10 text-primary",
+  },
+  {
+    range: `${RISK_BANDS.moderate} – ${RISK_BANDS.low - 1}`,
+    label: "Moderate",
+    desc: "Roughly half runs off",
+    cls: "border-warning/30 bg-warning/10 text-warning",
+  },
+  {
+    range: `0 – ${RISK_BANDS.moderate - 1}`,
+    label: "High",
+    desc: "Two thirds or more runs off",
+    cls: "border-destructive/30 bg-destructive/10 text-destructive",
+  },
 ];
 
 // Capabilities are named once, under the audience that actually cares about
@@ -213,9 +231,12 @@ export default function Index() {
                 The score is not a black box
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
-                Every scan produces one 0–100 number, derived from land-cover
-                percentages weighted by simplified runoff coefficients from urban
-                hydrology. Here are the weights. All of them.
+                Every scan produces one 0–100 number: the share of rainfall the
+                land can absorb. Each weight is{" "}
+                <span className="font-mono text-foreground">1 − C</span>, where{" "}
+                <span className="font-mono text-foreground">C</span> is the
+                Rational-Method runoff coefficient used in real drainage
+                engineering. Here are the weights. All of them.
               </p>
             </div>
           </Reveal>
@@ -225,23 +246,45 @@ export default function Index() {
               <div className="space-y-2.5">
                 {weights.map((w) => (
                   <div
-                    key={w.label}
+                    key={w.key}
                     className="panel flex items-center gap-3 rounded-lg border border-border px-4 py-3"
                   >
                     <span className={`h-3 w-3 shrink-0 rounded-md ${w.cls}`} />
                     <span className="w-24 text-sm font-medium">{w.label}</span>
                     <span className="font-mono text-sm font-semibold tabular-nums text-primary">
-                      {w.weight.toFixed(2)}
+                      {ABSORPTION_WEIGHTS[w.key].toFixed(2)}
                     </span>
                     <span className="ml-auto text-right text-xs text-muted-foreground">
                       {w.note}
                     </span>
                   </div>
                 ))}
+
+                {/* Water is deliberately absent from the table above, and saying
+                    so plainly is the point -- it was the model's real bug. */}
+                <div className="flex items-start gap-3 rounded-lg border border-dashed border-border px-4 py-3">
+                  <span className="mt-1 h-3 w-3 shrink-0 rounded-md bg-surface-water" />
+                  <div>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-sm font-medium">Open water</span>
+                      <span className="font-mono text-sm font-semibold text-muted-foreground">
+                        excluded
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      A river is not a sponge — it is where the runoff goes.
+                      Scoring it as absorption rewards a site for being
+                      flood-exposed, so water is removed from the denominator
+                      entirely. The score asks: of the <em>land</em> here, how
+                      much rain can it take?
+                    </p>
+                  </div>
+                </div>
               </div>
               <p className="mt-4 text-xs text-muted-foreground">
-                Weights are intentionally simple. Fork the project and calibrate
-                them against local runoff data for your climate zone.
+                Calibrated against 18 real scans, from Bois de Boulogne (74.7) to
+                Midtown Manhattan (14.0). Fork the project and recalibrate
+                against local runoff data for your climate zone.
               </p>
             </Reveal>
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Index from "@/pages/Index";
+import { ABSORPTION_WEIGHTS } from "@/lib/absorption";
 
 function renderLanding() {
   return render(
@@ -35,12 +36,28 @@ describe("landing page", () => {
 
   it("publishes the full scoring weight table", () => {
     // The methodology section is the page's credibility anchor: the claim is
-    // that the score is auditable, so every weight must actually be on the page.
+    // that the score is auditable, so every weight must actually be on the page,
+    // and it must be the weight the model actually applies.
     renderLanding();
-    for (const label of ["Vegetation", "Bare soil", "Water", "Buildings", "Pavement"]) {
+    for (const label of ["Vegetation", "Bare soil", "Buildings", "Pavement"]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
-    expect(screen.getByText("1.00")).toBeInTheDocument();
-    expect(screen.getByText("0.85")).toBeInTheDocument();
+    for (const [key, weight] of Object.entries(ABSORPTION_WEIGHTS)) {
+      expect(
+        screen.getByText(weight.toFixed(2)),
+        `the page must publish the ${key} weight actually in use`
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("discloses that open water is excluded, rather than quietly omitting it", () => {
+    // Water used to be weighted 0.50 -- scoring a harbour as a half-strength
+    // sponge, which rewarded a site for being flood-exposed. Dropping it from
+    // the model silently would be its own kind of dishonesty: the page has to
+    // say the class exists and say why it earns nothing.
+    renderLanding();
+    expect(screen.getByText(/open water/i)).toBeInTheDocument();
+    expect(screen.getByText(/excluded/i)).toBeInTheDocument();
+    expect(screen.getByText(/where the runoff goes/i)).toBeInTheDocument();
   });
 });

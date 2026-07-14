@@ -38,27 +38,42 @@ type LandCover = {
   soil: number;
 };
 
-const WEIGHTS: Record<keyof LandCover, number> = {
-  vegetation: 1.0,
-  soil: 0.85,
-  water: 0.5,
-  buildings: 0.05,
-  pavement: 0.05,
+// KEEP IN SYNC with src/lib/absorption.ts. This runs on Deno and cannot import
+// from src/, so the model is duplicated by necessity. A test in
+// src/lib/absorption.test.ts parses THIS FILE and fails if the two drift.
+//
+// Weights are `1 - C`, where C is the Rational Method runoff coefficient used in
+// real drainage design (ASCE; Chow, Maidment & Mays). Water carries no weight and
+// is excluded from the denominator: open water is the body that RECEIVES runoff,
+// not absorption capacity. See the long note in src/lib/absorption.ts.
+type AbsorbingKey = "vegetation" | "soil" | "buildings" | "pavement";
+
+const WEIGHTS: Record<AbsorbingKey, number> = {
+  vegetation: 0.8,
+  soil: 0.7,
+  buildings: 0.1,
+  pavement: 0.12,
 };
 
+const ABSORBING: AbsorbingKey[] = ["vegetation", "soil", "buildings", "pavement"];
+
 function computeAbsorption(c: LandCover): number {
-  const total = Object.values(c).reduce((a, b) => a + b, 0) || 1;
-  const raw =
-    (Object.keys(WEIGHTS) as (keyof LandCover)[]).reduce(
-      (s, k) => s + (c[k] || 0) * WEIGHTS[k],
-      0,
-    ) / total;
-  return Math.round(raw * 100 * 10) / 10;
+  const land = ABSORBING.reduce((s, k) => s + (Number(c[k]) || 0), 0);
+  if (land <= 0) return 0;
+  const absorbed = ABSORBING.reduce(
+    (s, k) => s + (Number(c[k]) || 0) * WEIGHTS[k],
+    0,
+  );
+  return Math.round((absorbed / land) * 100 * 10) / 10;
 }
 
+// Calibrated against 18 real scans spanning Bois de Boulogne (74.7) to Midtown
+// Manhattan (14.0). See docs/absorption-calibration.md.
+const RISK_BANDS = { moderate: 35, low: 55 };
+
 function classifyFloodRisk(score: number): "low" | "moderate" | "high" {
-  if (score >= 65) return "low";
-  if (score >= 40) return "moderate";
+  if (score >= RISK_BANDS.low) return "low";
+  if (score >= RISK_BANDS.moderate) return "moderate";
   return "high";
 }
 
