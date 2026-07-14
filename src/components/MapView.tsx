@@ -55,6 +55,20 @@ const FIRST_TILE_TIMEOUT_MS = 10_000;
 // Tile-fetch errors tolerated before giving up on a provider early.
 const MAX_TILE_ERRORS = 3;
 
+// Place and boundary labels drawn over the imagery. Bare satellite is beautiful
+// and useless for orientation -- you cannot tell which city you are looking at.
+const LABEL_TILES =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
+
+const LABELS_LAYER_ID = "place-labels";
+
+// Labels are an orientation aid, not a map feature. Zoomed out they tell you
+// which city you are looking at; zoomed in this reference layer stamps a label
+// on every individual building and buries the imagery under red text. They cut
+// out before analysis zoom (14-15), which is also exactly where the imagery has
+// to be legible.
+const LABELS_MAX_ZOOM = 13;
+
 function styleFor(p: ImageryProvider): maplibregl.StyleSpecification {
   return {
     version: 8,
@@ -68,8 +82,23 @@ function styleFor(p: ImageryProvider): maplibregl.StyleSpecification {
         maxzoom: p.maxzoom,
         attribution: p.attribution,
       },
+      labels: {
+        type: "raster",
+        tiles: [LABEL_TILES],
+        tileSize: 256,
+        maxzoom: 19,
+      },
     },
-    layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+    layers: [
+      { id: "satellite", type: "raster", source: "satellite" },
+      {
+        id: LABELS_LAYER_ID,
+        type: "raster",
+        source: "labels",
+        maxzoom: LABELS_MAX_ZOOM,
+        paint: { "raster-opacity": 0.9 },
+      },
+    ],
   };
 }
 
@@ -206,16 +235,34 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
       async captureImage() {
         const map = mapRef.current;
         if (!map) return null;
-        // Force a repaint so the drawing buffer is fresh.
-        await new Promise<void>((resolve) => {
-          map.once("render", () => resolve());
-          map.triggerRepaint();
-        });
+
+        // Hide the place labels before capturing. The tile goes to a vision
+        // model for land-cover classification, and burnt-in street names and
+        // city labels are text the model would try to read as terrain. The
+        // user sees labels; the classifier must not.
+        const hadLabels = Boolean(map.getLayer(LABELS_LAYER_ID));
+        if (hadLabels) {
+          map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "none");
+        }
+
+        const repaint = () =>
+          new Promise<void>((resolve) => {
+            map.once("render", () => resolve());
+            map.triggerRepaint();
+          });
+
         try {
+          // Force a repaint so the drawing buffer reflects the hidden labels.
+          await repaint();
           return map.getCanvas().toDataURL("image/jpeg", 0.82);
         } catch (e) {
           console.error("captureImage failed", e);
           return null;
+        } finally {
+          if (hadLabels) {
+            map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "visible");
+            await repaint();
+          }
         }
       },
       getBounds() {
