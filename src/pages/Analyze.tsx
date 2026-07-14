@@ -5,6 +5,7 @@ import { MapView, type MapViewHandle } from "@/components/MapView";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { RecommendationsList } from "@/components/RecommendationsList";
+import { LocationSearch } from "@/components/LocationSearch";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
+import type { GeocodeResult } from "@/lib/geocode";
 import type { ScenarioExport } from "@/lib/scenario";
 import {
   analysesToGeoJSON,
@@ -28,14 +30,6 @@ import {
   exportFilename,
 } from "@/lib/geo";
 import { toast } from "sonner";
-
-const PRESETS: Array<{ label: string; lat: number; lng: number; zoom: number }> = [
-  { label: "Manhattan, NY", lat: 40.758, lng: -73.985, zoom: 15 },
-  { label: "Jakarta, ID", lat: -6.2088, lng: 106.8456, zoom: 14 },
-  { label: "Copenhagen, DK", lat: 55.6761, lng: 12.5683, zoom: 14 },
-  { label: "Lagos, NG", lat: 6.5244, lng: 3.3792, zoom: 14 },
-  { label: "Phoenix, AZ", lat: 33.4484, lng: -112.074, zoom: 14 },
-];
 
 const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
 
@@ -211,9 +205,12 @@ export default function Analyze() {
     }
   }, [result]);
 
-  const jumpTo = (p: (typeof PRESETS)[number]) => {
-    mapRef.current?.flyTo(p.lat, p.lng, p.zoom);
-    setLocationLabel(p.label);
+  // Search pre-fills the location label, but the map can be panned away
+  // afterwards -- the label stays editable so it can't silently disagree with
+  // the coordinates it gets stored beside.
+  const goTo = (r: GeocodeResult & { zoom?: number }) => {
+    mapRef.current?.flyTo(r.lat, r.lng, r.zoom ?? 14);
+    setLocationLabel(r.label);
   };
 
   return (
@@ -246,24 +243,6 @@ export default function Analyze() {
             </div>
           </div>
 
-          {/* Presets */}
-          <div
-            className="pointer-events-auto absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[calc(100%-8rem)]"
-            role="group"
-            aria-label="Preset locations"
-          >
-            {PRESETS.map((p) => (
-              <button
-                key={p.label}
-                onClick={() => jumpTo(p)}
-                aria-label={`Fly to ${p.label}`}
-                className="rounded-full border border-border bg-background/85 backdrop-blur px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-              >
-                <MapPin className="mr-1 inline h-3 w-3" aria-hidden="true" />
-                {p.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Side panel */}
@@ -271,11 +250,16 @@ export default function Analyze() {
           <div className="border-b border-border p-5 panel">
             <h1 className="text-lg font-semibold">Run resilience scan</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Pan and zoom to your area of interest, then analyze the visible
-              satellite tile.
+              Search for a place, or pan the map yourself, then analyze the
+              visible satellite tile.
             </p>
 
             <div className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="location-search">Location</Label>
+                <LocationSearch onSelect={goTo} />
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="name">Site name</Label>
                 <Input

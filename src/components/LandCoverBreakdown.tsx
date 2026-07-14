@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { LAND_COVER_META, type LandCover, type LandCoverKey } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Info } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
+
+// The vision model returns five INDEPENDENT percentages. They routinely land on
+// 97 or 103 rather than 100. Report what it actually said, and flag the drift.
+const TOLERANCE = 1;
 
 interface Props {
   cover: LandCover;
@@ -20,7 +24,11 @@ export function LandCoverBreakdown({ cover, animated = true }: Props) {
   const [displayValues, setDisplayValues] = useState(
     animated ? ORDER.map(() => 0) : ORDER.map((key) => cover[key] || 0)
   );
-  const total = Object.values(cover).reduce((a, b) => a + b, 0) || 1;
+  // rawTotal is what the model actually returned; `total` is the || 1 guard used
+  // for division. Reporting the guarded value would round an empty result to 100%.
+  const rawTotal = ORDER.reduce((sum, key) => sum + (cover[key] ?? 0), 0);
+  const deviates = Math.abs(rawTotal - 100) > TOLERANCE;
+  const total = rawTotal || 1;
 
   // Animate values
   useEffect(() => {
@@ -149,7 +157,7 @@ export function LandCoverBreakdown({ cover, animated = true }: Props) {
               </div>
 
               {/* Hint on hover */}
-              <div className="absolute left-0 -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-card border border-border rounded-md text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap shadow-lg">
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-card border border-border rounded-md text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap shadow-lg">
                 {meta.hint}
               </div>
             </div>
@@ -161,8 +169,23 @@ export function LandCoverBreakdown({ cover, animated = true }: Props) {
       <div className="pt-3 border-t border-border/50">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Total coverage</span>
-          <span className="font-mono font-semibold">100%</span>
+          <span className="font-mono font-semibold tabular-nums">
+            {Math.round(rawTotal)}%
+          </span>
         </div>
+
+        {deviates && (
+          <div
+            role="status"
+            className="mt-2 flex items-start gap-2 text-xs text-muted-foreground"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Classification does not sum to 100%. Percentages are reported as
+              returned by the model, not normalized.
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
