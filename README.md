@@ -1,4 +1,4 @@
-# Vers3Dynamics — Urban Resilience Platform
+# Vers3Dynamics — Mannahatta (Urban Resilience Platform)
 
 An open-source, AI-powered analytics platform that turns any satellite view of
 a city into a **quantitative resilience report**: land-cover breakdown, an
