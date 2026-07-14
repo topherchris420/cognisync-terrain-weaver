@@ -131,19 +131,6 @@
     transform: none;
   }
 
-  /* Slow ambient drift for the hero grid */
-  .terrain-grid-animated {
-    animation: grid-drift 24s linear infinite;
-  }
-}
-
-@keyframes grid-drift {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 40px 40px;
-  }
 }
 
 /* Honour users who prefer reduced motion */
@@ -158,9 +145,6 @@
     transition: none;
   }
 
-  .terrain-grid-animated {
-    animation: none;
-  }
 }
 
 /* MapLibre overrides — keep controls consistent with theme */
