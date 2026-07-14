@@ -1,29 +1,22 @@
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
-  Satellite,
-  Sprout,
-  Droplets,
-  Cpu,
-  GaugeCircle,
   Github,
   Globe2,
-  MousePointerClick,
   PencilRuler,
-  ScanSearch,
-  ClipboardList,
-  CheckCircle2,
-  SlidersHorizontal,
-  FileJson,
   TrendingUp,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/AppNav";
 import { Reveal } from "@/components/Reveal";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
+import { RecentScans } from "@/components/RecentScans";
 import { SITE } from "@/lib/site";
 
+// A fixed composition used to demonstrate the two real components in the hero.
+// Labelled as a sample on the page -- it is not presented as a live scan.
 const previewCover = {
   vegetation: 18,
   soil: 6,
@@ -32,92 +25,64 @@ const previewCover = {
   pavement: 31,
 };
 
-const features = [
-  {
-    icon: Satellite,
-    title: "Satellite land-cover analysis",
-    body: "Point at any city. We segment the tile into pavement, buildings, vegetation, water, and bare soil using a vision LLM.",
-  },
-  {
-    icon: GaugeCircle,
-    title: "Urban Absorption Score",
-    body: "A single 0–100 metric that fuses surface permeability into a stormwater-absorption rating with flood-risk banding.",
-  },
-  {
-    icon: Sprout,
-    title: "Adaptation playbook",
-    body: "AI-generated green / blue / gray interventions prioritized for the site's specific composition and vulnerabilities.",
-  },
-  {
-    icon: SlidersHorizontal,
-    title: "Scenario Studio",
-    body: "Drag intervention sliders — depaving, bioswales, permeable pavement, green roofs — and watch the score, retention volume, cost, and payback update live.",
-  },
-  {
-    icon: FileJson,
-    title: "GIS-native export",
-    body: "GeoJSON footprint polygons, CSV attribute tables, and PDF reports that slot straight into QGIS, ArcGIS, PostGIS, or your BI stack.",
-  },
-  {
-    icon: Cpu,
-    title: "Modular by design",
-    body: "Ready to plug in hydrological simulations, IoT sensor streams, and city-scale digital twin layers.",
-  },
-];
-
 const steps = [
   {
-    icon: MousePointerClick,
     step: "01",
     title: "Frame a location",
-    body: "Pan and zoom the live satellite map to any neighborhood, watershed, or district on Earth.",
+    body: "Search any city, or pan the live satellite map to a neighborhood, watershed, or district.",
   },
   {
-    icon: ScanSearch,
     step: "02",
     title: "Classify the surface",
     body: "The visible tile is captured and a vision model breaks it into five land-cover classes.",
   },
   {
-    icon: ClipboardList,
     step: "03",
-    title: "Score & act",
+    title: "Score and act",
     body: "Get an absorption score, a flood-risk band, and a prioritized adaptation playbook you can export.",
   },
 ];
 
 const weights = [
-  { label: "Vegetation", weight: 1.0, note: "Highest infiltration & cooling", cls: "bg-surface-vegetation" },
+  { label: "Vegetation", weight: 1.0, note: "Highest infiltration and cooling", cls: "bg-surface-vegetation" },
   { label: "Bare soil", weight: 0.85, note: "Permeable, variable", cls: "bg-surface-soil" },
   { label: "Water", weight: 0.5, note: "Existing hydro capacity", cls: "bg-surface-water" },
   { label: "Buildings", weight: 0.05, note: "Effectively impervious", cls: "bg-surface-building" },
   { label: "Pavement", weight: 0.05, note: "Effectively impervious", cls: "bg-surface-pavement" },
 ];
 
-const personas = [
+const riskBands = [
+  { range: "65 – 100", label: "Low", desc: "Resilient", cls: "border-primary/30 bg-primary/10 text-primary" },
+  { range: "40 – 64", label: "Moderate", desc: "Vulnerable", cls: "border-warning/30 bg-warning/10 text-warning" },
+  { range: "0 – 39", label: "High", desc: "Critical", cls: "border-destructive/30 bg-destructive/10 text-destructive" },
+];
+
+// Capabilities are named once, under the audience that actually cares about
+// them, rather than twice -- as a feature card and again as a persona bullet.
+const audiences = [
   {
     icon: PencilRuler,
-    eyebrow: "For urban planners",
+    eyebrow: "Urban planners",
     title: "Model the intervention before the ribbon cutting",
     points: [
-      "Scenario Studio — drag depaving, bioswale, permeable-pavement, and green-roof sliders over any analyzed block",
-      "Watch the absorption score, flood-risk band, and retained stormwater respond in real time",
+      "Scenario Studio: drag depaving, bioswale, permeable-pavement, and green-roof sliders over any analyzed block",
+      "Absorption score, flood-risk band, and retained stormwater respond in real time",
       "Every configured scenario lands in the PDF report, ready for the council packet",
     ],
   },
   {
     icon: Globe2,
-    eyebrow: "For GIS professionals",
+    eyebrow: "GIS professionals",
     title: "Open formats, zero lock-in",
     points: [
       "One-click GeoJSON export with true footprint polygons in WGS84",
       "CSV attribute tables for joins in QGIS, ArcGIS, PostGIS, or a spreadsheet",
-      "Deep links restore any map view; the scoring weights are open source",
+      "Deep links restore any map view, and the scoring weights are open source",
     ],
   },
   {
     icon: TrendingUp,
-    eyebrow: "For investors & finance",
+    eyebrow: "Investors and finance",
     title: "Underwrite resilience with numbers",
     points: [
       "Capital cost, annual benefit, and simple payback for every scenario",
@@ -127,10 +92,11 @@ const personas = [
   },
 ];
 
-const riskBands = [
-  { range: "65 – 100", label: "Low", desc: "Resilient", cls: "border-primary/30 bg-primary/10 text-primary" },
-  { range: "40 – 64", label: "Moderate", desc: "Vulnerable", cls: "border-warning/30 bg-warning/10 text-warning" },
-  { range: "0 – 39", label: "High", desc: "Critical", cls: "border-destructive/30 bg-destructive/10 text-destructive" },
+const roadmap = [
+  { v: "v0.1", label: "Land cover · absorption score", current: false },
+  { v: "v0.2", label: "Scenario studio · ROI · GIS export", current: true },
+  { v: "v0.3", label: "Runoff sim · IoT sensor fusion", current: false },
+  { v: "v1.0", label: "Digital twin & API", current: false },
 ];
 
 export default function Index() {
@@ -138,10 +104,10 @@ export default function Index() {
     <div className="flex min-h-screen flex-col">
       <AppNav />
 
-      {/* Hero */}
+      {/* Hero — the page's one atmospheric moment. */}
       <section className="relative overflow-hidden border-b border-border/60">
         <div className="absolute inset-0 hero-glow" aria-hidden />
-        <div className="absolute inset-0 terrain-grid terrain-grid-animated opacity-40" aria-hidden />
+        <div className="absolute inset-0 terrain-grid opacity-40" aria-hidden />
         <div className="relative mx-auto grid max-w-6xl gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="min-w-0">
             <div className="border-l-2 border-accent pl-3 text-xs font-semibold uppercase tracking-widest text-accent">
@@ -170,7 +136,7 @@ export default function Index() {
               </Button>
             </div>
 
-            {/* Metric strip */}
+            {/* Facts about the product, not invented usage statistics. */}
             <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border/60 pt-6 sm:grid-cols-4">
               {[
                 { k: "5", l: "land-cover classes" },
@@ -190,15 +156,18 @@ export default function Index() {
             </div>
           </div>
 
-          {/* Live product preview, not decoration */}
+          {/* The real components, running on a fixed sample composition.
+              Labelled as a sample: nothing here was scanned just now. */}
           <Reveal delay={120} className="panel min-w-0 rounded-xl border border-border p-5 md:p-6">
             <div className="flex items-center justify-between border-b border-border/60 pb-4">
               <div>
                 <div className="text-sm font-semibold">Lower Manhattan, NY</div>
-                <div className="text-xs text-muted-foreground">2.1 km² · scanned just now</div>
+                <div className="text-xs text-muted-foreground">
+                  Sample analysis · run your own in seconds
+                </div>
               </div>
               <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-                Sample scan
+                Sample
               </span>
             </div>
             <div className="pt-5">
@@ -211,222 +180,193 @@ export default function Index() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-6">
-        <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-            From satellite tile to action plan
-          </h2>
-          <p className="mt-3 text-muted-foreground">
-            Three steps, no GIS expertise required — go from a map view to a
-            defensible resilience report in under a minute.
-          </p>
-        </Reveal>
+      {/* Real scans from the public feed. Renders nothing if there are none --
+          the point of this strip is that the numbers are real. */}
+      <RecentScans />
 
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
-          {steps.map(({ icon: Icon, step, title, body }, i) => (
-            <Reveal
-              key={title}
-              delay={i * 90}
-              className="panel relative rounded-xl border border-border p-6"
-            >
-              <span className="absolute right-5 top-5 font-mono text-xs font-semibold text-muted-foreground/60">
-                {step}
-              </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent/15 text-accent">
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* Feature grid */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-6 pt-14">
-        <div className="grid gap-4 md:grid-cols-2">
-          {features.map(({ icon: Icon, title, body }, i) => (
-            <Reveal
-              key={title}
-              delay={(i % 2) * 80}
-              className="panel h-full rounded-xl border border-border p-6 transition-colors hover:border-primary/40"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 text-primary">
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* Personas */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-6 pt-14">
-        <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-            Built for the people shaping cities
-          </h2>
-          <p className="mt-3 text-muted-foreground">
-            One shared evidence base — whether you're drawing the plan, running
-            the spatial analysis, or writing the check.
-          </p>
-        </Reveal>
-
-        <div className="mt-10 grid gap-4 lg:grid-cols-3">
-          {personas.map(({ icon: Icon, eyebrow, title, points }, i) => (
-            <Reveal
-              key={eyebrow}
-              delay={i * 90}
-              className="panel flex h-full flex-col rounded-xl border border-border p-6 transition-colors hover:border-accent/40"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/15 text-accent">
-                  <Icon className="h-4.5 w-4.5" />
-                </div>
-                <span className="text-xs font-semibold uppercase tracking-widest text-accent">
-                  {eyebrow}
+      {/* How it works — a sequence, so it reads as a row, not a menu of cards. */}
+      <section className="mx-auto w-full max-w-6xl px-6 py-16">
+        <Reveal>
+          <div className="grid gap-8 md:grid-cols-3">
+            {steps.map(({ step, title, body }) => (
+              <div key={step} className="border-t border-border pt-5">
+                <span className="font-mono text-xs font-semibold text-accent">
+                  {step}
                 </span>
+                <h3 className="mt-2 text-lg font-semibold">{title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {body}
+                </p>
               </div>
-              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-              <ul className="mt-3 space-y-2.5">
-                {points.map((point) => (
-                  <li
-                    key={point}
-                    className="flex items-start gap-2 text-sm text-muted-foreground"
-                  >
-                    <CheckCircle2
-                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
-                      aria-hidden="true"
-                    />
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </Reveal>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Reveal>
       </section>
 
-      {/* Methodology — the Urban Absorption Score */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-6 pt-14">
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      {/* Methodology — the centerpiece. The most credible thing on the site is
+          that the number is auditable, so it gets the most room. */}
+      <section className="border-y border-border/60 bg-card/30">
+        <div className="mx-auto w-full max-w-6xl px-6 py-20 md:py-24">
           <Reveal>
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-              <GaugeCircle className="h-3.5 w-3.5" />
-              The methodology
-            </div>
-            <h2 className="mt-4 text-2xl md:text-3xl font-bold tracking-tight">
-              A transparent absorption score
-            </h2>
-            <p className="mt-3 text-muted-foreground">
-              Every scan produces one 0–100 number, derived from land-cover
-              percentages weighted by simplified runoff coefficients from urban
-              hydrology. No black box — the weights are open and calibratable.
-            </p>
-
-            <div className="mt-6 space-y-2.5">
-              {weights.map((w) => (
-                <div
-                  key={w.label}
-                  className="flex items-center gap-3 rounded-lg border border-border panel px-3 py-2.5"
-                >
-                  <span className={`h-3 w-3 shrink-0 rounded-md ${w.cls}`} />
-                  <span className="w-24 text-sm font-medium">{w.label}</span>
-                  <span className="font-mono text-sm font-semibold text-primary">
-                    {w.weight.toFixed(2)}
-                  </span>
-                  <span className="ml-auto text-right text-xs text-muted-foreground">
-                    {w.note}
-                  </span>
-                </div>
-              ))}
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
+                The score is not a black box
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Every scan produces one 0–100 number, derived from land-cover
+                percentages weighted by simplified runoff coefficients from urban
+                hydrology. Here are the weights. All of them.
+              </p>
             </div>
           </Reveal>
 
-          <Reveal delay={120}>
-            <div className="panel rounded-xl border border-border p-6">
-              <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Flood-risk banding
-              </h3>
-              <div className="mt-4 space-y-3">
-                {riskBands.map((b) => (
+          <div className="mt-12 grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+            <Reveal>
+              <div className="space-y-2.5">
+                {weights.map((w) => (
                   <div
-                    key={b.label}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 p-4"
+                    key={w.label}
+                    className="panel flex items-center gap-3 rounded-lg border border-border px-4 py-3"
                   >
-                    <div>
-                      <div className="font-mono text-lg font-semibold">
-                        {b.range}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {b.desc}
-                      </div>
-                    </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${b.cls}`}
-                    >
-                      {b.label} risk
+                    <span className={`h-3 w-3 shrink-0 rounded-md ${w.cls}`} />
+                    <span className="w-24 text-sm font-medium">{w.label}</span>
+                    <span className="font-mono text-sm font-semibold tabular-nums text-primary">
+                      {w.weight.toFixed(2)}
+                    </span>
+                    <span className="ml-auto text-right text-xs text-muted-foreground">
+                      {w.note}
                     </span>
                   </div>
                 ))}
               </div>
               <p className="mt-4 text-xs text-muted-foreground">
-                Weights are intentionally simple and transparent. Fork the
-                project to calibrate them against local runoff data for your
-                climate zone.
+                Weights are intentionally simple. Fork the project and calibrate
+                them against local runoff data for your climate zone.
               </p>
-            </div>
-          </Reveal>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <div className="panel rounded-xl border border-border p-6">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Flood-risk banding
+                </h3>
+                <div className="mt-4 space-y-3">
+                  {riskBands.map((b) => (
+                    <div
+                      key={b.label}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 p-4"
+                    >
+                      <div>
+                        <div className="font-mono text-lg font-semibold tabular-nums">
+                          {b.range}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {b.desc}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${b.cls}`}
+                      >
+                        {b.label} risk
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
-      {/* Roadmap */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-6 pt-14">
-        <Reveal className="rounded-xl border border-border panel p-6 md:p-8">
-          <div className="flex items-start gap-3">
-            <Droplets className="h-5 w-5 text-accent" />
-            <div>
-              <h3 className="text-lg font-semibold">Where this is heading</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Today: land-cover classification, absorption scoring,
-                what-if scenario modeling with investment analytics, and
-                GIS-native export. Next up: hydrological simulation of runoff
-                paths, live IoT sensor ingestion (rain gauges, soil moisture),
-                and a block-level digital-twin view exposed via a documented
-                API.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                {[
-                  { v: "v0.1 — Land cover · Absorption score", current: false },
-                  { v: "v0.2 — Scenario studio · ROI · GIS export", current: true },
-                  { v: "v0.3 — Runoff sim · IoT sensor fusion", current: false },
-                  { v: "v1.0 — Digital twin & API", current: false },
-                ].map(({ v, current }) => (
-                  <span
-                    key={v}
-                    className={
-                      current
-                        ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary"
-                        : "rounded-full border border-border px-2.5 py-1 text-muted-foreground"
-                    }
-                  >
-                    {v}
+      {/* Who it's for — left-aligned, and the only place capabilities are named. */}
+      <section className="mx-auto w-full max-w-6xl px-6 py-20">
+        <Reveal>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
+            Built for the people shaping cities
+          </h2>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
+            One shared evidence base — whether you're drawing the plan, running
+            the spatial analysis, or writing the check.
+          </p>
+        </Reveal>
+
+        <Reveal delay={90}>
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {audiences.map(({ icon: Icon, eyebrow, title, points }) => (
+              <div
+                key={eyebrow}
+                className="panel flex h-full flex-col rounded-xl border border-border p-6"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/15 text-accent">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-accent">
+                    {eyebrow}
                   </span>
-                ))}
+                </div>
+                <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+                <ul className="mt-3 space-y-2.5">
+                  {points.map((point) => (
+                    <li
+                      key={point}
+                      className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground"
+                    >
+                      <CheckCircle2
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            ))}
           </div>
         </Reveal>
       </section>
 
-      {/* Closing CTA */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-24 pt-14">
-        <Reveal className="relative overflow-hidden rounded-2xl border border-primary/25 panel p-8 text-center md:p-12">
-          <div className="absolute inset-0 hero-glow opacity-70" aria-hidden />
-          <div className="relative">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+      {/* Roadmap — a quiet strip. */}
+      <section className="mx-auto w-full max-w-6xl px-6 pb-20">
+        <Reveal>
+          <div className="rounded-xl border border-border/60 p-6 md:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+              Where this is heading
+            </h3>
+            <ul className="mt-5 space-y-3">
+              {roadmap.map(({ v, label, current }) => (
+                <li key={v} className="flex items-baseline gap-4">
+                  <span
+                    className={`w-12 shrink-0 font-mono text-sm font-semibold tabular-nums ${
+                      current ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    {v}
+                  </span>
+                  <span
+                    className={
+                      current ? "text-sm" : "text-sm text-muted-foreground"
+                    }
+                  >
+                    {label}
+                  </span>
+                  {current && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                      Shipping
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* Closing CTA — no second glow. The hero owns the atmosphere. */}
+      <section className="mx-auto w-full max-w-6xl px-6 pb-24">
+        <Reveal>
+          <div className="panel rounded-2xl border border-primary/25 p-8 text-center md:p-12">
+            <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
               Ready to measure your city's resilience?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
@@ -434,7 +374,7 @@ export default function Index() {
               seconds and export a shareable PDF report.
             </p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg" className="glow-primary">
+              <Button asChild size="lg">
                 <Link to="/analyze">
                   Start analyzing
                   <ArrowRight className="ml-2 h-4 w-4" />

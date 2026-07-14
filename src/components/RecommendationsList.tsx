@@ -114,7 +114,7 @@ export function RecommendationsList({ items }: Props) {
                     cat.className
                   )}
                 >
-                  <Icon className="h-4.5 w-4.5" />
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
