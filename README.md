@@ -95,7 +95,7 @@ margin, a rising-waterline featured card, and the roadmap as a timeline.
 | `--font-body` | Lora | Justified body copy |
 | `--radius-md` | `4px` | Baked-in corner radius |
 
-Inspired by my favorite version of [NYC](https://www.welikia.org/).
+Inspired by my favorite version of [NYC](https://www.welikia.org/); Kintecoying, Manahatta
 
 ## The Urban Absorption Score
 
