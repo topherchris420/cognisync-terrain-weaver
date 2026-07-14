@@ -7,9 +7,15 @@ import {
   Cpu,
   GaugeCircle,
   Github,
+  Globe2,
   MousePointerClick,
+  PencilRuler,
   ScanSearch,
   ClipboardList,
+  CheckCircle2,
+  SlidersHorizontal,
+  FileJson,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/AppNav";
@@ -31,6 +37,16 @@ const features = [
     icon: Sprout,
     title: "Adaptation playbook",
     body: "AI-generated green / blue / gray interventions prioritized for the site's specific composition and vulnerabilities.",
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "Scenario Studio",
+    body: "Drag intervention sliders — depaving, bioswales, permeable pavement, green roofs — and watch the score, retention volume, cost, and payback update live.",
+  },
+  {
+    icon: FileJson,
+    title: "GIS-native export",
+    body: "GeoJSON footprint polygons, CSV attribute tables, and PDF reports that slot straight into QGIS, ArcGIS, PostGIS, or your BI stack.",
   },
   {
     icon: Cpu,
@@ -66,6 +82,39 @@ const weights = [
   { label: "Water", weight: 0.5, note: "Existing hydro capacity", cls: "bg-surface-water" },
   { label: "Buildings", weight: 0.05, note: "Effectively impervious", cls: "bg-surface-building" },
   { label: "Pavement", weight: 0.05, note: "Effectively impervious", cls: "bg-surface-pavement" },
+];
+
+const personas = [
+  {
+    icon: PencilRuler,
+    eyebrow: "For urban planners",
+    title: "Model the intervention before the ribbon cutting",
+    points: [
+      "Scenario Studio — drag depaving, bioswale, permeable-pavement, and green-roof sliders over any analyzed block",
+      "Watch the absorption score, flood-risk band, and retained stormwater respond in real time",
+      "Every configured scenario lands in the PDF report, ready for the council packet",
+    ],
+  },
+  {
+    icon: Globe2,
+    eyebrow: "For GIS professionals",
+    title: "Open formats, zero lock-in",
+    points: [
+      "One-click GeoJSON export with true footprint polygons in WGS84",
+      "CSV attribute tables for joins in QGIS, ArcGIS, PostGIS, or a spreadsheet",
+      "Deep links restore any map view; the scoring weights are open source",
+    ],
+  },
+  {
+    icon: TrendingUp,
+    eyebrow: "For investors & finance",
+    title: "Underwrite resilience with numbers",
+    points: [
+      "Capital cost, annual benefit, and simple payback for every scenario",
+      "Portfolio view: score distribution, risk mix, and site-vs-site comparison",
+      "Transparent assumptions you can calibrate to your market before underwriting",
+    ],
+  },
 ];
 
 const riskBands = [
@@ -114,11 +163,12 @@ export default function Index() {
           </div>
 
           {/* Metric strip */}
-          <div className="mx-auto mt-14 grid max-w-3xl grid-cols-3 gap-4">
+          <div className="mx-auto mt-14 grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-4">
             {[
               { k: "5", l: "land-cover classes" },
               { k: "0–100", l: "absorption score" },
-              { k: "3 tiers", l: "flood risk banding" },
+              { k: "4", l: "what-if interventions" },
+              { k: "3", l: "open export formats" },
             ].map((m) => (
               <div
                 key={m.l}
@@ -182,6 +232,53 @@ export default function Index() {
               </div>
               <h3 className="mt-4 text-lg font-semibold">{title}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Personas */}
+      <section className="mx-auto w-full max-w-6xl px-6 pb-6 pt-14">
+        <Reveal className="mx-auto max-w-2xl text-center">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+            Built for the people shaping cities
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            One shared evidence base — whether you're drawing the plan, running
+            the spatial analysis, or writing the check.
+          </p>
+        </Reveal>
+
+        <div className="mt-10 grid gap-4 lg:grid-cols-3">
+          {personas.map(({ icon: Icon, eyebrow, title, points }, i) => (
+            <Reveal
+              key={eyebrow}
+              delay={i * 90}
+              className="panel flex h-full flex-col rounded-xl border border-border p-6 transition-colors hover:border-accent/40"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/15 text-accent">
+                  <Icon className="h-4.5 w-4.5" />
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-widest text-accent">
+                  {eyebrow}
+                </span>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+              <ul className="mt-3 space-y-2.5">
+                {points.map((point) => (
+                  <li
+                    key={point}
+                    className="flex items-start gap-2 text-sm text-muted-foreground"
+                  >
+                    <CheckCircle2
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+                      aria-hidden="true"
+                    />
+                    {point}
+                  </li>
+                ))}
+              </ul>
             </Reveal>
           ))}
         </div>
@@ -268,22 +365,24 @@ export default function Index() {
             <div>
               <h3 className="text-lg font-semibold">Where this is heading</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Today: satellite-tile land-cover classification and absorption
-                scoring. Next up: hydrological simulation of runoff paths, live
-                IoT sensor ingestion (rain gauges, soil moisture), and a
-                block-level digital-twin view exposed via a documented API.
+                Today: land-cover classification, absorption scoring,
+                what-if scenario modeling with investment analytics, and
+                GIS-native export. Next up: hydrological simulation of runoff
+                paths, live IoT sensor ingestion (rain gauges, soil moisture),
+                and a block-level digital-twin view exposed via a documented
+                API.
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
                 {[
-                  "v0.1 — Land cover · Absorption score",
-                  "v0.2 — Hydrological runoff sim",
-                  "v0.3 — IoT sensor fusion",
-                  "v1.0 — Digital twin & API",
-                ].map((v, i) => (
+                  { v: "v0.1 — Land cover · Absorption score", current: false },
+                  { v: "v0.2 — Scenario studio · ROI · GIS export", current: true },
+                  { v: "v0.3 — Runoff sim · IoT sensor fusion", current: false },
+                  { v: "v1.0 — Digital twin & API", current: false },
+                ].map(({ v, current }) => (
                   <span
                     key={v}
                     className={
-                      i === 0
+                      current
                         ? "rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary"
                         : "rounded-full border border-border px-2.5 py-1 text-muted-foreground"
                     }

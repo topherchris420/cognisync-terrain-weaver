@@ -9,7 +9,7 @@ Built as a modular foundation for climate-adaptation tooling — future modules
 plug in hydrological simulation, IoT sensor fusion, and city-scale digital
 twins.
 
-![status](https://img.shields.io/badge/status-v0.1_MVP-brightgreen)
+![status](https://img.shields.io/badge/status-v0.2-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)
 
@@ -23,8 +23,50 @@ twins.
 | Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
 | Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
 | Generate 4 adaptation strategies (green / blue / gray infrastructure) 
+| **Scenario Studio** — what-if modeling of depaving, bioswales, permeable pavement, and green roofs with live score, retention, cost, and payback | Frontend |
 | Persist and browse a public feed with stats, search, and sorting | Postgres
-| Export any analysis as a PDF report | Frontend
+| Portfolio analytics — score distribution histogram and side-by-side site comparison | Frontend |
+| Export any analysis as a PDF report (including the configured scenario) | Frontend
+| Export analyses as **GeoJSON** (footprint polygons) and **CSV** for QGIS / ArcGIS / spreadsheets | Frontend |
+
+## Scenario Studio & investment analytics
+
+Every analyzed tile can be stress-tested against four green-infrastructure
+interventions, each converting a fraction of one land-cover class into a
+surface with a different absorption weight:
+
+| Intervention | Converts | Effective weight | Planning cost |
+|---|---|:--:|:--:|
+| Street trees & pocket parks | pavement | 1.00 | $45/m² |
+| Bioswales & rain gardens | pavement | 0.90 | $65/m² |
+| Permeable pavement | pavement | 0.75 | $150/m² |
+| Green roofs | buildings | 0.60 | $180/m² |
+
+Because the score is a weighted sum of cover shares, an intervention's effect
+is exact and instant: `Δscore = share × fraction × (targetWeight − sourceWeight) × 100`.
+The studio then sizes the site from its stored bounding box (spherical-earth
+area) and derives:
+
+- **Added retention** (m³/yr) from the score delta × site area × annual rainfall
+- **Capital cost** from converted area × unit cost
+- **Annual benefit** from a transparent $/m³-retained default
+- **Simple payback** in years
+
+All assumptions (rainfall, unit costs, benefit rate) are visible in the UI and
+in `src/lib/scenario.ts` — calibrate them to your market before underwriting.
+Configured scenarios flow into the exported PDF as a
+"Scenario & Investment Analysis" section.
+
+## GIS interoperability
+
+No lock-in: analyses export as open formats from both the Analyze view
+(single site) and the Dashboard (whole feed).
+
+- **GeoJSON** (RFC 7946) — footprint `Polygon`s built from each scan's stored
+  bbox (falling back to center `Point`s), with score, risk band, land-cover
+  percentages, area in km², and a restorable deep link as properties. Drops
+  straight into QGIS, ArcGIS, Felt, or PostGIS.
+- **CSV** — the same attributes as a flat table for spreadsheets and BI tools.
 
 ## Architecture
 
@@ -167,11 +209,17 @@ src/
 │   ├── MapView.tsx        MapLibre wrapper + image capture
 │   ├── AbsorptionScoreGauge.tsx
 │   ├── LandCoverBreakdown.tsx
-│   └── RecommendationsList.tsx
+│   ├── RecommendationsList.tsx
+│   ├── ScenarioStudio.tsx What-if intervention modeling + ROI panel
+│   └── SiteComparison.tsx Side-by-side comparison of two analyses
 ├── lib/
 │   ├── types.ts           LandCover, Recommendation, Analysis
 │   ├── absorption.ts      Score + risk classification
 │   ├── absorption.test.ts Unit tests for scoring + risk bands
+│   ├── scenario.ts        Interventions, projections, retention, cost, payback
+│   ├── scenario.test.ts   Unit tests for scenario math + finance
+│   ├── geo.ts             BBox parsing, spherical area, GeoJSON/CSV export
+│   ├── geo.test.ts        Unit tests for the GIS toolkit
 │   └── pdf-export.ts      PDF report generation (lazy-loaded)
 └── integrations/
     └── supabase/          Auto-generated Cloud client
@@ -208,8 +256,8 @@ fork it for a private deployment).
 ## Roadmap
 
 - **v0.1** ✅ — Land cover classification, absorption scoring, adaptation LLM
-- **v0.2** — Hydrological runoff simulation (SWMM integration)
-- **v0.3** — IoT sensor fusion (rain gauges, soil moisture over MQTT)
+- **v0.2** ✅ — Scenario Studio (what-if interventions + investment analytics), GeoJSON/CSV export, portfolio comparison
+- **v0.3** — Hydrological runoff simulation (SWMM integration), IoT sensor fusion (rain gauges, soil moisture over MQTT)
 - **v1.0** — Digital twin export + public REST/GraphQL API
 
 ## Contributing

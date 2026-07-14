@@ -2,9 +2,18 @@ import { jsPDF } from "jspdf";
 import type { AnalysisRecord, LandCover, Recommendation } from "./types";
 import { LAND_COVER_META } from "./types";
 import { classifyFloodRisk, riskLabel } from "./absorption";
+import {
+  INTERVENTIONS,
+  INTERVENTION_ORDER,
+  formatCompactUSD,
+  formatVolumeM3,
+  type ScenarioExport,
+} from "./scenario";
 
 interface PDFExportOptions {
   includeMapImage?: boolean;
+  /** When set, appends a Scenario & Investment Analysis section. */
+  scenario?: ScenarioExport;
 }
 
 /**
@@ -288,6 +297,74 @@ export function generatePDFReport(
     addText("No recommendations available for this analysis.");
   }
 
+  // Scenario & Investment Analysis
+  if (options.scenario) {
+    const { scenario, impact, assumptions } = options.scenario;
+
+    checkPageOverflow(110);
+    addDivider();
+    addSectionTitle("Scenario & Investment Analysis");
+
+    addText("Modeled interventions:", 10, true);
+    INTERVENTION_ORDER.forEach((key) => {
+      const fraction = scenario[key];
+      if (fraction <= 0) return;
+      const def = INTERVENTIONS[key];
+      const area = impact.convertedAreaM2[key];
+      const sized =
+        area > 0 ? ` (~${Math.round(area).toLocaleString("en-US")} m²)` : "";
+      addText(
+        `• ${def.label} — ${Math.round(fraction * 100)}% of ${
+          def.source
+        } converted${sized} at $${def.unitCostUSD}/m²`,
+        9
+      );
+    });
+    yPos += 3;
+
+    checkPageOverflow(60);
+    addMetric(
+      "Projected score",
+      `${impact.baseScore.toFixed(0)} → ${impact.projectedScore.toFixed(
+        0
+      )} (+${impact.scoreDelta.toFixed(1)})`,
+      colors.primary
+    );
+    addMetric(
+      "Flood risk",
+      `${riskLabel(impact.baseRisk)} → ${riskLabel(impact.projectedRisk)}`
+    );
+    if (impact.totalConvertedAreaM2 > 0) {
+      addMetric(
+        "Added retention",
+        `${formatVolumeM3(impact.addedRetentionM3)} / year`,
+        colors.accent
+      );
+      addMetric("Capital cost", formatCompactUSD(impact.capexUSD));
+      addMetric(
+        "Annual benefit",
+        `${formatCompactUSD(impact.annualBenefitUSD)} / year`,
+        colors.primary
+      );
+      addMetric(
+        "Simple payback",
+        impact.paybackYears === null
+          ? "N/A"
+          : impact.paybackYears > 100
+          ? "Over 100 years"
+          : `${impact.paybackYears.toFixed(1)} years`
+      );
+    }
+    yPos += 2;
+    addText(
+      `Assumptions: ${assumptions.annualRainfallMm} mm mean annual rainfall; ` +
+        `$${assumptions.benefitPerM3USD.toFixed(2)}/m³ monetized retention benefit. ` +
+        "Planning-level estimates — calibrate unit costs and benefits to local data before underwriting.",
+      8
+    );
+    yPos += 3;
+  }
+
   // Footer
   const footerY = pageHeight - 12;
   doc.setDrawColor(...colors.border);
@@ -333,8 +410,12 @@ function getLandCoverColor(key: keyof LandCover): [number, number, number] {
 /**
  * Download a PDF report for an analysis
  */
-export function downloadPDFReport(analysis: AnalysisRecord, filename?: string): void {
-  const doc = generatePDFReport(analysis);
+export function downloadPDFReport(
+  analysis: AnalysisRecord,
+  options: PDFExportOptions = {},
+  filename?: string
+): void {
+  const doc = generatePDFReport(analysis, options);
   const defaultFilename = `vers3dynamics-report-${analysis.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${new Date(analysis.created_at).toISOString().split("T")[0]}.pdf`;
   doc.save(filename || defaultFilename);
 }

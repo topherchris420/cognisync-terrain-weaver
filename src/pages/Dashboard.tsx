@@ -2,13 +2,23 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AppNav } from "@/components/AppNav";
+import { SiteComparison } from "@/components/SiteComparison";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
 import { classifyFloodRisk, riskColor, riskLabel } from "@/lib/absorption";
 import {
+  analysesToCSV,
+  analysesToGeoJSON,
+  downloadTextFile,
+  exportFilename,
+} from "@/lib/geo";
+import {
   MapPin,
   ArrowRight,
   ArrowUpRight,
+  ArrowLeftRight,
+  FileJson,
+  FileSpreadsheet,
   GaugeCircle,
   Sparkles,
   Search,
@@ -18,6 +28,7 @@ import {
   Droplets,
   ShieldCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,6 +75,8 @@ async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
 export default function Dashboard() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
 
   const {
     data: rows,
@@ -78,16 +91,72 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     if (!rows || rows.length === 0) return null;
-    const scores = rows.map((r) => Number(r.absorption_score));
+    const scores = rows
+      .map((r) => Number(r.absorption_score))
+      .sort((a, b) => a - b);
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const mid = Math.floor(scores.length / 2);
+    const median =
+      scores.length % 2 === 0 ? (scores[mid - 1] + scores[mid]) / 2 : scores[mid];
     const highRisk = rows.filter(
       (r) => classifyFloodRisk(Number(r.absorption_score)) === "high"
     ).length;
     const lowRisk = rows.filter(
       (r) => classifyFloodRisk(Number(r.absorption_score)) === "low"
     ).length;
-    return { total: rows.length, avg, highRisk, lowRisk };
+    // Ten-point buckets for the portfolio score distribution.
+    const bins = Array.from({ length: 10 }, () => 0);
+    for (const s of scores) bins[Math.min(9, Math.max(0, Math.floor(s / 10)))]++;
+    return { total: rows.length, avg, median, highRisk, lowRisk, bins };
   }, [rows]);
+
+  const toggleCompareMode = () => {
+    setCompareMode((on) => !on);
+    setCompareIds([]);
+  };
+
+  const toggleSelected = (id: string) => {
+    setCompareIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length >= 2
+        ? [prev[1], id]
+        : [...prev, id]
+    );
+  };
+
+  const comparePair = useMemo(() => {
+    if (!rows || compareIds.length !== 2) return null;
+    const a = rows.find((r) => r.id === compareIds[0]);
+    const b = rows.find((r) => r.id === compareIds[1]);
+    return a && b ? ([a, b] as const) : null;
+  }, [rows, compareIds]);
+
+  const exportFeed = (format: "geojson" | "csv", records: AnalysisRecord[]) => {
+    if (records.length === 0) return;
+    if (format === "geojson") {
+      downloadTextFile(
+        exportFilename("mannahatta-sites", "geojson"),
+        JSON.stringify(analysesToGeoJSON(records), null, 2),
+        "application/geo+json"
+      );
+    } else {
+      downloadTextFile(
+        exportFilename("mannahatta-sites", "csv"),
+        analysesToCSV(records),
+        "text/csv"
+      );
+    }
+    toast.success(
+      `Exported ${records.length} ${records.length === 1 ? "site" : "sites"} as ${format.toUpperCase()}`,
+      {
+        description:
+          format === "geojson"
+            ? "Footprint polygons + attributes, ready for QGIS / ArcGIS."
+            : "Flat attribute table for spreadsheets and BI tools.",
+      }
+    );
+  };
 
   const visible = useMemo(() => {
     if (!rows) return [];
@@ -168,6 +237,60 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Portfolio score distribution */}
+        {stats && stats.total >= 3 && (
+          <div className="panel mb-8 rounded-xl border border-border p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-semibold uppercase tracking-widest">
+                Score distribution
+              </span>
+              <span>
+                median{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {stats.median.toFixed(1)}
+                </span>
+              </span>
+            </div>
+            <div
+              className="mt-3 flex h-16 items-end gap-1"
+              role="img"
+              aria-label={`Histogram of absorption scores across ${stats.total} sites`}
+            >
+              {stats.bins.map((count, i) => {
+                const max = Math.max(...stats.bins, 1);
+                const bandStart = i * 10;
+                return (
+                  <div
+                    key={i}
+                    className="flex h-full flex-1 items-end"
+                    title={`${bandStart}–${bandStart + 9}: ${count} ${count === 1 ? "site" : "sites"}`}
+                  >
+                    <div
+                      className={cn(
+                        "w-full rounded-t-sm transition-all",
+                        bandStart >= 65
+                          ? "bg-primary/70"
+                          : bandStart >= 40
+                          ? "bg-warning/60"
+                          : "bg-destructive/60",
+                        count === 0 && "bg-muted/30"
+                      )}
+                      style={{
+                        height: `${count === 0 ? 4 : Math.max(10, (count / max) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex justify-between font-mono text-[10px] text-muted-foreground">
+              <span>0</span>
+              <span>50</span>
+              <span>100</span>
+            </div>
+          </div>
+        )}
+
         {/* Controls */}
         {rows && rows.length > 0 && (
           <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -191,7 +314,57 @@ export default function Dashboard() {
                 <SelectItem value="score-asc">Lowest score</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant={compareMode ? "default" : "outline"}
+              size="sm"
+              className="gap-2"
+              onClick={toggleCompareMode}
+              aria-pressed={compareMode}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              Compare
+            </Button>
+            <div className="flex items-center gap-1.5" role="group" aria-label="Export the feed">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => exportFeed("geojson", visible)}
+                title="Export the visible sites as GeoJSON (QGIS / ArcGIS)"
+              >
+                <FileJson className="h-4 w-4" />
+                GeoJSON
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => exportFeed("csv", visible)}
+                title="Export the visible sites as CSV"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                CSV
+              </Button>
+            </div>
           </div>
+        )}
+
+        {/* Compare-mode hint */}
+        {compareMode && !comparePair && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm text-accent">
+            <ArrowLeftRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Select two sites to compare them side by side
+            {compareIds.length === 1 && " — one selected, pick another"}.
+          </div>
+        )}
+
+        {/* Side-by-side comparison */}
+        {comparePair && (
+          <SiteComparison
+            a={comparePair[0]}
+            b={comparePair[1]}
+            onClose={() => setCompareIds([])}
+          />
         )}
 
         {/* Loading skeletons */}
@@ -264,10 +437,19 @@ export default function Dashboard() {
               )}&lng=${Number(r.center_lng).toFixed(5)}&zoom=${Number(
                 r.zoom
               ).toFixed(1)}`;
+              const selected = compareIds.includes(r.id);
               return (
                 <article
                   key={r.id}
-                  className="group panel rounded-xl border border-border p-5 transition-colors hover:border-primary/40"
+                  className={cn(
+                    "group panel rounded-xl border p-5 transition-colors",
+                    compareMode && "cursor-pointer",
+                    selected
+                      ? "border-accent ring-1 ring-accent"
+                      : "border-border hover:border-primary/40"
+                  )}
+                  onClick={compareMode ? () => toggleSelected(r.id) : undefined}
+                  aria-selected={compareMode ? selected : undefined}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -331,6 +513,7 @@ export default function Dashboard() {
                         to={mapHref}
                         className="flex items-center gap-0.5 font-medium text-muted-foreground opacity-70 transition-all hover:text-primary group-hover:opacity-100"
                         aria-label={`Open ${r.name} in the map`}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         View area
                         <ArrowUpRight className="h-3 w-3" />
