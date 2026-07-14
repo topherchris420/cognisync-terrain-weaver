@@ -84,7 +84,6 @@ margin, a rising-waterline featured card, and the roadmap as a timeline.
 
 ![Landing direction 1c — The Index](./design/screens/landing-index.png)
 
-**Design tokens** (see [`styles.css`](./design/urban-resilience-platform-screens/project/_ds/classical-41e9adfe-24b3-4e08-b46b-f5c3c274fd46/styles.css)):
 
 | Token | Value | Role |
 |---|---|---|
@@ -96,8 +95,7 @@ margin, a rising-waterline featured card, and the roadmap as a timeline.
 | `--font-body` | Lora | Justified body copy |
 | `--radius-md` | `4px` | Baked-in corner radius |
 
-These are prototypes, not production code — the intent is to recreate the visual
-output in the React frontend, not to copy the prototype markup. Inspired by my favorite version of [NYC](https://www.welikia.org/).
+Inspired by my favorite version of [NYC](https://www.welikia.org/).
 
 ## The Urban Absorption Score
 
@@ -130,10 +128,6 @@ cd <this-repo>
 npm install
 npm run dev
 ```
-
-Cloud is preconfigured — the edge function and Postgres schema are already
-deployed. The frontend reads `VITE_SUPABASE_*` from `.env` (managed by Lovable
-Cloud, do not commit changes).
 
 ### Scripts
 
