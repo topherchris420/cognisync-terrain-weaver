@@ -12,6 +12,7 @@ import { AppNav } from "@/components/AppNav";
 import { Reveal } from "@/components/Reveal";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
+import { RecentScans } from "@/components/RecentScans";
 import { SITE } from "@/lib/site";
 
 // A fixed composition used to demonstrate the two real components in the hero.
@@ -178,6 +179,10 @@ export default function Index() {
           </Reveal>
         </div>
       </section>
+
+      {/* Real scans from the public feed. Renders nothing if there are none --
+          the point of this strip is that the numbers are real. */}
+      <RecentScans />
 
       {/* How it works — a sequence, so it reads as a row, not a menu of cards. */}
       <section className="mx-auto w-full max-w-6xl px-6 py-16">
