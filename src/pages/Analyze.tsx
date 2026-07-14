@@ -5,6 +5,7 @@ import { MapView, type MapViewHandle } from "@/components/MapView";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { RecommendationsList } from "@/components/RecommendationsList";
+import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +16,17 @@ import {
   MapPin,
   Info,
   Download,
+  FileJson,
   Link2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
+import type { ScenarioExport } from "@/lib/scenario";
+import {
+  analysesToGeoJSON,
+  downloadTextFile,
+  exportFilename,
+} from "@/lib/geo";
 import { toast } from "sonner";
 
 const PRESETS: Array<{ label: string; lat: number; lng: number; zoom: number }> = [
@@ -68,6 +76,9 @@ export default function Analyze() {
   const [analyzing, setAnalyzing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<AnalysisRecord | null>(null);
+  const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(
+    null
+  );
 
   // Keep the viewport in the URL (replace, not push) so any map view is a
   // shareable, restorable deep link: /analyze?lat=..&lng=..&zoom=..
@@ -109,8 +120,15 @@ export default function Analyze() {
     try {
       // Loaded on demand: jsPDF is heavy and most sessions never export.
       const { downloadPDFReport } = await import("@/lib/pdf-export");
-      downloadPDFReport(result);
-      toast.success("PDF report downloaded");
+      downloadPDFReport(
+        result,
+        scenarioExport ? { scenario: scenarioExport } : {}
+      );
+      toast.success(
+        scenarioExport
+          ? "PDF report downloaded — includes your scenario analysis"
+          : "PDF report downloaded"
+      );
     } catch (e) {
       console.error("PDF export failed:", e);
       toast.error("PDF export failed. Please try again.");
@@ -119,10 +137,26 @@ export default function Analyze() {
     }
   };
 
+  const exportGeoJSON = () => {
+    if (!result) return;
+    downloadTextFile(
+      exportFilename(
+        `mannahatta-${result.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`,
+        "geojson"
+      ),
+      JSON.stringify(analysesToGeoJSON([result]), null, 2),
+      "application/geo+json"
+    );
+    toast.success("GeoJSON downloaded", {
+      description: "Drop it straight into QGIS, ArcGIS, or Felt.",
+    });
+  };
+
   const runAnalysis = async () => {
     if (analyzing || !mapReady) return;
     setAnalyzing(true);
     setResult(null);
+    setScenarioExport(null);
 
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
@@ -321,20 +355,32 @@ export default function Analyze() {
                     Resilience score
                   </h2>
                   <AbsorptionScoreGauge score={Number(result.absorption_score)} />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-3 gap-2"
-                    disabled={exporting}
-                    onClick={exportPDF}
-                  >
-                    {exporting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    Export PDF Report
-                  </Button>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={exporting}
+                      onClick={exportPDF}
+                    >
+                      {exporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      PDF report
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={exportGeoJSON}
+                      title="Export this analysis as GeoJSON for QGIS / ArcGIS"
+                    >
+                      <FileJson className="h-4 w-4" />
+                      GeoJSON
+                    </Button>
+                  </div>
                   {result.ai_notes && (
                     <p className="mt-3 text-sm text-muted-foreground">
                       {result.ai_notes}
@@ -354,6 +400,21 @@ export default function Analyze() {
                     Adaptation recommendations
                   </h2>
                   <RecommendationsList items={result.recommendations} />
+                </section>
+
+                <section>
+                  <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Scenario studio
+                  </h2>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Model interventions before committing capital — the PDF
+                    report picks up whatever you configure here.
+                  </p>
+                  <ScenarioStudio
+                    cover={result.land_cover}
+                    bbox={result.bbox}
+                    onScenarioChange={setScenarioExport}
+                  />
                 </section>
               </>
             )}
