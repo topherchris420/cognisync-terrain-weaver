@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
-import maplibregl, { Map as MLMap, LngLatBoundsLike } from "maplibre-gl";
+import maplibregl, { Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Button } from "@/components/ui/button";
+import { Loader2, RefreshCw, SatelliteDish } from "lucide-react";
 
 export interface MapViewHandle {
   captureImage: () => Promise<string | null>;
@@ -17,31 +19,64 @@ interface Props {
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
 }
 
-// Free ESRI World Imagery satellite tiles (no key required).
-const SATELLITE_TILES =
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+interface ImageryProvider {
+  id: string;
+  label: string;
+  tiles: string;
+  maxzoom: number;
+  attribution: string;
+}
 
-const STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    "esri-satellite": {
-      type: "raster",
-      tiles: [SATELLITE_TILES],
-      tileSize: 256,
-      attribution:
-        "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-    },
+// Keyless satellite imagery providers, tried in order. If the current one
+// can't deliver a single tile the map hot-swaps to the next.
+const PROVIDERS: ImageryProvider[] = [
+  {
+    id: "esri-world-imagery",
+    label: "Esri World Imagery",
+    tiles:
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    maxzoom: 19,
+    attribution:
+      "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
   },
-  layers: [
-    {
-      id: "satellite",
-      type: "raster",
-      source: "esri-satellite",
-      minzoom: 0,
-      maxzoom: 22,
+  {
+    id: "eox-s2cloudless",
+    label: "Sentinel-2 cloudless",
+    tiles:
+      "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg",
+    maxzoom: 15,
+    attribution: "Sentinel-2 cloudless (2020) by EOX IT Services GmbH",
+  },
+];
+
+// How long a provider gets to deliver its first tile. Hung connections never
+// fire an error event, so a watchdog is the only reliable failure signal.
+const FIRST_TILE_TIMEOUT_MS = 10_000;
+// Tile-fetch errors tolerated before giving up on a provider early.
+const MAX_TILE_ERRORS = 3;
+
+function styleFor(p: ImageryProvider): maplibregl.StyleSpecification {
+  return {
+    version: 8,
+    sources: {
+      satellite: {
+        type: "raster",
+        tiles: [p.tiles],
+        tileSize: 256,
+        // Source-level maxzoom lets MapLibre overzoom (scale) the deepest
+        // tiles instead of requesting levels the provider doesn't serve.
+        maxzoom: p.maxzoom,
+        attribution: p.attribution,
+      },
     },
-  ],
-};
+    layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+  };
+}
+
+type Status =
+  | { kind: "connecting"; provider: number }
+  | { kind: "ready" }
+  | { kind: "failed"; reason: "imagery" | "webgl" };
 
 export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
   { initialCenter = [-73.985, 40.758], initialZoom = 15, onReady, onViewChange },
@@ -49,22 +84,43 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<Status>({ kind: "connecting", provider: 0 });
+  const [attempt, setAttempt] = useState(0);
+
+  // Kept in refs so the map effect never re-runs for a new callback identity,
+  // and so a Retry recreates the map at the view the user was last on.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
+  const viewRef = useRef<{ center: [number, number]; zoom: number }>({
+    center: initialCenter,
+    zoom: initialZoom,
+  });
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: STYLE,
-      center: initialCenter,
-      zoom: initialZoom,
-      minZoom: 2,
-      maxZoom: 19,
-      // Required so we can read pixels off the canvas for AI analysis.
-      canvasContextAttributes: { preserveDrawingBuffer: true },
-      attributionControl: { compact: true },
-    });
+    let map: MLMap;
+    try {
+      map = new maplibregl.Map({
+        container,
+        style: styleFor(PROVIDERS[0]),
+        center: viewRef.current.center,
+        zoom: viewRef.current.zoom,
+        minZoom: 2,
+        maxZoom: 19,
+        // Required so we can read pixels off the canvas for AI analysis.
+        canvasContextAttributes: { preserveDrawingBuffer: true },
+        attributionControl: { compact: true },
+      });
+    } catch (e) {
+      // Typically WebGL2 unavailable: disabled, blocked, or context lost.
+      console.error("Map failed to initialize:", e);
+      setStatus({ kind: "failed", reason: "webgl" });
+      return;
+    }
 
     map.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
@@ -78,22 +134,71 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
     );
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
 
-    map.on("load", () => {
-      setReady(true);
-      onReady?.();
+    let disposed = false;
+    let provider = 0;
+    let connected = false;
+    let tileErrors = 0;
+    let watchdog: number | undefined;
+
+    const nextProvider = (why: string) => {
+      if (disposed || connected) return;
+      window.clearTimeout(watchdog);
+      if (provider + 1 >= PROVIDERS.length) {
+        console.error(
+          `Imagery provider ${PROVIDERS[provider].id} failed (${why}); no providers left.`
+        );
+        setStatus({ kind: "failed", reason: "imagery" });
+        return;
+      }
+      console.warn(
+        `Imagery provider ${PROVIDERS[provider].id} failed (${why}); switching to ${PROVIDERS[provider + 1].id}.`
+      );
+      provider += 1;
+      tileErrors = 0;
+      setStatus({ kind: "connecting", provider });
+      map.setStyle(styleFor(PROVIDERS[provider]));
+      watchdog = window.setTimeout(() => nextProvider("timeout"), FIRST_TILE_TIMEOUT_MS);
+    };
+
+    watchdog = window.setTimeout(() => nextProvider("timeout"), FIRST_TILE_TIMEOUT_MS);
+
+    // A sourcedata event carrying a tile means real imagery arrived. The
+    // "load" event alone can't be trusted: it never fires when the tile
+    // server is unreachable, and hung requests produce no error either.
+    map.on("sourcedata", (e) => {
+      if (connected || disposed || !e.tile) return;
+      connected = true;
+      window.clearTimeout(watchdog);
+      setStatus({ kind: "ready" });
+      onReadyRef.current?.();
     });
+
+    map.on("error", (e) => {
+      if (connected || disposed) return;
+      console.error("Map error before imagery connected:", e.error ?? e);
+      tileErrors += 1;
+      if (tileErrors >= MAX_TILE_ERRORS) nextProvider("tile errors");
+    });
+
     map.on("moveend", () => {
       const c = map.getCenter();
-      onViewChange?.({ lat: c.lat, lng: c.lng, zoom: map.getZoom() });
+      viewRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() };
+      onViewChangeRef.current?.({ lat: c.lat, lng: c.lng, zoom: map.getZoom() });
     });
 
     mapRef.current = map;
     return () => {
+      disposed = true;
+      window.clearTimeout(watchdog);
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [attempt]);
+
+  const retry = () => {
+    setStatus({ kind: "connecting", provider: 0 });
+    setAttempt((a) => a + 1);
+  };
 
   useImperativeHandle(
     ref,
@@ -142,10 +247,41 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
 
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className="absolute inset-0" />
-      {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-sm text-muted-foreground">
-          Loading satellite imagery…
+      {/*
+        Inline styles, not Tailwind classes: maplibre-gl.css sets
+        `.maplibregl-map { position: relative }` on this element and loads
+        after the Tailwind bundle (route-split CSS), which overrides the
+        `absolute` utility and collapses the map to 0 height.
+      */}
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+      {status.kind === "connecting" && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-background/70 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          {status.provider === 0
+            ? "Connecting to satellite imagery…"
+            : `Primary imagery unreachable — trying ${PROVIDERS[status.provider].label}…`}
+        </div>
+      )}
+      {status.kind === "failed" && (
+        <div
+          role="alert"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 p-6 text-center"
+        >
+          <SatelliteDish className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          <div className="text-sm font-medium">
+            {status.reason === "webgl"
+              ? "The map renderer couldn't start"
+              : "Satellite imagery is unreachable"}
+          </div>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            {status.reason === "webgl"
+              ? "Your browser blocked WebGL, which the map needs to draw imagery. Enable hardware acceleration or try another browser, then retry."
+              : "None of the imagery providers responded. Check your connection, then retry."}
+          </p>
+          <Button variant="outline" size="sm" onClick={retry} className="gap-2">
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            Reconnect map
+          </Button>
         </div>
       )}
     </div>

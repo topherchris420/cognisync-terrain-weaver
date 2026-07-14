@@ -48,15 +48,24 @@ const PRIORITY_META = {
 export function RecommendationsList({ items }: Props) {
   const [visibleItems, setVisibleItems] = useState<number[]>([]);
 
-  // Staggered animation
+  // Staggered animation.
+  //
+  // Two bugs used to live here. The timers were never cleared, so unmounting
+  // mid-reveal set state on a dead component; and visibleItems was never reset,
+  // so a second analysis appended its indices to the first one's array -- leaving
+  // items from the previous run's tail already "revealed" before their turn.
+  // Reset up front, and clear every timer on teardown.
   useEffect(() => {
+    setVisibleItems([]);
     if (!items?.length) return;
 
-    items.forEach((_, i) => {
+    const timers = items.map((_, i) =>
       setTimeout(() => {
         setVisibleItems((prev) => [...prev, i]);
-      }, i * 150);
-    });
+      }, i * 150)
+    );
+
+    return () => timers.forEach(clearTimeout);
   }, [items]);
 
   if (!items?.length) {
