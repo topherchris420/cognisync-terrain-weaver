@@ -1,9 +1,13 @@
 # Vers3Dynamics — Mannahatta (Urban Resilience Platform)
 
-An open-source, AI-powered analytics platform that turns any satellite view of
-a city into a **quantitative resilience report**: land-cover breakdown, an
-**Urban Absorption Score**, a flood-risk band, and prioritized
-climate-adaptation recommendations.
+**Point it at any city block. Get a quantitative climate-resilience report back in seconds.**
+
+Mannahatta is an open-source, AI-powered analytics platform that turns a
+satellite tile into land-cover breakdown, an **Urban Absorption Score**, a
+flood-risk band, and prioritized climate-adaptation recommendations — then
+lets you stress-test green-infrastructure interventions and export the
+results as a PDF, GeoJSON, or CSV. No survey crew, no proprietary dataset,
+no lock-in.
 
 Built as a modular foundation for climate-adaptation tooling — future modules
 plug in hydrological simulation, IoT sensor fusion, and city-scale digital
@@ -12,6 +16,24 @@ twins.
 ![status](https://img.shields.io/badge/status-v0.2-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)
+![PRs welcome](https://img.shields.io/badge/PRs-welcome-orange)
+
+![Mannahatta — The Manifesto landing page](./design/screens/landing-manifesto.png)
+
+## Contents
+
+- [What the platform does today](#what-the-platform-does-today)
+- [Scenario Studio & investment analytics](#scenario-studio--investment-analytics)
+- [GIS interoperability](#gis-interoperability)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Design language](#design-language)
+- [The Urban Absorption Score](#the-urban-absorption-score)
+- [Getting started](#getting-started)
+- [Project structure](#project-structure)
+- [Data model](#data-model)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 
 ## What the platform does today
 
@@ -22,11 +44,11 @@ twins.
 | Capture the visible map tile as an image | Frontend |
 | Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
 | Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
-| Generate 4 adaptation strategies (green / blue / gray infrastructure) 
+| Generate 4 adaptation strategies (green / blue / gray infrastructure) | Edge function |
 | **Scenario Studio** — what-if modeling of depaving, bioswales, permeable pavement, and green roofs with live score, retention, cost, and payback | Frontend |
-| Persist and browse a public feed with stats, search, and sorting | Postgres
+| Persist and browse a public feed with stats, search, and sorting | Postgres |
 | Portfolio analytics — score distribution histogram and side-by-side site comparison | Frontend |
-| Export any analysis as a PDF report (including the configured scenario) | Frontend
+| Export any analysis as a PDF report (including the configured scenario) | Frontend |
 | Export analyses as **GeoJSON** (footprint polygons) and **CSV** for QGIS / ArcGIS / spreadsheets | Frontend |
 
 ## Scenario Studio & investment analytics
@@ -114,7 +136,12 @@ full model control.
 - Pillow + NumPy heuristic segmenter (swap for DeepLabV3 / U-Net / SAM)
 - Dockerfile for one-command deploy
 
-![Landing direction 1a — The Manifesto](./design/screens/landing-manifesto.png)
+## Design language
+
+Three landing-page directions, all built on the same design tokens:
+
+**1a · The Manifesto** — the hero shown above: a single gold-stroke argument
+for why the platform exists.
 
 **1b · The Field Report** — data-forward: a stroke gauge, a matted satellite
 plate, and land-cover as a hairline ledger over the runoff weights.
@@ -125,7 +152,6 @@ plate, and land-cover as a hairline ledger over the runoff weights.
 margin, a rising-waterline featured card, and the roadmap as a timeline.
 
 ![Landing direction 1c — The Index](./design/screens/landing-index.png)
-
 
 | Token | Value | Role |
 |---|---|---|
@@ -165,11 +191,13 @@ runoff data in `src/lib/absorption.ts` (frontend) and
 ## Getting started
 
 ```bash
-git clone <this-repo>
-cd <this-repo>
+git clone https://github.com/topherchris420/cognisync-terrain-weaver.git
+cd cognisync-terrain-weaver
 npm install
 npm run dev
 ```
+
+The dev server runs at `http://localhost:8080`.
 
 ### Scripts
 
