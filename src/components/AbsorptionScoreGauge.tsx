@@ -152,7 +152,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
           Urban Absorption Score
         </div>
 
-        <div className="mt-1.5 flex items-center gap-2">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <div
             className={cn(
               "text-xl font-bold tracking-tight",

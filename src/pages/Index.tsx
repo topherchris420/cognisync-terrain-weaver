@@ -20,7 +20,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/AppNav";
 import { Reveal } from "@/components/Reveal";
+import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
+import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { SITE } from "@/lib/site";
+
+const previewCover = {
+  vegetation: 18,
+  soil: 6,
+  water: 4,
+  buildings: 41,
+  pavement: 31,
+};
 
 const features = [
   {
@@ -129,60 +139,75 @@ export default function Index() {
       <AppNav />
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden border-b border-border/60">
         <div className="absolute inset-0 hero-glow" aria-hidden />
         <div className="absolute inset-0 terrain-grid terrain-grid-animated opacity-40" aria-hidden />
-        <div className="relative mx-auto max-w-5xl px-6 py-20 md:py-28 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-soft" />
-            Open-source · Urban Resilience Intelligence
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div className="min-w-0">
+            <div className="border-l-2 border-accent pl-3 text-xs font-semibold uppercase tracking-widest text-accent">
+              Open-source urban resilience intelligence
+            </div>
+
+            <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-5xl">
+              See how much water your city{" "}
+              <span className="text-primary">can actually absorb.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-lg text-muted-foreground">
+              {SITE.name} analyzes satellite imagery and GIS data to estimate
+              urban permeability, quantify flood vulnerability, and surface
+              climate-adaptation strategies you can act on.
+            </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg" className="glow-primary">
+                <Link to="/analyze">
+                  Analyze a location
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/dashboard">Browse public analyses</Link>
+              </Button>
+            </div>
+
+            {/* Metric strip */}
+            <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border/60 pt-6 sm:grid-cols-4">
+              {[
+                { k: "5", l: "land-cover classes" },
+                { k: "0–100", l: "absorption score" },
+                { k: "4", l: "what-if interventions" },
+                { k: "3", l: "open export formats" },
+              ].map((m) => (
+                <div key={m.l} className="min-w-0">
+                  <div className="font-mono text-xl font-semibold text-foreground">
+                    {m.k}
+                  </div>
+                  <div className="mt-0.5 text-xs uppercase tracking-widest text-muted-foreground">
+                    {m.l}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <h1 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight">
-            See how much water your city{" "}
-            <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              can actually absorb.
-            </span>
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-            {SITE.name} analyzes satellite imagery and GIS data to estimate
-            urban permeability, quantify flood vulnerability, and surface
-            climate-adaptation strategies you can act on.
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" className="glow-primary">
-              <Link to="/analyze">
-                Analyze a location
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/dashboard">Browse public analyses</Link>
-            </Button>
-          </div>
-
-          {/* Metric strip */}
-          <div className="mx-auto mt-14 grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-4">
-            {[
-              { k: "5", l: "land-cover classes" },
-              { k: "0–100", l: "absorption score" },
-              { k: "4", l: "what-if interventions" },
-              { k: "3", l: "open export formats" },
-            ].map((m) => (
-              <div
-                key={m.l}
-                className="panel rounded-lg border border-border p-4"
-              >
-                <div className="font-mono text-2xl font-semibold text-primary">
-                  {m.k}
-                </div>
-                <div className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">
-                  {m.l}
-                </div>
+          {/* Live product preview, not decoration */}
+          <Reveal delay={120} className="panel min-w-0 rounded-xl border border-border p-5 md:p-6">
+            <div className="flex items-center justify-between border-b border-border/60 pb-4">
+              <div>
+                <div className="text-sm font-semibold">Lower Manhattan, NY</div>
+                <div className="text-xs text-muted-foreground">2.1 km² · scanned just now</div>
               </div>
-            ))}
-          </div>
+              <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                Sample scan
+              </span>
+            </div>
+            <div className="pt-5">
+              <AbsorptionScoreGauge score={58} />
+            </div>
+            <div className="mt-6 border-t border-border/60 pt-5">
+              <LandCoverBreakdown cover={previewCover} />
+            </div>
+          </Reveal>
         </div>
       </section>
 
