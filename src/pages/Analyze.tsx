@@ -7,6 +7,7 @@ import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { LocationSearch } from "@/components/LocationSearch";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
+import { AnalyzingState } from "@/components/AnalyzingState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,6 @@ import {
   Loader2,
   Play,
   Sparkles,
-  MapPin,
   Info,
   Download,
   FileJson,
@@ -70,6 +70,7 @@ export default function Analyze() {
   const [analyzing, setAnalyzing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<AnalysisRecord | null>(null);
+  const [capturedTile, setCapturedTile] = useState<string | null>(null);
   const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(
     null
   );
@@ -150,6 +151,7 @@ export default function Analyze() {
     if (analyzing || !mapReady) return;
     setAnalyzing(true);
     setResult(null);
+    setCapturedTile(null);
     setScenarioExport(null);
 
     try {
@@ -159,6 +161,8 @@ export default function Analyze() {
         setAnalyzing(false);
         return;
       }
+      // Surface the exact tile going to the model while the request is in flight.
+      setCapturedTile(imageDataUrl);
       const bounds = mapRef.current?.getBounds() ?? null;
 
       const { data, error } = await supabase.functions.invoke("analyze-terrain", {
@@ -198,12 +202,13 @@ export default function Analyze() {
     }
   };
 
-  // On small screens the results render below the fold — bring them into view.
+  // On small screens the panel renders below the fold — bring it into view when
+  // work starts so the analysing progress is visible, and again when results land.
   useEffect(() => {
-    if (result && window.innerWidth < 1024) {
+    if ((analyzing || result) && window.innerWidth < 1024) {
       resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [result]);
+  }, [analyzing, result]);
 
   // Search pre-fills the location label, but the map can be panned away
   // afterwards -- the label stays editable so it can't silently disagree with
@@ -321,6 +326,8 @@ export default function Analyze() {
             aria-live="polite"
             aria-busy={analyzing}
           >
+            {analyzing && <AnalyzingState tile={capturedTile} />}
+
             {!result && !analyzing && (
               <div className="rounded-lg border border-dashed border-border p-8 text-center">
                 <Sparkles className="mx-auto mb-3 h-6 w-6 text-primary" />
@@ -332,7 +339,7 @@ export default function Analyze() {
               </div>
             )}
 
-            {result && (
+            {result && !analyzing && (
               <>
                 <section>
                   <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
