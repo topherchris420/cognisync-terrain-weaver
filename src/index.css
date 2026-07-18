@@ -117,6 +117,36 @@
     box-shadow: var(--shadow-glow);
   }
 
+  /* Analysis "scanning" sweep — a soft primary band that tracks down the tile
+     being classified, giving the wait a sense of active work. */
+  .scanline {
+    height: 34%;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      hsl(var(--primary) / 0.22),
+      transparent
+    );
+    animation: scan 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes scan {
+    0% {
+      top: -34%;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    85% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+      opacity: 0;
+    }
+  }
+
   /* Scroll-reveal: elements start hidden, fade/rise in once observed */
   .reveal {
     opacity: 0;
@@ -143,6 +173,13 @@
     opacity: 1;
     transform: none;
     transition: none;
+  }
+
+  /* Hold the sweep still rather than looping it. */
+  .scanline {
+    animation: none;
+    top: 33%;
+    opacity: 0.5;
   }
 
 }
