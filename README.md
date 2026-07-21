@@ -3,7 +3,7 @@
 **Point it at any city block. Get a quantitative climate-resilience report back in seconds.**
 
 Mannahatta is an open-source, AI-powered analytics platform that turns a
-satellite tile into land-cover breakdown, an **Urban Absorption Score**, a
+satellite tile into a land-cover breakdown, an **Urban Absorption Score**, a
 flood-risk band, and prioritized climate-adaptation recommendations — then
 lets you stress-test green-infrastructure interventions and export the
 results as a PDF, GeoJSON, or CSV. No survey crew, no proprietary dataset,
