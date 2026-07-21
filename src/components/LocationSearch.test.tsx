@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
+import type { FormEvent } from "react";
 import { LocationSearch } from "@/components/LocationSearch";
 
 describe("LocationSearch", () => {
@@ -42,6 +43,61 @@ describe("LocationSearch", () => {
     expect(screen.getByText("Copenhagen, DK")).toBeInTheDocument();
     expect(screen.getByText("Lagos, NG")).toBeInTheDocument();
     expect(screen.getByText("Phoenix, AZ")).toBeInTheDocument();
+  });
+
+  it("renders option buttons as type=button, not submit", () => {
+    // Analyze wraps this list in a <form>. An untyped button defaults to
+    // type=submit, so a location pick would submit the form and fire the scan
+    // against the pre-flyTo map view. Every option must opt out explicitly.
+    render(<LocationSearch onSelect={vi.fn()} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    for (const opt of screen.getAllByRole("option")) {
+      expect(opt).toHaveAttribute("type", "button");
+    }
+  });
+
+  it("clicking a preset does not submit an enclosing form", () => {
+    const onSubmit = vi.fn((e: FormEvent) => e.preventDefault());
+    const onSelect = vi.fn();
+    render(
+      <form onSubmit={onSubmit}>
+        <LocationSearch onSelect={onSelect} />
+      </form>
+    );
+    fireEvent.focus(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByText("Manhattan, NY"));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clicking a search result does not submit an enclosing form", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { display_name: "Berlin, Germany", lat: "52.52", lon: "13.405" },
+      ],
+    } as Response);
+
+    const onSubmit = vi.fn((e: FormEvent) => e.preventDefault());
+    const onSelect = vi.fn();
+    render(
+      <form onSubmit={onSubmit}>
+        <LocationSearch onSelect={onSelect} />
+      </form>
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "berlin" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    fireEvent.click(screen.getByText("Berlin, Germany"));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("selects the first option via ArrowDown then Enter", () => {
