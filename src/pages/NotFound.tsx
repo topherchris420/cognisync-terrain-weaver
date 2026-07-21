@@ -3,8 +3,10 @@ import { useEffect } from "react";
 import { Compass, ArrowLeft, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/AppNav";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 const NotFound = () => {
+  usePageTitle("Page not found");
   const location = useLocation();
 
   useEffect(() => {
@@ -18,7 +20,7 @@ const NotFound = () => {
     <div className="flex min-h-screen flex-col">
       <AppNav />
 
-      <main className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-20">
+      <main id="main" className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-20">
         <div className="absolute inset-0 hero-glow" aria-hidden />
         <div className="absolute inset-0 terrain-grid opacity-30" aria-hidden />
 

@@ -13,6 +13,23 @@ describe("AbsorptionScoreGauge", () => {
     expect(screen.getByText("Critical")).toBeInTheDocument();
   });
 
+  it("keeps the status word and the risk pill on the same band boundary", () => {
+    // A score of 58 is "low" risk (>= 55). The status word once used its own
+    // 65 threshold, so it read "Vulnerable" beside a "Low" pill. Both must now
+    // derive from the same band: a low-risk score reads "Resilient".
+    render(<AbsorptionScoreGauge score={58} animated={false} />);
+    expect(screen.getByText("Resilient")).toBeInTheDocument();
+    expect(screen.getByText("Low")).toBeInTheDocument();
+    expect(screen.queryByText("Vulnerable")).not.toBeInTheDocument();
+  });
+
+  it("labels a moderate-band score as vulnerable", () => {
+    // 40 sits in the moderate band (35–54); status and pill agree.
+    render(<AbsorptionScoreGauge score={40} animated={false} />);
+    expect(screen.getByText("Vulnerable")).toBeInTheDocument();
+    expect(screen.getByText("Moderate")).toBeInTheDocument();
+  });
+
   it("clamps a score above 100", () => {
     render(<AbsorptionScoreGauge score={150} animated={false} />);
     expect(screen.getByText("100")).toBeInTheDocument();

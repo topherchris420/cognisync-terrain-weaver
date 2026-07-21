@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Sprout, Droplets, Building2, TrendingUp, Lightbulb, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import type { Recommendation } from "@/lib/types";
-import { Button } from "@/components/ui/button";
 
 interface Props {
   items: Recommendation[];
@@ -46,6 +46,7 @@ const PRIORITY_META = {
 } as const;
 
 export function RecommendationsList({ items }: Props) {
+  const reduceMotion = usePrefersReducedMotion();
   const [visibleItems, setVisibleItems] = useState<number[]>([]);
 
   // Staggered animation.
@@ -59,6 +60,11 @@ export function RecommendationsList({ items }: Props) {
     setVisibleItems([]);
     if (!items?.length) return;
 
+    if (reduceMotion) {
+      setVisibleItems(items.map((_, i) => i));
+      return;
+    }
+
     const timers = items.map((_, i) =>
       setTimeout(() => {
         setVisibleItems((prev) => [...prev, i]);
@@ -66,7 +72,7 @@ export function RecommendationsList({ items }: Props) {
     );
 
     return () => timers.forEach(clearTimeout);
-  }, [items]);
+  }, [items, reduceMotion]);
 
   if (!items?.length) {
     return (
@@ -94,7 +100,7 @@ export function RecommendationsList({ items }: Props) {
           <li
             key={i}
             className={cn(
-              "relative overflow-hidden rounded-xl border border-border bg-card/60 p-4 transition-all duration-500 hover:border-primary/50 hover:shadow-md",
+              "relative overflow-hidden rounded-xl border border-border bg-card/60 p-4 transition-all duration-500 motion-reduce:transition-none hover:border-primary/50 hover:shadow-md",
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >

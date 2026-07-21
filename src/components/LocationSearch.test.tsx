@@ -61,6 +61,46 @@ describe("LocationSearch", () => {
     });
   });
 
+  it("selects the top hit on Enter with no option highlighted", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { display_name: "Berlin, Germany", lat: "52.52", lon: "13.405" },
+      ],
+    } as Response);
+
+    const onSelect = vi.fn();
+    render(<LocationSearch onSelect={onSelect} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "berlin" } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    // No ArrowDown first -- typing then Enter should still take the first hit,
+    // adding the default zoom the map flies to.
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "Berlin, Germany", zoom: 14 })
+    );
+  });
+
+  it("does nothing on Enter for an empty query with no highlight", () => {
+    const onSelect = vi.fn();
+    render(<LocationSearch onSelect={onSelect} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+
+    // Presets are shown but none is highlighted -- Enter should not guess one.
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("wraps ArrowUp from nothing highlighted to the last option", () => {
     render(<LocationSearch onSelect={vi.fn()} />);
     const input = screen.getByRole("combobox");

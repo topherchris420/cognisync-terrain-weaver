@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { LAND_COVER_META, type LandCoverKey } from "@/lib/types";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 const ORDER: LandCoverKey[] = [
   "vegetation",
@@ -73,6 +74,7 @@ async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
 }
 
 export default function Dashboard() {
+  usePageTitle("Dashboard");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
   const [compareMode, setCompareMode] = useState(false);
@@ -174,7 +176,7 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen flex-col">
       <AppNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-6 md:py-12">
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-6 md:py-12">
         <header className="mb-8 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold">
@@ -259,6 +261,11 @@ export default function Dashboard() {
               {stats.bins.map((count, i) => {
                 const max = Math.max(...stats.bins, 1);
                 const bandStart = i * 10;
+                // Tint each bucket by the model's own banding (a 10-wide bucket
+                // can straddle a boundary; its midpoint is the least-wrong
+                // representative). Hardcoded cutoffs here once disagreed with
+                // classifyFloodRisk, tinting whole buckets the wrong risk.
+                const bucketRisk = classifyFloodRisk(bandStart + 5);
                 return (
                   <div
                     key={i}
@@ -268,9 +275,9 @@ export default function Dashboard() {
                     <div
                       className={cn(
                         "w-full rounded-t-sm transition-all",
-                        bandStart >= 65
+                        bucketRisk === "low"
                           ? "bg-primary/70"
-                          : bandStart >= 40
+                          : bucketRisk === "moderate"
                           ? "bg-warning/60"
                           : "bg-destructive/60",
                         count === 0 && "bg-muted/30"
@@ -448,8 +455,29 @@ export default function Dashboard() {
                       ? "border-accent ring-1 ring-accent"
                       : "border-border hover:border-primary/40"
                   )}
+                  // In compare mode the card is a toggle, and must be one for
+                  // the keyboard too. The keydown guard ignores Enter/Space
+                  // bubbling up from the inner "View area" link.
                   onClick={compareMode ? () => toggleSelected(r.id) : undefined}
-                  aria-selected={compareMode ? selected : undefined}
+                  onKeyDown={
+                    compareMode
+                      ? (e) => {
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSelected(r.id);
+                          }
+                        }
+                      : undefined
+                  }
+                  role={compareMode ? "button" : undefined}
+                  tabIndex={compareMode ? 0 : undefined}
+                  aria-pressed={compareMode ? selected : undefined}
+                  aria-label={
+                    compareMode
+                      ? `${selected ? "Remove" : "Select"} ${r.name} for comparison`
+                      : undefined
+                  }
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

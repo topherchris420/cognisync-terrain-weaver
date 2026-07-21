@@ -5,6 +5,8 @@
 
 export const SITE = {
   name: "Vers3Dynamics",
+  /** Product name — matches the <title> baked into index.html. */
+  product: "Mannahatta",
   tagline: "Urban Resilience Intelligence",
   url: "https://vers3dynamics.com",
   repoUrl: "https://github.com/topherchris420/cognisync-terrain-weaver",

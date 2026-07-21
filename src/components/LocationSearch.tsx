@@ -92,6 +92,10 @@ export function LocationSearch({ onSelect }: Props) {
         e.preventDefault();
         if (activeIndex >= 0) {
           selectOption(activeIndex);
+        } else if (trimmedQuery !== "" && options.length > 0) {
+          // Type a place and hit Enter: take the top hit. Requiring an arrow
+          // key first made Enter silently do nothing.
+          selectOption(0);
         }
         break;
       case "Escape":

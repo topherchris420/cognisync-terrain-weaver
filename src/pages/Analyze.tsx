@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Loader2,
+  MapPin,
   Play,
   Sparkles,
   Info,
@@ -20,6 +21,7 @@ import {
   FileJson,
   Link2,
 } from "lucide-react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
 import type { GeocodeResult } from "@/lib/geocode";
@@ -53,6 +55,7 @@ function viewFromParams(params: URLSearchParams) {
 }
 
 export default function Analyze() {
+  usePageTitle("Analyze");
   const mapRef = useRef<MapViewHandle>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -222,7 +225,7 @@ export default function Analyze() {
     <div className="flex min-h-screen flex-col">
       <AppNav />
 
-      <main className="flex-1 grid gap-0 lg:grid-cols-[1fr_400px] min-h-0">
+      <main id="main" className="flex-1 grid gap-0 lg:grid-cols-[1fr_400px] min-h-0">
         {/* Map */}
         <div className="relative min-h-[420px] lg:min-h-0 border-b lg:border-b-0 lg:border-r border-border">
           <MapView
@@ -259,7 +262,16 @@ export default function Analyze() {
               visible satellite tile.
             </p>
 
-            <div className="mt-4 space-y-3">
+            {/* A real form: pressing Enter in the name or label fields starts
+                the scan. LocationSearch preventDefaults its own Enter key, so
+                picking a search result never submits. */}
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                runAnalysis();
+              }}
+            >
               <div className="space-y-1.5">
                 <Label htmlFor="location-search">Location</Label>
                 <LocationSearch onSelect={goTo} />
@@ -287,7 +299,7 @@ export default function Analyze() {
               </div>
 
               <Button
-                onClick={runAnalysis}
+                type="submit"
                 disabled={analyzing || !mapReady}
                 size="lg"
                 className="w-full glow-primary"
@@ -317,7 +329,7 @@ export default function Analyze() {
                   vision AI. Higher zoom = higher precision.
                 </span>
               </div>
-            </div>
+            </form>
           </div>
 
           <div
@@ -341,6 +353,50 @@ export default function Analyze() {
 
             {result && !analyzing && (
               <>
+                {/* The exact tile the report describes, so the numbers below
+                    are visibly grounded in what was captured. */}
+                <section aria-label="Analyzed site">
+                  <div className="relative overflow-hidden rounded-lg border border-border">
+                    {capturedTile && (
+                      <img
+                        src={capturedTile}
+                        alt={`Satellite tile analyzed for ${result.name}`}
+                        className="block aspect-video w-full object-cover"
+                      />
+                    )}
+                    <div
+                      className={
+                        capturedTile
+                          ? "absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/95 via-background/70 to-transparent px-3 pb-2.5 pt-10"
+                          : "px-3 py-2.5"
+                      }
+                    >
+                      <div className="truncate text-sm font-semibold">
+                        {result.name}
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                          {result.location_label ??
+                            `${Number(result.center_lat).toFixed(4)}, ${Number(
+                              result.center_lng
+                            ).toFixed(4)}`}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <time
+                          dateTime={result.created_at}
+                          className="shrink-0"
+                        >
+                          {new Date(result.created_at).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                        </time>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
                 <section>
                   <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Resilience score
