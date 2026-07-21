@@ -8,6 +8,12 @@ import { RecommendationsList } from "@/components/RecommendationsList";
 import { LocationSearch } from "@/components/LocationSearch";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { AnalyzingState } from "@/components/AnalyzingState";
+import {
+  SimulationPanel,
+  type SimulationRunParams,
+} from "@/components/SimulationPanel";
+import { FlowLayer } from "@/components/FlowLayer";
+import { RiskHeatmap } from "@/components/RiskHeatmap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,14 +30,20 @@ import {
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { supabase } from "@/integrations/supabase/client";
+import type { Map as MLMap } from "maplibre-gl";
 import type { AnalysisRecord } from "@/lib/types";
 import type { GeocodeResult } from "@/lib/geocode";
 import type { ScenarioExport } from "@/lib/scenario";
+import type { SimulationResponse } from "@/lib/simulation-types";
 import {
   analysesToGeoJSON,
+  bboxAreaKm2,
   downloadTextFile,
   exportFilename,
+  parseBBox,
+  type BBox,
 } from "@/lib/geo";
+import { boundsToSimBBox, MAX_SIMULATION_AREA_KM2 } from "@/lib/simulation";
 import { toast } from "sonner";
 
 const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
@@ -71,6 +83,7 @@ export default function Analyze() {
   const [locationLabel, setLocationLabel] = useState("");
   const [view, setView] = useState(initialView);
   const [mapReady, setMapReady] = useState(false);
+  const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<AnalysisRecord | null>(null);
@@ -78,6 +91,23 @@ export default function Analyze() {
   const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(
     null
   );
+  const [simulating, setSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
+
+  // The analyzed footprint, if one was stored — drives the instant runoff
+  // estimate and the "too large to simulate" guard on the panel.
+  const analyzedBBox: BBox | null = useMemo(
+    () => (result ? parseBBox(result.bbox) : null),
+    [result]
+  );
+  const simDisabledReason = useMemo(() => {
+    if (!analyzedBBox) return null;
+    const area = bboxAreaKm2(analyzedBBox);
+    if (area > MAX_SIMULATION_AREA_KM2) {
+      return `This view spans ${area.toFixed(0)} km² — zoom in to under ${MAX_SIMULATION_AREA_KM2} km² to simulate runoff.`;
+    }
+    return null;
+  }, [analyzedBBox]);
 
   // Keep the viewport in the URL (replace, not push) so any map view is a
   // shareable, restorable deep link: /analyze?lat=..&lng=..&zoom=..
@@ -157,6 +187,7 @@ export default function Analyze() {
     setResult(null);
     setCapturedTile(null);
     setScenarioExport(null);
+    setSimResult(null);
 
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
@@ -206,6 +237,63 @@ export default function Analyze() {
     }
   };
 
+  // Route a design storm across the currently-visible terrain: the edge
+  // function pulls elevation, runs D8 flow accumulation, and returns flow paths
+  // + flood-risk zones that draw onto the map as overlays.
+  const runSimulation = async (params: SimulationRunParams) => {
+    if (simulating) return;
+    const bounds = mapRef.current?.getBounds() as BBox | null;
+    if (!bounds) {
+      toast.error("Map isn't ready yet — try again in a moment.");
+      return;
+    }
+    const areaKm2 = bboxAreaKm2(bounds);
+    if (areaKm2 > MAX_SIMULATION_AREA_KM2) {
+      toast.error(
+        `This view spans ${areaKm2.toFixed(0)} km². Zoom in to under ${MAX_SIMULATION_AREA_KM2} km² and try again.`
+      );
+      return;
+    }
+
+    setSimulating(true);
+    setSimResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("run-simulation", {
+        body: {
+          bbox: boundsToSimBBox(bounds),
+          rainfall_mm: params.rainfall_mm,
+          resolution: params.resolution,
+          include_drainage: params.include_drainage,
+        },
+      });
+
+      if (error) {
+        console.error("run-simulation failed:", error);
+        toast.error(
+          error.message?.includes("429")
+            ? "Rate limit hit. Please wait a moment and try again."
+            : "Simulation failed — see console for details."
+        );
+        return;
+      }
+
+      const sim = data as SimulationResponse;
+      if (!sim?.metadata) {
+        toast.error("Simulation returned no result.");
+        return;
+      }
+      setSimResult(sim);
+      toast.success("Simulation complete", {
+        description: `${sim.risk_zones.length} risk zones and ${sim.flow_paths.length} flow paths mapped over ${params.rainfall_mm}mm of rain.`,
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error("Unexpected error running the simulation.");
+    } finally {
+      setSimulating(false);
+    }
+  };
+
   // On small screens the panel renders below the fold — bring it into view when
   // work starts so the analysing progress is visible, and again when results land.
   useEffect(() => {
@@ -229,6 +317,7 @@ export default function Analyze() {
     setResult(null);
     setCapturedTile(null);
     setScenarioExport(null);
+    setSimResult(null);
     if (window.innerWidth < 1024) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -245,9 +334,16 @@ export default function Analyze() {
             ref={mapRef}
             initialCenter={[initialView.lng, initialView.lat]}
             initialZoom={initialView.zoom}
-            onReady={() => setMapReady(true)}
+            onReady={() => {
+              setMapReady(true);
+              setMapInstance(mapRef.current?.getMap() ?? null);
+            }}
             onViewChange={onViewChange}
           />
+
+          {/* Simulation overlays — render nothing until a simulation returns. */}
+          <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
+          <FlowLayer map={mapInstance} flowPaths={simResult?.flow_paths ?? []} />
 
           {/* Floating chip: coords + share */}
           <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
@@ -482,6 +578,24 @@ export default function Analyze() {
                     cover={result.land_cover}
                     bbox={result.bbox}
                     onScenarioChange={setScenarioExport}
+                  />
+                </section>
+
+                <section>
+                  <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Hydrological simulation
+                  </h2>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Route a design storm across the terrain — flow paths and
+                    flood-risk zones draw straight onto the map.
+                  </p>
+                  <SimulationPanel
+                    landCover={result.land_cover}
+                    bbox={analyzedBBox}
+                    onRunSimulation={runSimulation}
+                    simulationResult={simResult ?? undefined}
+                    isLoading={simulating}
+                    disabledReason={simDisabledReason}
                   />
                 </section>
               </>

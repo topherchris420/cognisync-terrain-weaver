@@ -21,3 +21,12 @@ Object.defineProperty(window, "matchMedia", {
 
 window.HTMLCanvasElement.prototype.getContext =
   vi.fn() as unknown as typeof window.HTMLCanvasElement.prototype.getContext;
+
+// jsdom ships no ResizeObserver; Radix primitives (Slider, Select) construct one.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+window.ResizeObserver =
+  window.ResizeObserver ?? (ResizeObserverStub as typeof ResizeObserver);

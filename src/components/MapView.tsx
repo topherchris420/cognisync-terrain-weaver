@@ -10,6 +10,8 @@ export interface MapViewHandle {
   getCenter: () => { lat: number; lng: number };
   getZoom: () => number;
   flyTo: (lat: number, lng: number, zoom?: number) => void;
+  /** The live MapLibre instance, for overlay layers (flow paths, risk zones). */
+  getMap: () => MLMap | null;
 }
 
 interface Props {
@@ -287,6 +289,9 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
           zoom: zoom ?? mapRef.current!.getZoom(),
           essential: true,
         });
+      },
+      getMap() {
+        return mapRef.current;
       },
     }),
     []

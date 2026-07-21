@@ -170,13 +170,17 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
     [map]
   );
 
-  // Auto-add to map when riskZones are provided
+  // Sync overlay with the current zones: add/update when there are zones,
+  // and tear the layer down again when they're cleared.
   useEffect(() => {
-    if (riskZones.length > 0 && map) {
+    if (!map) return;
+    if (riskZones.length > 0) {
       addToMap();
       updateZones(riskZones);
+    } else {
+      removeFromMap();
     }
-  }, [riskZones, map, addToMap, updateZones]);
+  }, [riskZones, map, addToMap, updateZones, removeFromMap]);
 
   useImperativeHandle(
     ref,

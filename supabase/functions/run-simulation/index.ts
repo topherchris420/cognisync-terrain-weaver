@@ -24,6 +24,12 @@ const RESOLUTION_GRID: Record<string, number> = {
   high: 180,
 };
 
+// Largest area (km²) we'll simulate. The grid is a fixed size per resolution,
+// so a bigger box just means coarser cells; this caps it at a scale where the
+// runoff model still says something useful. Mirrored client-side in
+// src/lib/simulation.ts (MAX_SIMULATION_AREA_KM2).
+const MAX_AREA_KM2 = 50;
+
 interface BBox {
   north: number;
   south: number;
@@ -287,10 +293,15 @@ function calculateFlowAccumulation(
         }
 
         if (path.length > 1) {
+          // Flow velocity from the head drop between the path's source (i,j)
+          // and its outlet (r,c), via Torricelli v = sqrt(2·g·h). Clamped to a
+          // sane channel range so flat terrain still reads as slow-moving flow.
+          const headDrop = Math.max(0, elevation[i][j] - elevation[r][c]);
+          const velocity = Math.min(10, Math.max(0.5, Math.sqrt(2 * 9.81 * headDrop)));
           paths.push({
             points: path,
             volume_m3: accumulation[i][j],
-            velocity_mps: Math.sqrt(2 * 9.81 * (elevation[i][j] - elevation[path.length > 1 ? path.length - 1 : 0] || 0)) || 1,
+            velocity_mps: velocity,
           });
         }
       }
@@ -440,10 +451,13 @@ Deno.serve(async (req) => {
     return jsonError(400, "Invalid bbox: coordinates out of range.");
   }
 
-  // Validate area (max 1km²)
+  // Validate area
   const areaKm2 = calculateAreaKm2(bbox);
-  if (areaKm2 > 1) {
-    return jsonError(400, "Area too large. Please zoom in to under 1km².");
+  if (areaKm2 > MAX_AREA_KM2) {
+    return jsonError(
+      400,
+      `Area too large (${areaKm2.toFixed(0)} km²). Please zoom in to under ${MAX_AREA_KM2} km².`,
+    );
   }
 
   // Validate resolution
