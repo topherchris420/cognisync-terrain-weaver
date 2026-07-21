@@ -40,6 +40,7 @@ twins.
 | Capability | Where it runs |
 |---|---|
 | Interactive satellite map (MapLibre GL + free ESRI imagery, automatic Sentinel-2 fallback) | Frontend |
+| Free-text location search (OpenStreetMap Nominatim, no API key) with one-click city presets | Frontend |
 | Shareable deep links — every map view is a restorable URL | Frontend |
 | Capture the visible map tile as an image | Frontend |
 | Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
@@ -123,8 +124,12 @@ full model control.
 - MapLibre GL JS with free ESRI World Imagery tiles (no API key), with
   automatic failover to EOX Sentinel-2 cloudless imagery and an explicit
   reconnect UI if no provider is reachable
+- OpenStreetMap Nominatim geocoding for free-text location search (no API key)
 - shadcn/ui primitives + Radix UI
 - TanStack Query, React Router, Sonner
+- Route-level code splitting (the ~800 kB map bundle never touches the landing page)
+- Vitest + React Testing Library for unit and component tests
+- Capacitor shells for iOS and Android (`capacitor.config.ts`)
 
 **Backend (Lovable Cloud)**
 - Supabase Postgres for persistence
@@ -218,7 +223,22 @@ npm install
 npm run dev
 ```
 
-The dev server runs at `http://localhost:8080`.
+The dev server runs at `http://localhost:8080`. It works out of the box: the
+committed `.env` points at a public, read-only demo backend.
+
+### Configuration
+
+To run against your own backend, set these in `.env` (all `VITE_`-prefixed so
+Vite exposes them to the client):
+
+| Variable | Purpose |
+|---|---|
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon / publishable key |
+| `VITE_SUPABASE_PROJECT_ID` | Supabase project ref |
+
+The edge function also reads a `LOVABLE_API_KEY` secret (the AI gateway key)
+from the Supabase environment — see `supabase/functions/analyze-terrain/index.ts`.
 
 ### Scripts
 
@@ -228,7 +248,8 @@ The dev server runs at `http://localhost:8080`.
 | `npm run build` | Production build (route-level code splitting) |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest unit tests (scoring logic) |
+| `npm test` | Vitest unit + component tests (scoring, scenario math, GIS export, geocoding, UI) |
+| `npm run test:watch` | Vitest in watch mode |
 
 All four checks run in CI on every push and pull request
 (`.github/workflows/ci.yml`).
@@ -250,36 +271,48 @@ swap the naive HSV-based segmenter for DeepLabV3, U-Net, or SAM.
 ```
 src/
 ├── pages/
-│   ├── Index.tsx          Landing page
-│   ├── Analyze.tsx        Map + analysis workflow
-│   └── Dashboard.tsx      Public feed of analyses
+│   ├── Index.tsx          Landing page (live scans, absorption model explainer)
+│   ├── Analyze.tsx        Map + search + analysis workflow
+│   ├── Dashboard.tsx      Public feed of analyses
+│   └── NotFound.tsx
 ├── components/
 │   ├── AppNav.tsx
 │   ├── MapView.tsx        MapLibre wrapper + image capture
+│   ├── LocationSearch.tsx Nominatim search box + city presets
 │   ├── AbsorptionScoreGauge.tsx
 │   ├── LandCoverBreakdown.tsx
 │   ├── RecommendationsList.tsx
+│   ├── AnalyzingState.tsx Progress UI during a scan
+│   ├── RecentScans.tsx    Live scan strip on the landing page
 │   ├── ScenarioStudio.tsx What-if intervention modeling + ROI panel
-│   └── SiteComparison.tsx Side-by-side comparison of two analyses
+│   ├── SiteComparison.tsx Side-by-side comparison of two analyses
+│   ├── ErrorBoundary.tsx  App-level error fallback
+│   └── ui/                shadcn/ui primitives
 ├── lib/
 │   ├── types.ts           LandCover, Recommendation, Analysis
 │   ├── absorption.ts      Score + risk classification
-│   ├── absorption.test.ts Unit tests for scoring + risk bands
 │   ├── scenario.ts        Interventions, projections, retention, cost, payback
-│   ├── scenario.test.ts   Unit tests for scenario math + finance
 │   ├── geo.ts             BBox parsing, spherical area, GeoJSON/CSV export
-│   ├── geo.test.ts        Unit tests for the GIS toolkit
-│   └── pdf-export.ts      PDF report generation (lazy-loaded)
+│   ├── geocode.ts         Free-text location search (Nominatim)
+│   ├── site.ts            Site metadata + copy
+│   ├── pdf-export.ts      PDF report generation (lazy-loaded)
+│   └── *.test.ts          Co-located Vitest unit tests
+├── hooks/                 use-mobile, use-page-title, use-reveal, …
 └── integrations/
     └── supabase/          Auto-generated Cloud client
 
 supabase/
-├── functions/analyze-terrain/index.ts
+├── functions/
+│   ├── analyze-terrain/   Classify → score → recommend → persist
+│   └── run-simulation/    Hydrological runoff scaffolding (v0.3, in progress)
 ├── migrations/            Schema history
 └── config.toml
 
 backend/                   Reference FastAPI service (not run by Lovable)
 ```
+
+> Component tests live next to their components (`*.test.tsx`); scoring,
+> scenario, GIS, and geocoding logic each have co-located `*.test.ts` suites.
 
 ## Data model
 
@@ -306,7 +339,7 @@ fork it for a private deployment).
 
 - **v0.1** ✅ — Land cover classification, absorption scoring, adaptation LLM
 - **v0.2** ✅ — Scenario Studio (what-if interventions + investment analytics), GeoJSON/CSV export, portfolio comparison
-- **v0.3** — Hydrological runoff simulation (SWMM integration), IoT sensor fusion (rain gauges, soil moisture over MQTT)
+- **v0.3** 🚧 — Hydrological runoff simulation (flow engine + `run-simulation` edge function scaffolding landed; SWMM integration next), IoT sensor fusion (rain gauges, soil moisture over MQTT)
 - **v1.0** — Digital twin export + public REST/GraphQL API
 
 ## Contributing
