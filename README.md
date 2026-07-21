@@ -13,7 +13,7 @@ Built as a modular foundation for climate-adaptation tooling — future modules
 plug in hydrological simulation, IoT sensor fusion, and city-scale digital
 twins.
 
-![status](https://img.shields.io/badge/status-v0.2-brightgreen)
+![status](https://img.shields.io/badge/status-v0.3-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-orange)
@@ -24,6 +24,7 @@ twins.
 
 - [What the platform does today](#what-the-platform-does-today)
 - [Scenario Studio & investment analytics](#scenario-studio--investment-analytics)
+- [Hydrological runoff simulation](#hydrological-runoff-simulation)
 - [GIS interoperability](#gis-interoperability)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
@@ -47,6 +48,7 @@ twins.
 | Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
 | Generate 4 adaptation strategies (green / blue / gray infrastructure) | Edge function |
 | **Scenario Studio** — what-if modeling of depaving, bioswales, permeable pavement, and green roofs with live score, retention, cost, and payback | Frontend |
+| **Hydrological runoff simulation** — route a design storm across the terrain (D8 flow accumulation over SRTM elevation) and draw flow paths + flood-risk zones onto the map | Edge function + Frontend |
 | Persist and browse a public feed with stats, search, and sorting | Postgres |
 | Portfolio analytics — score distribution histogram and side-by-side site comparison | Frontend |
 | Export any analysis as a PDF report (including the configured scenario) | Frontend |
@@ -79,6 +81,33 @@ All assumptions (rainfall, unit costs, benefit rate) are visible in the UI and
 in `src/lib/scenario.ts` — calibrate them to your market before underwriting.
 Configured scenarios flow into the exported PDF as a
 "Scenario & Investment Analysis" section.
+
+## Hydrological runoff simulation
+
+Land cover tells you how much rain a tile *absorbs*; it doesn't tell you where
+the rest of the water *goes*. The Analyze view answers that: pick a rainfall
+depth (10–200 mm) and a grid resolution, and the `run-simulation` edge function
+routes that storm across the terrain.
+
+1. **Elevation** — pulls an SRTM digital elevation model for the visible bbox
+   from OpenTopography (or falls back to a synthetic north–south slope when no
+   `OPENTOPOGRAPHY_API_KEY` is configured).
+2. **Flow direction** — a D8 algorithm points every grid cell at its steepest
+   downhill neighbour.
+3. **Flow accumulation** — rainfall is added to each cell, then routed downslope
+   in elevation order, so channels emerge where water concentrates.
+4. **Risk zones** — cells are banded (low → severe) by accumulation percentile.
+
+The result draws straight onto the map: **animated flow paths** (blue lines,
+opacity scaled by volume) and **flood-risk zones** (a graded fill). A quick,
+DEM-free runoff estimate — `V = rainfall × C × area`, using the land-cover
+runoff coefficient — shows instantly while the full simulation runs. Results are
+cached per bbox + rainfall for 24 h in the `simulation_cache` table.
+
+The flow engine lives in `supabase/functions/run-simulation/index.ts`; the
+map overlays are `src/components/FlowLayer.tsx` and `RiskHeatmap.tsx`; the
+client-side estimate and helpers are in `src/lib/simulation.ts`. Physically
+based drainage (SWMM) and live sensor fusion are on the roadmap for v0.4.
 
 ## GIS interoperability
 
@@ -237,8 +266,11 @@ Vite exposes them to the client):
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon / publishable key |
 | `VITE_SUPABASE_PROJECT_ID` | Supabase project ref |
 
-The edge function also reads a `LOVABLE_API_KEY` secret (the AI gateway key)
-from the Supabase environment — see `supabase/functions/analyze-terrain/index.ts`.
+The `analyze-terrain` edge function reads a `LOVABLE_API_KEY` secret (the AI
+gateway key) from the Supabase environment. The `run-simulation` function reads
+an optional `OPENTOPOGRAPHY_API_KEY` for real SRTM elevation — without it, the
+simulation falls back to a synthetic north–south slope model, so flow paths and
+risk zones are illustrative rather than survey-grade.
 
 ### Scripts
 
@@ -285,6 +317,9 @@ src/
 │   ├── AnalyzingState.tsx Progress UI during a scan
 │   ├── RecentScans.tsx    Live scan strip on the landing page
 │   ├── ScenarioStudio.tsx What-if intervention modeling + ROI panel
+│   ├── SimulationPanel.tsx Runoff simulation controls + results
+│   ├── FlowLayer.tsx      Animated flow-path overlay (MapLibre)
+│   ├── RiskHeatmap.tsx    Flood-risk zone overlay (MapLibre)
 │   ├── SiteComparison.tsx Side-by-side comparison of two analyses
 │   ├── ErrorBoundary.tsx  App-level error fallback
 │   └── ui/                shadcn/ui primitives
@@ -292,6 +327,8 @@ src/
 │   ├── types.ts           LandCover, Recommendation, Analysis
 │   ├── absorption.ts      Score + risk classification
 │   ├── scenario.ts        Interventions, projections, retention, cost, payback
+│   ├── simulation.ts      Runoff coefficient + volume estimate + bbox helpers
+│   ├── simulation-types.ts Simulation request/response contracts
 │   ├── geo.ts             BBox parsing, spherical area, GeoJSON/CSV export
 │   ├── geocode.ts         Free-text location search (Nominatim)
 │   ├── site.ts            Site metadata + copy
@@ -304,7 +341,7 @@ src/
 supabase/
 ├── functions/
 │   ├── analyze-terrain/   Classify → score → recommend → persist
-│   └── run-simulation/    Hydrological runoff scaffolding (v0.3, in progress)
+│   └── run-simulation/    D8 runoff flow accumulation → flow paths + risk zones
 ├── migrations/            Schema history
 └── config.toml
 
@@ -339,7 +376,8 @@ fork it for a private deployment).
 
 - **v0.1** ✅ — Land cover classification, absorption scoring, adaptation LLM
 - **v0.2** ✅ — Scenario Studio (what-if interventions + investment analytics), GeoJSON/CSV export, portfolio comparison
-- **v0.3** 🚧 — Hydrological runoff simulation (flow engine + `run-simulation` edge function scaffolding landed; SWMM integration next), IoT sensor fusion (rain gauges, soil moisture over MQTT)
+- **v0.3** ✅ — Hydrological runoff simulation: the `run-simulation` edge function runs D8 flow accumulation over SRTM elevation (with a synthetic-slope fallback), and the Analyze view draws animated flow paths and flood-risk zones onto the map for any design storm
+- **v0.4** 🚧 — Physically-based drainage (SWMM integration) and IoT sensor fusion (rain gauges, soil moisture over MQTT)
 - **v1.0** — Digital twin export + public REST/GraphQL API
 
 ## Contributing

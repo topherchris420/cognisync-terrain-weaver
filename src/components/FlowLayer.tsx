@@ -238,13 +238,17 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     };
   }, [map]);
 
-  // Auto-add to map when flowPaths are provided
+  // Sync overlay with the current paths: add/update when there are paths,
+  // and tear the layers down again when they're cleared.
   useEffect(() => {
-    if (flowPaths.length > 0 && map) {
+    if (!map) return;
+    if (flowPaths.length > 0) {
       addToMap();
       updatePaths(flowPaths);
+    } else {
+      removeFromMap();
     }
-  }, [flowPaths, map, addToMap, updatePaths]);
+  }, [flowPaths, map, addToMap, updatePaths, removeFromMap]);
 
   useImperativeHandle(
     ref,
