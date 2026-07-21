@@ -441,7 +441,7 @@ export default function Index() {
 
       <footer className="mt-auto border-t border-border/60 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-xs text-muted-foreground sm:flex-row">
-          <span>© {new Date().getFullYear()} {SITE.name} · Open Urban Resilience</span>
+          <span>© {new Date().getFullYear()} {SITE.name} · Built by {SITE.creator}</span>
           <nav className="flex items-center gap-5">
             <Link to="/analyze" className="hover:text-foreground transition-colors">
               Analyze

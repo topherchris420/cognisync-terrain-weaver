@@ -11,7 +11,7 @@ import { SITE } from "@/lib/site";
 export function usePageTitle(page?: string) {
   useEffect(() => {
     document.title = page
-      ? `${page} · ${SITE.product}`
-      : `${SITE.product} — ${SITE.tagline}`;
+      ? `${page} · ${SITE.name}`
+      : `${SITE.name} — ${SITE.tagline}`;
   }, [page]);
 }
