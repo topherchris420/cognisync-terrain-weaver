@@ -15,6 +15,7 @@ import {
   Loader2,
   MapPin,
   Play,
+  Plus,
   Sparkles,
   Info,
   Download,
@@ -221,6 +222,18 @@ export default function Analyze() {
     setLocationLabel(r.label);
   };
 
+  // Clear the current result and return to a framing state. On small screens
+  // the map sits above the fold, so scroll back up to it; on desktop the map
+  // and form are always in view, so clearing the panel is enough.
+  const resetScan = () => {
+    setResult(null);
+    setCapturedTile(null);
+    setScenarioExport(null);
+    if (window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppNav />
@@ -364,6 +377,14 @@ export default function Analyze() {
                         className="block aspect-video w-full object-cover"
                       />
                     )}
+                    <button
+                      type="button"
+                      onClick={resetScan}
+                      className="absolute right-2 top-2 flex items-center gap-1.5 rounded-md border border-border bg-background/85 px-2.5 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur transition-colors hover:border-primary/50 hover:text-foreground"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                      New scan
+                    </button>
                     <div
                       className={
                         capturedTile

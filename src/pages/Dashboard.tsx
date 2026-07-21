@@ -60,15 +60,19 @@ const SORTERS: Record<SortKey, (a: AnalysisRecord, b: AnalysisRecord) => number>
   "score-asc": (a, b) => Number(a.absorption_score) - Number(b.absorption_score),
 };
 
+// Bound each attempt so a stalled connection surfaces the error/retry UI
+// instead of leaving the feed on skeletons forever. Paired with retry: 1 on
+// the query, the worst-case wait before the error state is ~2 × this (plus
+// backoff) — around 20s, down from the ~48s of three 15s attempts.
+const FEED_TIMEOUT_MS = 10_000;
+
 async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
-  // Bound each attempt so a stalled connection surfaces the error/retry UI
-  // instead of leaving the feed on skeletons forever.
   const { data, error } = await supabase
     .from("analyses")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(50)
-    .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(15_000)]));
+    .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(FEED_TIMEOUT_MS)]));
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AnalysisRecord[];
 }
@@ -89,6 +93,9 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ["analyses"],
     queryFn: ({ signal }) => fetchAnalyses(signal),
+    // One retry, not the app-wide default of two: a public feed should reach
+    // its error+Retry state in ~20s on a dead network, not sit on skeletons.
+    retry: 1,
   });
 
   const stats = useMemo(() => {
@@ -539,7 +546,7 @@ export default function Dashboard() {
                       </span>
                       <Link
                         to={mapHref}
-                        className="flex items-center gap-0.5 font-medium text-muted-foreground opacity-70 transition-all hover:text-primary group-hover:opacity-100"
+                        className="flex items-center gap-0.5 font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:text-primary"
                         aria-label={`Open ${r.name} in the map`}
                         onClick={(e) => e.stopPropagation()}
                       >

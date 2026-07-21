@@ -3,11 +3,10 @@ import { LAND_COVER_META, type LandCover, type LandCoverKey } from "@/lib/types"
 import { cn } from "@/lib/utils";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { AlertTriangle, Info } from "lucide-react";
 
 // The vision model returns five INDEPENDENT percentages. They routinely land on
@@ -98,84 +97,86 @@ export function LandCoverBreakdown({ cover, animated = true }: Props) {
         <div className="absolute inset-0 rounded-lg border border-border/50 pointer-events-none" />
       </div>
 
-      {/* Per-class rows. Each hint rides a real tooltip on a focusable
-          trigger — the old version only appeared on mouse hover, which
-          keyboard and touch users could never reach. */}
-      <TooltipProvider delayDuration={150}>
-        <div className="space-y-3">
-          {ORDER.map((key) => {
-            const currentValue = displayValues[ORDER.indexOf(key)];
-            const value = cover[key] || 0;
-            const pct = (value / total) * 100;
-            const meta = LAND_COVER_META[key];
+      {/* Per-class rows. Each hint rides a Popover on a focusable trigger:
+          tap, click, and keyboard all open it. A hover tooltip (the previous
+          version) never opens on touch, and this ships as a Capacitor app. */}
+      <div className="space-y-3">
+        {ORDER.map((key) => {
+          const currentValue = displayValues[ORDER.indexOf(key)];
+          const value = cover[key] || 0;
+          const pct = (value / total) * 100;
+          const meta = LAND_COVER_META[key];
 
-            const getColorClass = () => {
-              switch (key) {
-                case "vegetation":
-                  return "bg-surface-vegetation";
-                case "soil":
-                  return "bg-surface-soil";
-                case "water":
-                  return "bg-surface-water";
-                case "buildings":
-                  return "bg-surface-building";
-                case "pavement":
-                  return "bg-surface-pavement";
-                default:
-                  return "bg-muted";
-              }
-            };
+          const getColorClass = () => {
+            switch (key) {
+              case "vegetation":
+                return "bg-surface-vegetation";
+              case "soil":
+                return "bg-surface-soil";
+              case "water":
+                return "bg-surface-water";
+              case "buildings":
+                return "bg-surface-building";
+              case "pavement":
+                return "bg-surface-pavement";
+              default:
+                return "bg-muted";
+            }
+          };
 
-            return (
-              <div key={key}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={cn(
-                        "h-3 w-3 rounded-md shadow-sm",
-                        getColorClass()
-                      )}
-                    />
-                    <span className="text-sm font-medium">{meta.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono tabular-nums text-sm font-semibold text-foreground">
-                      {pct.toFixed(1)}%
-                    </span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={`About ${meta.label.toLowerCase()}`}
-                          className="text-muted-foreground/50 transition-colors hover:text-foreground focus-visible:text-foreground"
-                        >
-                          <Info className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        {meta.hint}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-
-                {/* Progress bar for each type */}
-                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/30">
+          return (
+            <div key={key}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
                   <div
                     className={cn(
-                      "h-full transition-all duration-1000 ease-out motion-reduce:transition-none",
+                      "h-3 w-3 rounded-md shadow-sm",
                       getColorClass()
                     )}
-                    style={{
-                      width: animated ? `${(currentValue / total) * 100}%` : `${pct}%`,
-                    }}
                   />
+                  <span className="text-sm font-medium">{meta.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono tabular-nums text-sm font-semibold text-foreground">
+                    {pct.toFixed(1)}%
+                  </span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`About ${meta.label.toLowerCase()}`}
+                        className="text-muted-foreground/50 transition-colors hover:text-foreground focus-visible:text-foreground"
+                      >
+                        <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      side="top"
+                      align="end"
+                      className="w-auto max-w-[220px] p-3 text-xs text-muted-foreground"
+                    >
+                      {meta.hint}
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </TooltipProvider>
+
+              {/* Progress bar for each type */}
+              <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/30">
+                <div
+                  className={cn(
+                    "h-full transition-all duration-1000 ease-out motion-reduce:transition-none",
+                    getColorClass()
+                  )}
+                  style={{
+                    width: animated ? `${(currentValue / total) * 100}%` : `${pct}%`,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* Summary */}
       <div className="pt-3 border-t border-border/50">
