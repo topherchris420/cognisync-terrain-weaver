@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { SITE } from "@/lib/site";
 
 interface LogoProps {
   className?: string;
@@ -19,7 +20,7 @@ const iconSizes = {
 };
 
 /**
- * Vers3Dynamics Logo
+ * Mannahatta Logo
  *
  * A professional mark combining:
  * - Water droplet (representing water resilience, absorption)
@@ -179,7 +180,7 @@ export function Logo({ className, size = "md", variant = "full" }: LogoProps) {
       {/* Text portion - only shown in full variant */}
       <div className="leading-tight">
         <div className="text-sm font-semibold tracking-tight text-foreground">
-          Vers3Dynamics
+          {SITE.name}
         </div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
           Urban Resilience

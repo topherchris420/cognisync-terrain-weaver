@@ -4,7 +4,10 @@
  */
 
 export const SITE = {
-  name: "Vers3Dynamics",
+  /** Product name — the brand shown throughout the UI and in the page title. */
+  name: "Mannahatta",
+  /** The organisation behind it, credited in the footer and PDF export. */
+  creator: "Vers3Dynamics",
   tagline: "Urban Resilience Intelligence",
   url: "https://vers3dynamics.com",
   repoUrl: "https://github.com/topherchris420/cognisync-terrain-weaver",

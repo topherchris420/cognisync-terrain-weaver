@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 
 // Route-level code splitting: Analyze pulls in MapLibre GL (~800 kB) and
@@ -29,8 +30,12 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        {/* The design system is dark-only; without this, sonner follows the OS
+            theme and renders white toasts over the dark UI on light-mode
+            machines (no ThemeProvider is mounted to say otherwise). */}
+        <Sonner theme="dark" />
         <BrowserRouter>
+          <ScrollToTop />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />

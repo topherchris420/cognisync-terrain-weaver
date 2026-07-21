@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { classifyFloodRisk, riskColor, riskLabel } from "@/lib/absorption";
+import { classifyFloodRisk, riskLabel } from "@/lib/absorption";
+import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function AbsorptionScoreGauge({ score, className, animated = true }: Props) {
+  const reduceMotion = usePrefersReducedMotion();
   const [displayScore, setDisplayScore] = useState(animated ? 0 : score);
   const clamped = Math.max(0, Math.min(100, displayScore));
   const circumference = 2 * Math.PI * 52;
@@ -19,7 +21,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
 
   // Animate score counting up
   useEffect(() => {
-    if (!animated) {
+    if (!animated || reduceMotion) {
       setDisplayScore(score);
       return;
     }
@@ -43,7 +45,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
     };
 
     requestAnimationFrame(animate);
-  }, [score, animated]);
+  }, [score, animated, reduceMotion]);
 
   // Score colour smoothly follows risk band
   const strokeClass =
@@ -59,11 +61,11 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
     return <TrendingDown className="h-3.5 w-3.5" />;
   };
 
-  const getStatusText = () => {
-    if (targetClamped >= 65) return "Resilient";
-    if (targetClamped >= 40) return "Vulnerable";
-    return "Critical";
-  };
+  // The word and the pill must agree. Both derive from the same risk band --
+  // independent thresholds here once let a score of 58 read "Vulnerable"
+  // beside a pill that said "Low" risk.
+  const statusText =
+    risk === "low" ? "Resilient" : risk === "moderate" ? "Vulnerable" : "Critical";
 
   return (
     <div className={cn("flex items-center gap-5", className)}>
@@ -95,7 +97,10 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
             cx="60"
             cy="60"
             r="52"
-            className={cn("transition-all duration-1000 ease-out", strokeClass)}
+            className={cn(
+              "transition-all duration-1000 ease-out motion-reduce:transition-none",
+              strokeClass
+            )}
             strokeWidth="10"
             strokeLinecap="round"
             fill="none"
@@ -146,7 +151,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
               risk === "high" && "text-destructive"
             )}
           >
-            {getStatusText()}
+            {statusText}
           </div>
           <div
             className={cn(

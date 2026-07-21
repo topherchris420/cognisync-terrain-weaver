@@ -92,6 +92,10 @@ export function LocationSearch({ onSelect }: Props) {
         e.preventDefault();
         if (activeIndex >= 0) {
           selectOption(activeIndex);
+        } else if (trimmedQuery !== "" && options.length > 0) {
+          // Type a place and hit Enter: take the top hit. Requiring an arrow
+          // key first made Enter silently do nothing.
+          selectOption(0);
         }
         break;
       case "Escape":
@@ -149,6 +153,11 @@ export function LocationSearch({ onSelect }: Props) {
               {options.map((opt, i) => (
                 <button
                   key={opt.label}
+                  // Explicitly a button, not a submit: this list can render
+                  // inside a <form> (the Analyze scan panel), where an
+                  // untyped button defaults to submit and would fire the scan
+                  // on a location pick, before flyTo reaches the place.
+                  type="button"
                   id={`location-option-${i}`}
                   role="option"
                   aria-selected={i === activeIndex}
@@ -174,6 +183,7 @@ export function LocationSearch({ onSelect }: Props) {
               {options.map((opt, i) => (
                 <button
                   key={`${opt.lat},${opt.lng}`}
+                  type="button"
                   id={`location-option-${i}`}
                   role="option"
                   aria-selected={i === activeIndex}
