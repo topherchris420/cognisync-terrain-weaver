@@ -42,21 +42,21 @@ describe("compareToBaseline", () => {
   it("reports the shortfall for a dense urban score", () => {
     const cmp = compareToBaseline(14);
     expect(cmp.meetsBaseline).toBe(false);
-    expect(cmp.lost).toBeCloseTo(BASELINE_SCORE - 14, 1);
-    expect(cmp.retainedPct).toBe(Math.round((14 / BASELINE_SCORE) * 100));
+    expect(cmp.shortfall).toBeCloseTo(BASELINE_SCORE - 14, 1);
+    expect(cmp.benchmarkPct).toBe(Math.round((14 / BASELINE_SCORE) * 100));
   });
 
-  it("caps retained capacity at 100 rather than exceeding the forest", () => {
+  it("caps the benchmark share at 100 rather than exceeding the forest", () => {
     const cmp = compareToBaseline(100);
-    expect(cmp.retainedPct).toBe(100);
-    expect(cmp.lost).toBe(0);
+    expect(cmp.benchmarkPct).toBe(100);
+    expect(cmp.shortfall).toBe(0);
     expect(cmp.meetsBaseline).toBe(true);
   });
 
   it("treats a score at the baseline as meeting it", () => {
     const cmp = compareToBaseline(BASELINE_SCORE);
     expect(cmp.meetsBaseline).toBe(true);
-    expect(cmp.lost).toBe(0);
+    expect(cmp.shortfall).toBe(0);
   });
 
   it("clamps out-of-range and non-numeric input", () => {
@@ -67,19 +67,40 @@ describe("compareToBaseline", () => {
 });
 
 describe("baselineSentence", () => {
-  it("states the baseline is intact when the site meets it", () => {
-    expect(baselineSentence(compareToBaseline(90))).toMatch(/baseline is intact/);
+  it("says the site is at the benchmark when it meets it", () => {
+    expect(baselineSentence(compareToBaseline(90))).toMatch(/at the benchmark/);
   });
 
-  it("quotes the retained percentage for a depleted site", () => {
+  it("quotes the benchmark share for a depleted site", () => {
     const cmp = compareToBaseline(14);
-    expect(baselineSentence(cmp)).toContain(`${cmp.retainedPct}%`);
+    expect(baselineSentence(cmp)).toContain(`${cmp.benchmarkPct}%`);
   });
 
   it("never blames the site", () => {
     for (const score of [0, 14, 40, 60, 79, 100]) {
       const text = baselineSentence(compareToBaseline(score));
       expect(text).not.toMatch(/fail|bad|poor|worst/i);
+    }
+  });
+
+  // The copy is shown on scans of Jakarta and Copenhagen too, where a claim
+  // about "the absorption this ground had in 1609" is simply false -- and it
+  // over-claims inside Manhattan as well, since 79.1 is one island-wide figure
+  // for an island the project found to be anything but uniform.
+  it("never claims to know the scanned site's own history", () => {
+    for (const score of [0, 14, 40, 60, 79, 100]) {
+      const text = baselineSentence(compareToBaseline(score));
+      expect(text).not.toMatch(/it had in 1609/i);
+      expect(text).not.toMatch(/used to|once (?:took|absorbed)|started with/i);
+      expect(text).not.toMatch(/\bkeeps\b|\bretain/i);
+    }
+  });
+
+  it("names the benchmark as the thing being compared against", () => {
+    for (const score of [0, 14, 40, 60, 79, 100]) {
+      expect(baselineSentence(compareToBaseline(score))).toMatch(
+        /Mannahatta|benchmark/
+      );
     }
   });
 });

@@ -91,7 +91,11 @@ export function BaselineComparison({ score, className, compact = false }: Props)
         </div>
 
         <div className="relative mt-2 h-4 text-[11px] text-muted-foreground">
-          <span className="absolute left-0">Fully paved</span>
+          {/* Not "Fully paved": pavement carries a weight of 0.12, so a wholly
+              paved tile scores 12, not 0. Labelling this end for a surface
+              would put a real paved scan visibly to the right of its own
+              label. Zero is zero absorption, and nothing else. */}
+          <span className="absolute left-0">No absorption</span>
           {/* Centred on the tick, except near the right edge, where centring
               would hang the label off the panel. Guards against a recalibrated
               weight set pushing the baseline toward 100. */}
@@ -109,22 +113,25 @@ export function BaselineComparison({ score, className, compact = false }: Props)
         </div>
       </div>
 
-      {/* The two numbers behind the sentence, so it can be checked. */}
+      {/* The two numbers behind the sentence, so it can be checked. Labelled
+          as a comparison ("of benchmark", "below benchmark") rather than as
+          retention or loss -- this site never held the benchmark's capacity to
+          lose unless it happens to sit in Manhattan. */}
       <dl className="mt-5 grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-border bg-background/40 p-3">
           <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            Capacity retained
+            Of benchmark
           </dt>
           <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
-            {cmp.retainedPct}%
+            {cmp.benchmarkPct}%
           </dd>
         </div>
         <div className="rounded-lg border border-border bg-background/40 p-3">
           <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            Absorption lost
+            Below benchmark
           </dt>
           <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
-            {cmp.lost > 0 ? `−${cmp.lost.toFixed(1)}` : "0"}
+            {cmp.shortfall > 0 ? `−${cmp.shortfall.toFixed(1)}` : "0"}
             <span className="ml-1 text-xs font-normal text-muted-foreground">
               pts
             </span>
@@ -134,8 +141,10 @@ export function BaselineComparison({ score, className, compact = false }: Props)
 
       {!compact && (
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-          The baseline is our estimate of pre-development land cover, scored
-          with the same weights as a live scan — not a figure published by the
+          A fixed reference every site is measured against, wherever it is —
+          not a reconstruction of what stood on this particular ground. It is
+          our estimate of Manhattan's pre-development land cover, scored with
+          the same weights as a live scan, and not a figure published by the
           Mannahatta Project. The island's ecology it is derived from is{" "}
           <a
             href={BASELINE_SOURCE.href}

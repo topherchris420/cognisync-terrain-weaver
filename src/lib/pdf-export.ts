@@ -239,17 +239,19 @@ export function generatePDFReport(
   const baseline = compareToBaseline(score);
   addText(baselineSentence(baseline));
   addText(
-    `Capacity retained: ${baseline.retainedPct}%   |   Absorption lost: ${
-      baseline.lost > 0 ? `-${baseline.lost.toFixed(1)}` : "0"
-    } pts   |   Baseline: ${BASELINE_SCORE.toFixed(1)}`,
+    `Of benchmark: ${baseline.benchmarkPct}%   |   Below benchmark: ${
+      baseline.shortfall > 0 ? `-${baseline.shortfall.toFixed(1)}` : "0"
+    } pts   |   Benchmark: ${BASELINE_SCORE.toFixed(1)}`,
     9,
     true
   );
   addText(
-    "The baseline is an estimate of pre-development land cover for Manhattan " +
-      "in 1609, scored with the same weights as this analysis. It is derived " +
-      "from the Wildlife Conservation Society's Mannahatta Project, not " +
-      "published by it.",
+    "This is a fixed reference every site is measured against, wherever it " +
+      "is -- not a reconstruction of what stood on this particular ground. It " +
+      "is an estimate of pre-development land cover for Manhattan in 1609, " +
+      "scored with the same weights as this analysis, derived from the " +
+      "Wildlife Conservation Society's Mannahatta Project but not published " +
+      "by it.",
     8
   );
   yPos += 5;

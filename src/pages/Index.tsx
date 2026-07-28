@@ -287,10 +287,17 @@ export default function Index() {
                   </p>
                   <p>
                     That is the idea this tool borrows. A resilience score of 31
-                    means nothing on its own. Measured against the ground that
-                    was there first, it means something to everyone — so every
-                    scan is reported as a distance from the baseline, not as a
+                    means nothing on its own. Measured against a landscape that
+                    took its own rain, it means something to everyone — so every
+                    scan is reported as a distance from that benchmark, not as a
                     grade.
+                  </p>
+                  <p className="text-base">
+                    The benchmark is fixed: scan a block in Jakarta or
+                    Copenhagen and it is still measured against Mannahatta, the
+                    same way it is measured against 100. It is a shared
+                    yardstick, not a claim about what stood on your particular
+                    patch of ground.
                   </p>
                 </div>
 

@@ -13,9 +13,13 @@ import type { LandCover } from "./types";
  * answer before: *what was on this block, before the block?*
  *
  * That is the idea this module borrows. An Urban Absorption Score of 31 means
- * nothing to someone who is not a drainage engineer. "This ground used to take
- * four fifths of its rain, and now it takes a third" means something to
- * everybody. The baseline turns an abstract index into a distance.
+ * nothing to someone who is not a drainage engineer. "A third of what a
+ * pre-city landscape took" means something to everybody. The baseline turns an
+ * abstract index into a distance.
+ *
+ * It is a *benchmark*, not a site history: every scan is measured against this
+ * one fixed landscape, wherever the scan is. See `baselineSentence` for why the
+ * copy never claims to know what stood on the scanned block.
  *
  * ## Where the numbers come from — and where they don't
  *
@@ -99,28 +103,28 @@ export interface BaselineComparison {
   score: number;
   /** The 1609 reference score under the same model. */
   baseline: number;
-  /** Absorption points lost since 1609. Zero if the site meets or beats it. */
-  lost: number;
+  /** Points below the benchmark. Zero if the site meets or beats it. */
+  shortfall: number;
   /**
-   * How much of the 1609 capacity survives, 0–100. This is the number the UI
-   * leads with: "38% of the absorption this ground started with."
+   * The site's score as a share of the benchmark, 0–100. This is the number
+   * the UI leads with: "38% of what Mannahatta's landscape absorbed."
    */
-  retainedPct: number;
-  /** True when the site scores at or above the pre-development baseline. */
+  benchmarkPct: number;
+  /** True when the site scores at or above the benchmark. */
   meetsBaseline: boolean;
 }
 
 /**
- * Position a scanned site against the 1609 baseline.
+ * Position a scanned site against the 1609 benchmark.
  *
- * `retainedPct` is capped at 100 so a genuinely exceptional site — restored
- * wetland, mature park — reads as "at baseline" rather than claiming to be
- * more absorbent than a forest, which the weights cannot support.
+ * `benchmarkPct` is capped at 100 so a genuinely exceptional site — restored
+ * wetland, mature park — reads as "at the benchmark" rather than claiming to
+ * be more absorbent than a forest, which the weights cannot support.
  */
 export function compareToBaseline(score: number): BaselineComparison {
   const clamped = Math.max(0, Math.min(100, Number(score) || 0));
-  const lost = Math.max(0, BASELINE_SCORE - clamped);
-  const retainedPct = Math.min(
+  const shortfall = Math.max(0, BASELINE_SCORE - clamped);
+  const benchmarkPct = Math.min(
     100,
     Math.round((clamped / BASELINE_SCORE) * 100)
   );
@@ -128,8 +132,8 @@ export function compareToBaseline(score: number): BaselineComparison {
   return {
     score: clamped,
     baseline: BASELINE_SCORE,
-    lost: Math.round(lost * 10) / 10,
-    retainedPct,
+    shortfall: Math.round(shortfall * 10) / 10,
+    benchmarkPct,
     meetsBaseline: clamped >= BASELINE_SCORE,
   };
 }
@@ -137,19 +141,36 @@ export function compareToBaseline(score: number): BaselineComparison {
 /**
  * A short, plain-language reading of the comparison.
  *
- * Deliberately avoids blame. A site scoring 14 is not a moral failure; it is
- * Midtown, and Midtown is why the score exists. The sentence states the
- * distance and stops.
+ * ## Why this never says "the absorption *this ground* used to have"
+ *
+ * It is tempting, and it was the first draft, but it is a false claim twice
+ * over. Sites outside Manhattan are a supported flow: a scan of Jakarta or
+ * Copenhagen has no relationship to Mannahatta's ecology, and telling a user
+ * their block "kept 18% of the absorption it had in 1609" invents a history
+ * for ground the project never surveyed.
+ *
+ * It over-claims *inside* Manhattan too. `BASELINE_SCORE` is one island-wide
+ * figure, while the Mannahatta Project's central finding is that the island
+ * was not uniform — Times Square was wetland, Harlem was meadow, the ridges
+ * were forest. A single number cannot speak for a specific block's past.
+ *
+ * So the comparison is framed as what it actually is: a fixed, named
+ * reference landscape that every site is measured against, the same way a
+ * score is measured against 100. That is true everywhere, which is why this
+ * needs no location gating and no arbitrary Manhattan boundary.
+ *
+ * It also avoids blame. A site scoring 14 is not a moral failure; it is
+ * Midtown, and Midtown is why the score exists. State the distance and stop.
  */
 export function baselineSentence(cmp: BaselineComparison): string {
   if (cmp.meetsBaseline) {
-    return "This ground absorbs about as much rain as it did before the city — the baseline is intact here.";
+    return "This ground absorbs about as much rain as Mannahatta's pre-city landscape did — it is at the benchmark.";
   }
-  if (cmp.retainedPct >= 60) {
-    return `This ground keeps roughly ${cmp.retainedPct}% of the absorption it had in 1609 — much of the original capacity is still working.`;
+  if (cmp.benchmarkPct >= 60) {
+    return `This ground absorbs roughly ${cmp.benchmarkPct}% of what Mannahatta's pre-city landscape did — much of that capacity is matched here.`;
   }
-  if (cmp.retainedPct >= 30) {
-    return `This ground keeps roughly ${cmp.retainedPct}% of the absorption it had in 1609. The rest now runs to a drain.`;
+  if (cmp.benchmarkPct >= 30) {
+    return `This ground absorbs roughly ${cmp.benchmarkPct}% of what Mannahatta's pre-city landscape did. The rest of the rain runs to a drain.`;
   }
-  return `This ground keeps roughly ${cmp.retainedPct}% of the absorption it had in 1609. Almost all of the rain that falls here now has to be carried away.`;
+  return `This ground absorbs roughly ${cmp.benchmarkPct}% of what Mannahatta's pre-city landscape did. Almost all of the rain that falls here has to be carried away.`;
 }
