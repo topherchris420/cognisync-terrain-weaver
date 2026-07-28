@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { AppNav } from "@/components/AppNav";
 import { MapView, type MapViewHandle } from "@/components/MapView";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
+import { BaselineComparison } from "@/components/BaselineComparison";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { LocationSearch } from "@/components/LocationSearch";
@@ -519,6 +520,15 @@ export default function Analyze() {
                     Resilience score
                   </h2>
                   <AbsorptionScoreGauge score={Number(result.absorption_score)} />
+
+                  {/* The gauge gives the number; this gives it a scale. Placed
+                      before the export buttons so the reading is complete
+                      before the user is asked to do anything with it. */}
+                  <BaselineComparison
+                    score={Number(result.absorption_score)}
+                    className="mt-4"
+                  />
+
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button
                       variant="outline"

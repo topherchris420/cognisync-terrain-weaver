@@ -30,6 +30,7 @@ twins.
 - [Tech stack](#tech-stack)
 - [Design language](#design-language)
 - [The Urban Absorption Score](#the-urban-absorption-score)
+- [The 1609 baseline](#the-1609-baseline)
 - [Getting started](#getting-started)
 - [Project structure](#project-structure)
 - [Data model](#data-model)
@@ -236,6 +237,49 @@ tuned to give a flattering spread — most urban land really is mostly imperviou
 
 **Full methodology, calibration set, and known limits:
 [`docs/absorption-calibration.md`](docs/absorption-calibration.md).**
+
+### The 1609 baseline
+
+A score of 31 means nothing to anyone who is not a drainage engineer. So every
+scan is also reported as a **distance from a landscape that took its own rain.**
+
+This platform is named after the Wildlife Conservation Society's
+[Mannahatta Project](https://welikia.org/) — Eric W. Sanderson's ten-year
+reconstruction of Manhattan as it stood in 1609, which georeferenced an
+18th-century British map onto the modern street grid until it could answer,
+block by block, *what was here before this?* That island held 66 miles of
+streams, 627 plant species, 233 bird species, and 85 kinds of fish. Times
+Square was a wetland.
+
+`src/lib/baseline.ts` estimates that landscape as land cover — 89% vegetation,
+9% bare soil, 2% inland water, no pavement or roofs — and runs it through
+`computeAbsorptionScore`, the *same* function that scores a live scan. It comes
+out at **79.1**. Not 100: the model holds that even mature woodland sheds
+5–25%, and a baseline of 100 would be a slogan rather than a result.
+
+**It is a benchmark, not a site history.** Every scan is measured against this
+one fixed landscape, wherever the scan is — the same way it is measured against
+100. The copy never claims to know what stood on the scanned block, because for
+a scan of Jakarta or Copenhagen that would be invented, and even inside
+Manhattan a single island-wide figure cannot speak for a specific block: the
+project's central finding is that the island was *not* uniform. Times Square
+was wetland, Harlem was meadow, the ridges were forest.
+
+Two more things this is careful about:
+
+- **The land-cover split is our estimate, not a WCS figure.** The species and
+  stream counts are the project's published findings; the five-class raster is
+  ours, derived from its description of the island's ecology, and it is labelled
+  as an estimate everywhere it appears in the UI and in exported PDFs.
+- **Lenape longhouses are not counted as `buildings`.** The roof coefficient
+  (`C ≈ 0.90`) describes sealed, drained, engineered surfaces. Bark over a dirt
+  floor is not one.
+
+The baseline is derived at module load rather than hard-coded, so recalibrating
+the weights for another climate zone moves it too — which is correct, because
+it is a claim about *this* model. `BaselineComparison` renders it on the landing
+page, on every analysis, in the PDF report, and as a reference line on the
+dashboard histogram.
 
 The model lives in three places — `src/lib/absorption.ts`,
 `supabase/functions/analyze-terrain/index.ts` (which computes and stores every
