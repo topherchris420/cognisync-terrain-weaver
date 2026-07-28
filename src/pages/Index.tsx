@@ -11,9 +11,15 @@ import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/AppNav";
 import { Reveal } from "@/components/Reveal";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
+import { BaselineComparison } from "@/components/BaselineComparison";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { RecentScans } from "@/components/RecentScans";
 import { ABSORPTION_WEIGHTS, RISK_BANDS } from "@/lib/absorption";
+import {
+  BASELINE_SCORE,
+  BASELINE_SOURCE,
+  MANNAHATTA_1609,
+} from "@/lib/baseline";
 import { SITE } from "@/lib/site";
 import { usePageTitle } from "@/hooks/use-page-title";
 
@@ -111,6 +117,18 @@ const audiences = [
   },
 ];
 
+// The island's own inventory, from the Mannahatta Project's published
+// findings. Shown as a list of what one island held, because the scale of it
+// is the argument -- no commentary needed.
+const inventory1609 = [
+  { k: MANNAHATTA_1609.streamMiles, unit: "miles", l: "of streams and rivers" },
+  { k: MANNAHATTA_1609.plantSpecies, unit: "", l: "plant species" },
+  { k: MANNAHATTA_1609.birdSpecies, unit: "", l: "bird species" },
+  { k: MANNAHATTA_1609.fishSpecies, unit: "", l: "fish species" },
+  { k: MANNAHATTA_1609.treeSpecies, unit: "kinds", l: "of tree" },
+  { k: MANNAHATTA_1609.mammalSpecies, unit: "", l: "mammal species" },
+];
+
 const roadmap = [
   { v: "v0.1", label: "Land cover · absorption score", current: false },
   { v: "v0.2", label: "Scenario studio · ROI · GIS export", current: true },
@@ -195,6 +213,9 @@ export default function Index() {
               <div className="pt-5">
                 <AbsorptionScoreGauge score={58} />
               </div>
+              {/* The product's whole argument in one strip: the number, and the
+                  thing it should be measured against. */}
+              <BaselineComparison score={58} compact className="mt-5" />
               <div className="mt-6 border-t border-border/60 pt-5">
                 <LandCoverBreakdown cover={previewCover} />
               </div>
@@ -223,6 +244,120 @@ export default function Index() {
               ))}
             </div>
           </Reveal>
+        </section>
+
+        {/* Why the name. The product had been called Mannahatta on every screen
+            without ever saying what that was -- and the thing it refers to is
+            also the reason the score is framed as a distance rather than a
+            grade. Placed before the methodology because it sets up the "against
+            what?" that the methodology then answers in numbers. */}
+        <section
+          aria-labelledby="origin-heading"
+          className="relative overflow-hidden border-y border-border/60"
+        >
+          <div className="absolute inset-0 terrain-grid opacity-20" aria-hidden />
+          <div className="relative mx-auto w-full max-w-6xl px-6 py-20 md:py-24">
+            <div className="grid gap-12 lg:grid-cols-[1fr_0.85fr] lg:items-start">
+              <Reveal>
+                <div className="border-l-2 border-accent pl-3 text-xs font-semibold uppercase tracking-widest text-accent">
+                  Where the name comes from
+                </div>
+                <h2
+                  id="origin-heading"
+                  className="mt-5 text-3xl font-bold tracking-tight md:text-4xl"
+                >
+                  In 1609, Manhattan absorbed{" "}
+                  <span className="text-primary">nearly all of its rain.</span>
+                </h2>
+                <div className="mt-5 space-y-4 text-lg leading-relaxed text-muted-foreground">
+                  <p>
+                    For ten years the Wildlife Conservation Society's{" "}
+                    <span className="text-foreground">Mannahatta Project</span>{" "}
+                    reconstructed the island as it stood the year Henry Hudson
+                    reached it — georeferencing an 18th-century British map onto
+                    the modern grid until it could answer, block by block, a
+                    question nobody could answer before:{" "}
+                    <em className="text-foreground not-italic">
+                      what was here, before this?
+                    </em>
+                  </p>
+                  <p>
+                    Times Square was a wetland. A stream ran where Canal Street
+                    is. The ground under all of it took the rain and held it.
+                  </p>
+                  <p>
+                    That is the idea this tool borrows. A resilience score of 31
+                    means nothing on its own. Measured against the ground that
+                    was there first, it means something to everyone — so every
+                    scan is reported as a distance from the baseline, not as a
+                    grade.
+                  </p>
+                </div>
+
+                <p className="mt-6 text-xs text-muted-foreground">
+                  Findings from the Mannahatta Project and its successor,{" "}
+                  <a
+                    href={BASELINE_SOURCE.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                  >
+                    the Welikia Project
+                  </a>
+                  . The {BASELINE_SCORE.toFixed(1)} baseline is our own estimate
+                  of that landscape scored with the weights below — not a WCS
+                  figure.
+                </p>
+              </Reveal>
+
+              <Reveal delay={120}>
+                <div className="panel rounded-xl border border-border p-6 md:p-7">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    One island, 1609
+                  </h3>
+                  <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5">
+                    {inventory1609.map((m) => (
+                      <div key={m.l} className="min-w-0">
+                        <dt className="sr-only">{m.l}</dt>
+                        <dd>
+                          <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">
+                            {m.k}
+                          </span>
+                          {m.unit && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              {m.unit}
+                            </span>
+                          )}
+                          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                            {m.l}
+                          </span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+
+                  <div className="mt-6 border-t border-border/60 pt-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm text-muted-foreground">
+                        Estimated absorption, 1609
+                      </span>
+                      <span className="font-mono text-lg font-semibold tabular-nums text-primary">
+                        {BASELINE_SCORE.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-baseline justify-between gap-3">
+                      <span className="text-sm text-muted-foreground">
+                        Midtown Manhattan, scanned
+                      </span>
+                      <span className="font-mono text-lg font-semibold tabular-nums text-destructive">
+                        14.0
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          </div>
         </section>
 
         {/* Methodology — the centerpiece. The most credible thing on the site is

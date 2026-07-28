@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import type { AnalysisRecord, LandCover, Recommendation } from "./types";
 import { LAND_COVER_META } from "./types";
 import { classifyFloodRisk, riskLabel } from "./absorption";
+import { BASELINE_SCORE, baselineSentence, compareToBaseline } from "./baseline";
 import {
   INTERVENTIONS,
   INTERVENTION_ORDER,
@@ -205,9 +206,16 @@ export function generatePDFReport(
   doc.setTextColor(...colors.muted);
   doc.text("/100", circleCenterX + 10, circleCenterY + 2);
 
-  // Status text
+  // Status text. Derived from the same risk band as the line beneath it and as
+  // the on-screen gauge -- this used to carry its own 65/40 thresholds, so a
+  // score of 58 printed "VULNERABLE" directly above "Flood Risk: Low", and
+  // disagreed with the "Resilient" the user had just seen on screen.
   const statusText =
-    score >= 65 ? "RESILIENT" : score >= 40 ? "VULNERABLE" : "CRITICAL";
+    risk === "low"
+      ? "RESILIENT"
+      : risk === "moderate"
+      ? "VULNERABLE"
+      : "CRITICAL";
   const riskText = riskLabel(risk);
 
   doc.setTextColor(...scoreColor);
@@ -221,6 +229,30 @@ export function generatePDFReport(
   doc.text(`Flood Risk: ${riskText}`, circleCenterX - 25, circleCenterY + 48);
 
   yPos += 65;
+
+  addDivider();
+
+  // Against the 1609 baseline -- the same framing the results panel shows, so
+  // a report handed to a council reads the way the screen did.
+  addSectionTitle("Against the 1609 Baseline");
+
+  const baseline = compareToBaseline(score);
+  addText(baselineSentence(baseline));
+  addText(
+    `Capacity retained: ${baseline.retainedPct}%   |   Absorption lost: ${
+      baseline.lost > 0 ? `-${baseline.lost.toFixed(1)}` : "0"
+    } pts   |   Baseline: ${BASELINE_SCORE.toFixed(1)}`,
+    9,
+    true
+  );
+  addText(
+    "The baseline is an estimate of pre-development land cover for Manhattan " +
+      "in 1609, scored with the same weights as this analysis. It is derived " +
+      "from the Wildlife Conservation Society's Mannahatta Project, not " +
+      "published by it.",
+    8
+  );
+  yPos += 5;
 
   addDivider();
 

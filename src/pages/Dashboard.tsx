@@ -6,6 +6,7 @@ import { SiteComparison } from "@/components/SiteComparison";
 import { supabase } from "@/integrations/supabase/client";
 import type { AnalysisRecord } from "@/lib/types";
 import { classifyFloodRisk, riskColor, riskLabel } from "@/lib/absorption";
+import { BASELINE_SCORE } from "@/lib/baseline";
 import {
   analysesToCSV,
   analysesToGeoJSON,
@@ -261,10 +262,20 @@ export default function Dashboard() {
               </span>
             </div>
             <div
-              className="mt-3 flex h-16 items-end gap-1"
+              className="relative mt-3 flex h-16 items-end gap-1"
               role="img"
-              aria-label={`Histogram of absorption scores across ${stats.total} sites`}
+              aria-label={`Histogram of absorption scores across ${stats.total} sites, against an estimated pre-development baseline of ${BASELINE_SCORE.toFixed(
+                1
+              )}`}
             >
+              {/* The 1609 reference, on the same 0–100 axis the buckets use --
+                  a reference line over the bars, kept faint so it reads as an
+                  annotation rather than as data. */}
+              <div
+                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-foreground/25"
+                style={{ left: `${BASELINE_SCORE}%` }}
+                aria-hidden="true"
+              />
               {stats.bins.map((count, i) => {
                 const max = Math.max(...stats.bins, 1);
                 const bandStart = i * 10;
@@ -297,10 +308,16 @@ export default function Dashboard() {
                 );
               })}
             </div>
-            <div className="mt-1.5 flex justify-between font-mono text-[10px] text-muted-foreground">
-              <span>0</span>
-              <span>50</span>
-              <span>100</span>
+            <div className="relative mt-1.5 h-3.5 font-mono text-[10px] text-muted-foreground">
+              <span className="absolute left-0">0</span>
+              <span className="absolute left-1/2 -translate-x-1/2">50</span>
+              <span
+                className="absolute -translate-x-1/2 whitespace-nowrap font-sans text-foreground/70"
+                style={{ left: `${BASELINE_SCORE}%` }}
+              >
+                1609
+              </span>
+              <span className="absolute right-0">100</span>
             </div>
           </div>
         )}
