@@ -1,4 +1,4 @@
-# Vers3Dynamics — Mannahatta (Urban Resilience Platform)
+Mannahatta (Urban Resilience Platform)
 
 **Point it at any city block. Get a quantitative climate-resilience report back in seconds.**
 
