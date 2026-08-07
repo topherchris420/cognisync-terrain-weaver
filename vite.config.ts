@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-maplibre": ["maplibre-gl"],
           "vendor-supabase": ["@supabase/supabase-js"],
-        },
+        } as Record<string, string[]>,
       },
     },
   },

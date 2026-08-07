@@ -1,3 +1,4 @@
+import type { FeatureCollection } from "geojson";
 import { forwardRef, useImperativeHandle, useEffect, useCallback } from "react";
 import maplibregl, { Map as MLMap, GeoJSONSource } from "maplibre-gl";
 import type { RiskZone } from "@/lib/simulation-types";
@@ -32,7 +33,7 @@ const RISK_OPACITIES: Record<string, number> = {
   severe: 0.5,
 };
 
-function riskZonesToGeoJSON(zones: RiskZone[]): GeoJSON.FeatureCollection {
+function riskZonesToGeoJSON(zones: RiskZone[]): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: zones.map((zone) => ({

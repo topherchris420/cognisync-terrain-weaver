@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useEffect, useRef, useCallback } from "react";
 import maplibregl, { Map as MLMap, GeoJSONSource } from "maplibre-gl";
+import type { FeatureCollection } from "geojson";
 import type { FlowPath } from "@/lib/simulation-types";
 
 interface FlowLayerProps {
@@ -17,7 +18,7 @@ const FLOW_SOURCE_ID = "flow-paths-source";
 const FLOW_LAYER_ID = "flow-paths-layer";
 const FLOW_ANIMATION_LAYER_ID = "flow-paths-animation-layer";
 
-function flowPathsToGeoJSON(paths: FlowPath[]): GeoJSON.FeatureCollection {
+function flowPathsToGeoJSON(paths: FlowPath[]): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: paths.map((path) => ({
