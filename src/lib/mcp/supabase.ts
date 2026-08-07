@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { ToolContext } from "@lovable.dev/mcp-js";
 
 type RuntimeGlobals = typeof globalThis & {
   Deno?: { env?: { get?: (name: string) => string | undefined } };
