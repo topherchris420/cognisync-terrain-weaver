@@ -7,7 +7,7 @@ import { defineMcp } from "npm:@lovable.dev/mcp-js@0.26.1";
 
 // src/lib/mcp/tools/list-scans.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.26.1";
-import { z } from "npm:zod@^3.23.8";
+import { z } from "npm:zod@^4";
 
 // src/lib/mcp/supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.110.2";
@@ -85,7 +85,7 @@ var list_scans_default = defineTool({
 
 // src/lib/mcp/tools/get-scan.ts
 import { defineTool as defineTool2, ToolError } from "npm:@lovable.dev/mcp-js@0.26.1";
-import { z as z2 } from "npm:zod@^3.23.8";
+import { z as z2 } from "npm:zod@^4";
 var get_scan_default = defineTool2({
   name: "get_scan",
   title: "Get terrain scan",
@@ -105,7 +105,7 @@ var get_scan_default = defineTool2({
 
 // src/lib/mcp/tools/find-scans-near.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.1";
-import { z as z3 } from "npm:zod@^3.23.8";
+import { z as z3 } from "npm:zod@^4";
 var EARTH_KM_PER_DEG = 111.32;
 var find_scans_near_default = defineTool3({
   name: "find_scans_near",
@@ -140,7 +140,7 @@ var find_scans_near_default = defineTool3({
 
 // src/lib/mcp/tools/score-land-cover.ts
 import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
-import { z as z4 } from "npm:zod@^3.23.8";
+import { z as z4 } from "npm:zod@^4";
 import { classifyFloodRisk, computeAbsorptionScore } from "npm:@/lib/absorption";
 var score_land_cover_default = defineTool4({
   name: "score_land_cover",
