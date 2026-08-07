@@ -30,6 +30,8 @@ export type Database = {
           name: string
           recommendations: Json
           status: string
+          updated_at: string
+          user_id: string | null
           zoom: number
         }
         Insert: {
@@ -47,6 +49,8 @@ export type Database = {
           name: string
           recommendations?: Json
           status?: string
+          updated_at?: string
+          user_id?: string | null
           zoom: number
         }
         Update: {
@@ -64,6 +68,8 @@ export type Database = {
           name?: string
           recommendations?: Json
           status?: string
+          updated_at?: string
+          user_id?: string | null
           zoom?: number
         }
         Relationships: []
