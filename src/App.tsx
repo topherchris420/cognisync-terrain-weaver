@@ -14,6 +14,8 @@ import Index from "./pages/Index";
 const Analyze = lazy(() => import("./pages/Analyze"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Auth = lazy(() => import("./pages/Auth"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +43,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/analyze" element={<Analyze />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
