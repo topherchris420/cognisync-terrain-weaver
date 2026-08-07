@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "cognisync-terrain-weaver",
+      "version": "0.1.0",
+      "title": "cognisync-terrain-weaver"
+    },
+    "tools": [
+      {
+        "name": "list_scans",
+        "title": "List terrain scans",
+        "description": "List recent urban terrain scans with their Urban Absorption Score and flood-risk band, newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "default": 10,
+              "description": "How many scans to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "flood_risk": {
+              "description": "Optional filter by flood-risk band.",
+              "type": "string",
+              "enum": [
+                "low",
+                "moderate",
+                "high"
+              ]
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_scan",
+        "title": "Get terrain scan",
+        "description": "Fetch one terrain scan by id, including land-cover breakdown, absorption score, flood risk and climate-adaptation recommendations.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "The scan id."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "find_scans_near",
+        "title": "Find scans near a location",
+        "description": "Find terrain scans whose map centre lies within a radius of the given latitude/longitude, sorted by distance.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "lat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "description": "Latitude in decimal degrees."
+            },
+            "lng": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180,
+              "description": "Longitude in decimal degrees."
+            },
+            "radius_km": {
+              "default": 25,
+              "description": "Search radius in kilometres.",
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 500
+            },
+            "limit": {
+              "default": 10,
+              "description": "Maximum scans to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "lat",
+            "lng"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "score_land_cover",
+        "title": "Score a land-cover mix",
+        "description": "Compute the Urban Absorption Score (0-100) and flood-risk band for a hypothetical land-cover mix. Percentages should roughly sum to 100.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "pavement": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Pavement percentage."
+            },
+            "buildings": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Building rooftop percentage."
+            },
+            "vegetation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Vegetation percentage."
+            },
+            "water": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Open water percentage."
+            },
+            "soil": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Bare soil percentage."
+            }
+          },
+          "required": [
+            "pavement",
+            "buildings",
+            "vegetation",
+            "water",
+            "soil"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

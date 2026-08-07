@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,6 +12,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    mcpPlugin(),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
@@ -22,10 +24,13 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-maplibre": ["maplibre-gl"],
-          "vendor-supabase": ["@supabase/supabase-js"],
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom)\//.test(id))
+            return "vendor-react";
+          if (id.includes("node_modules/maplibre-gl/")) return "vendor-maplibre";
+          if (id.includes("node_modules/@supabase/")) return "vendor-supabase";
+          return undefined;
         },
       },
     },
