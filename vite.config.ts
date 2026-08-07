@@ -22,11 +22,14 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-maplibre": ["maplibre-gl"],
-          "vendor-supabase": ["@supabase/supabase-js"],
-        } as Record<string, string[]>,
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom)\//.test(id))
+            return "vendor-react";
+          if (id.includes("node_modules/maplibre-gl/")) return "vendor-maplibre";
+          if (id.includes("node_modules/@supabase/")) return "vendor-supabase";
+          return undefined;
+        },
       },
     },
   },
