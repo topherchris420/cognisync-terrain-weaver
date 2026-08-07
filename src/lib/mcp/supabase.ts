@@ -61,3 +61,13 @@ export function supabaseAnon() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+/** Forwards the verified bearer token so RLS runs as the signed-in user. */
+export function supabaseForUser(ctx: ToolContext) {
+  const token = ctx.getToken();
+  if (!token) throw new Error("supabaseForUser requires a verified OAuth token");
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
