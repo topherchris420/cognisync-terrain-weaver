@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { AppNav } from "@/components/AppNav";
 import { MapView, type MapViewHandle } from "@/components/MapView";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
