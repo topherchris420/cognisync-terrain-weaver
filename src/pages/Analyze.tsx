@@ -582,6 +582,37 @@ export default function Analyze() {
                   </div>
                 </section>
 
+                {/* What the lens is currently pointed at. The present keeps the
+                    familiar report below; the other two epochs add a plate. */}
+                {epoch === "1609" && (
+                  <section className="rounded-xl border border-primary/25 bg-background/40 p-5">
+                    <h2 className="catalyst-serif text-sm uppercase text-foreground">
+                      1609 — What was
+                    </h2>
+                    <div className="mt-3 flex items-baseline gap-3">
+                      <span className="font-mono text-3xl font-semibold tabular-nums">
+                        {BASELINE_SCORE.toFixed(1)}
+                      </span>
+                      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        {EPOCHS["1609"].provenance}
+                      </span>
+                    </div>
+                    <p className="catalyst-body mt-3 text-xs leading-relaxed text-muted-foreground">
+                      {EPOCHS["1609"].provenanceNote}
+                    </p>
+                  </section>
+                )}
+
+                {epoch === "future" && catalystUnlocked && (
+                  <CatalystFuturePanel
+                    cover={result.land_cover}
+                    bbox={result.bbox}
+                    onFutureChange={setCatalystFuture}
+                    onCompare={() => setComparing(true)}
+                    comparing={comparing}
+                  />
+                )}
+
                 <section>
                   <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Resilience score
