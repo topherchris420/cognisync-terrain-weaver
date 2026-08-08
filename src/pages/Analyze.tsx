@@ -561,11 +561,18 @@ export default function Analyze() {
           cinematic.isActive ? "-translate-x-[120%]" : "translate-x-0"
         )}>
           <aside className="pointer-events-auto flex w-full sm:w-[420px] max-h-full flex-col overflow-y-auto rounded-xl bg-background/90 backdrop-blur-md border border-border shadow-2xl">
+          {!result && (
+            <div className="border-b border-border p-5 panel bg-muted/10">
+              <h1 className="text-2xl font-bold tracking-tight mb-2 catalyst-serif">Mannahatta</h1>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                A spatial counterfactual engine. What if you could change the ground and watch the future respond? Search for a place, run a storm on the current terrain, and redesign the landscape for resilience.
+              </p>
+            </div>
+          )}
           <div className="border-b border-border p-5 panel">
-            <h1 className="text-lg font-semibold">Run resilience scan</h1>
+            <h2 className="text-lg font-semibold">{result ? "New scan" : "Run resilience scan"}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Search for a place, or pan the map yourself, then analyze the
-              visible satellite tile.
+              {result ? "Search for a new place to analyze." : "Pan the map or search for a location to analyze."}
             </p>
 
             {/* A real form: pressing Enter in the name or label fields starts
