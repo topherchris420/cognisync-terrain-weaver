@@ -385,6 +385,34 @@ export default function Analyze() {
           <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
           <FlowLayer map={mapInstance} flowPaths={simResult?.flow_paths ?? []} />
 
+          {/* Catalyst: the epoch skin, the reveal, and the split comparison.
+              All of it sits over the map — the map is never replaced. */}
+          {!comparing && (
+            <EpochVeil epoch={epoch} futureConfigured={Boolean(catalystFuture)} />
+          )}
+          {catalystFuture && (
+            <CompareRealities
+              open={comparing && epoch === "future"}
+              onClose={() => setComparing(false)}
+              currentScore={catalystFuture.future.impact.baseScore}
+              futureScore={catalystFuture.future.impact.projectedScore}
+              currentRisk={riskLabel(catalystFuture.future.impact.baseRisk)}
+              futureRisk={riskLabel(catalystFuture.future.risk)}
+            />
+          )}
+          <CatalystReveal open={revealing} onDone={() => setRevealing(false)} />
+
+          {/* The Temporal Lens. Present from the first scan; it only grows the
+              third stop once the layer has been found. */}
+          {result && (
+            <TemporalLens
+              epoch={epoch}
+              onChange={changeEpoch}
+              unlocked={catalystUnlocked}
+              className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2"
+            />
+          )}
+
           {/* Floating chip: coords + share */}
           <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
             <button
@@ -566,6 +594,7 @@ export default function Analyze() {
                   <BaselineComparison
                     score={Number(result.absorption_score)}
                     className="mt-4"
+                    catalyst={{ unlocked: catalystUnlocked, onUnlock }}
                   />
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
