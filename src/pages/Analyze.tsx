@@ -537,41 +537,21 @@ export default function Analyze() {
               {view.lat.toFixed(4)}, {view.lng.toFixed(4)} · z{view.zoom.toFixed(1)}
             </div>
           </div>
-
         </div>
 
-        {/* Cinematic Hero Overlay */}
+        {/* Cinematic Subtitles */}
         {cinematic.isActive && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-background/30 backdrop-blur-[2px]">
-            <div className="max-w-5xl text-center space-y-8 reveal is-visible flex flex-col items-center">
-              <div className="cinematic-glow rounded-full p-2 mb-4">
-                <div className="bg-primary/20 text-primary border border-primary/30 rounded-full px-4 py-1.5 text-sm font-semibold tracking-wide uppercase">
-                  v2.0 Beta
-                </div>
-              </div>
-              
-              <h1 className="text-6xl md:text-8xl font-bold tracking-tighter catalyst-serif text-gradient drop-shadow-2xl">
-                Mannahatta
-              </h1>
-              
-              <p className="text-2xl md:text-3xl font-medium text-foreground max-w-3xl mx-auto drop-shadow-lg leading-snug">
-                A spatial counterfactual engine.
-              </p>
-              
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                What if you could change the ground and watch the future respond? Run design storms on the current city, and let Catalyst optimize the landscape for resilience.
-              </p>
-              
-              <div className="pt-8">
-                <Button 
-                  size="lg" 
-                  className="h-14 px-8 text-lg rounded-full shadow-[0_0_40px_-10px_hsl(158,55%,45%)] hover:scale-105 transition-transform bg-primary text-primary-foreground font-semibold"
-                  onClick={cinematic.skip}
-                >
-                  Start analyzing
-                </Button>
-              </div>
+          <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-end pb-32">
+            <div className="cinematic-glow bg-background/80 backdrop-blur-xl border border-border/50 px-10 py-5 rounded-full shadow-2xl reveal is-visible transition-all">
+               <p className="catalyst-serif text-xl font-medium text-gradient text-center">
+                 {cinematic.subtitle}
+               </p>
             </div>
+            {cinematic.isFirstVisit && (
+               <Button variant="ghost" className="mt-4 pointer-events-auto text-muted-foreground hover:text-foreground" onClick={cinematic.skip}>
+                 Skip Intro
+               </Button>
+            )}
           </div>
         )}
 
