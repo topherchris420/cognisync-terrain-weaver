@@ -64,6 +64,11 @@
     --sidebar-accent-foreground: 60 15% 92%;
     --sidebar-border: 155 12% 16%;
     --sidebar-ring: 158 55% 45%;
+
+    /* Catalyst — hidden layer. One restrained gold, used nowhere else. */
+    --catalyst-gold: 41 58% 62%;
+    --catalyst-gold-muted: 41 30% 42%;
+    --catalyst-ink: 40 30% 8%;
   }
 }
 
@@ -162,6 +167,94 @@
     transform: none;
   }
 
+  /* ---------------------------------------------------------- Catalyst --
+     A hidden scientific plate: thin gold rules, editorial serif, no glow
+     beyond a single soft halo. Nothing here is used outside the layer. */
+
+  .catalyst-plate {
+    background:
+      linear-gradient(180deg, hsl(40 12% 9% / 0.96), hsl(40 10% 7% / 0.96));
+    border: 1px solid hsl(var(--catalyst-gold) / 0.28);
+    box-shadow: 0 18px 50px -28px hsl(var(--catalyst-gold) / 0.4);
+  }
+
+  .catalyst-rule {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--catalyst-gold) / 0.5),
+      transparent
+    );
+    transform-origin: left center;
+  }
+
+  .catalyst-serif {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+  }
+
+  .catalyst-body {
+    font-family: 'Lora', Georgia, serif;
+  }
+
+  /* The contour that moves into the map when the layer opens. */
+  .catalyst-contour {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    height: 150vmax;
+    width: 150vmax;
+    margin-left: -75vmax;
+    margin-top: -75vmax;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--catalyst-gold) / 0.55);
+    box-shadow: 0 0 60px -10px hsl(var(--catalyst-gold) / 0.35) inset;
+    animation: catalyst-ripple 3.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* The 79.1 figure separating under a sustained press. */
+  .catalyst-sigil {
+    display: inline-flex;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color 0.4s ease, text-shadow 0.6s ease;
+  }
+
+  .catalyst-sigil[data-holding="true"] {
+    color: hsl(var(--catalyst-gold));
+    text-shadow: 0 0 18px hsl(var(--catalyst-gold) / 0.35);
+  }
+
+  .catalyst-sigil-char {
+    display: inline-block;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+
+  /* The future skin over the satellite imagery: a warm gold veil, and a
+     cooler one for the reconstructed past. Filters only — the map itself is
+     never touched, so every existing overlay keeps working. */
+  .epoch-veil {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    transition: opacity 0.9s ease, background 0.9s ease;
+  }
+
+  .epoch-veil-past {
+    background:
+      radial-gradient(circle at 50% 40%, hsl(120 35% 30% / 0.34), transparent 70%),
+      linear-gradient(180deg, hsl(90 30% 20% / 0.42), hsl(150 30% 12% / 0.5));
+    backdrop-filter: sepia(0.35) saturate(0.7);
+  }
+
+  .epoch-veil-future {
+    background:
+      radial-gradient(circle at 50% 45%, hsl(var(--catalyst-gold) / 0.16), transparent 68%),
+      linear-gradient(180deg, hsl(41 40% 30% / 0.14), hsl(190 45% 22% / 0.2));
+  }
 }
 
 /* Honour users who prefer reduced motion */
@@ -181,6 +274,13 @@
     animation: none;
     top: 33%;
     opacity: 0.5;
+  }
+
+  .catalyst-contour,
+  .catalyst-sigil-char,
+  .epoch-veil {
+    animation: none !important;
+    transition: none !important;
   }
 
 }
