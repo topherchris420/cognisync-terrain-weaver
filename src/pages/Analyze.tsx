@@ -476,6 +476,7 @@ export default function Analyze() {
             }}
             onViewChange={onViewChange}
           />
+          <div className="vignette transition-opacity duration-1000" style={{ opacity: cinematic.isActive ? 1 : 0.4 }} />
 
           {/* Simulation overlays — render nothing until a simulation returns. */}
           <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
@@ -542,8 +543,8 @@ export default function Analyze() {
         {/* Cinematic Subtitles */}
         {cinematic.isActive && (
           <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-end pb-32">
-            <div className="bg-background/80 backdrop-blur-md border border-border px-8 py-4 rounded-full shadow-2xl reveal is-visible transition-all">
-               <p className="catalyst-serif text-lg text-foreground text-center">
+            <div className="cinematic-glow bg-background/80 backdrop-blur-xl border border-border/50 px-10 py-5 rounded-full shadow-2xl reveal is-visible transition-all">
+               <p className="catalyst-serif text-xl font-medium text-gradient text-center">
                  {cinematic.subtitle}
                </p>
             </div>
@@ -562,9 +563,10 @@ export default function Analyze() {
         )}>
           <aside className="pointer-events-auto flex w-full sm:w-[420px] max-h-full flex-col overflow-y-auto rounded-xl bg-background/90 backdrop-blur-md border border-border shadow-2xl">
           {!result && (
-            <div className="border-b border-border p-5 panel bg-muted/10">
-              <h1 className="text-2xl font-bold tracking-tight mb-2 catalyst-serif">Mannahatta</h1>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+            <div className="border-b border-border p-5 panel bg-muted/10 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+              <h1 className="text-3xl font-bold tracking-tight mb-2 catalyst-serif text-gradient">Mannahatta</h1>
+              <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
                 A spatial counterfactual engine. What if you could change the ground and watch the future respond? Search for a place, run a storm on the current terrain, and redesign the landscape for resilience.
               </p>
             </div>
