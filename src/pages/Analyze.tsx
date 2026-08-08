@@ -15,6 +15,17 @@ import {
 } from "@/components/SimulationPanel";
 import { FlowLayer } from "@/components/FlowLayer";
 import { RiskHeatmap } from "@/components/RiskHeatmap";
+import { TemporalLens } from "@/components/catalyst/TemporalLens";
+import { EpochVeil } from "@/components/catalyst/EpochVeil";
+import { CatalystReveal } from "@/components/catalyst/CatalystReveal";
+import { CompareRealities } from "@/components/catalyst/CompareRealities";
+import { CatalystFuturePanel } from "@/components/catalyst/CatalystFuturePanel";
+import { useCatalystUnlocked } from "@/hooks/use-catalyst";
+import { EPOCHS, type Epoch } from "@/lib/catalyst";
+import type { FutureState } from "@/lib/catalyst";
+import type { Scenario } from "@/lib/scenario";
+import { riskLabel } from "@/lib/absorption";
+import { BASELINE_SCORE } from "@/lib/baseline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,6 +105,28 @@ export default function Analyze() {
   );
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
+
+  // ---- Catalyst: the hidden fourth layer of the map -----------------------
+  const [catalystUnlocked, unlockCatalystNow] = useCatalystUnlocked();
+  const [revealing, setRevealing] = useState(false);
+  const [epoch, setEpoch] = useState<Epoch>("2026");
+  const [comparing, setComparing] = useState(false);
+  const [catalystFuture, setCatalystFuture] = useState<{
+    scenario: Scenario;
+    future: FutureState;
+  } | null>(null);
+
+  const onUnlock = useCallback(() => {
+    unlockCatalystNow();
+    setRevealing(true);
+  }, [unlockCatalystNow]);
+
+  // Leaving the future closes the comparison with it — a divider between two
+  // presents makes no sense while looking at 1609.
+  const changeEpoch = useCallback((next: Epoch) => {
+    setEpoch(next);
+    if (next !== "future") setComparing(false);
+  }, []);
 
   // The analyzed footprint, if one was stored — drives the instant runoff
   // estimate and the "too large to simulate" guard on the panel.
@@ -189,6 +222,9 @@ export default function Analyze() {
     setCapturedTile(null);
     setScenarioExport(null);
     setSimResult(null);
+    setCatalystFuture(null);
+    setComparing(false);
+    setEpoch("2026");
 
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
@@ -319,6 +355,9 @@ export default function Analyze() {
     setCapturedTile(null);
     setScenarioExport(null);
     setSimResult(null);
+    setCatalystFuture(null);
+    setComparing(false);
+    setEpoch("2026");
     if (window.innerWidth < 1024) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -345,6 +384,34 @@ export default function Analyze() {
           {/* Simulation overlays — render nothing until a simulation returns. */}
           <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
           <FlowLayer map={mapInstance} flowPaths={simResult?.flow_paths ?? []} />
+
+          {/* Catalyst: the epoch skin, the reveal, and the split comparison.
+              All of it sits over the map — the map is never replaced. */}
+          {!comparing && (
+            <EpochVeil epoch={epoch} futureConfigured={Boolean(catalystFuture)} />
+          )}
+          {catalystFuture && (
+            <CompareRealities
+              open={comparing && epoch === "future"}
+              onClose={() => setComparing(false)}
+              currentScore={catalystFuture.future.impact.baseScore}
+              futureScore={catalystFuture.future.impact.projectedScore}
+              currentRisk={riskLabel(catalystFuture.future.impact.baseRisk)}
+              futureRisk={riskLabel(catalystFuture.future.risk)}
+            />
+          )}
+          <CatalystReveal open={revealing} onDone={() => setRevealing(false)} />
+
+          {/* The Temporal Lens. Present from the first scan; it only grows the
+              third stop once the layer has been found. */}
+          {result && (
+            <TemporalLens
+              epoch={epoch}
+              onChange={changeEpoch}
+              unlocked={catalystUnlocked}
+              className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2"
+            />
+          )}
 
           {/* Floating chip: coords + share */}
           <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
@@ -515,6 +582,37 @@ export default function Analyze() {
                   </div>
                 </section>
 
+                {/* What the lens is currently pointed at. The present keeps the
+                    familiar report below; the other two epochs add a plate. */}
+                {epoch === "1609" && (
+                  <section className="rounded-xl border border-primary/25 bg-background/40 p-5">
+                    <h2 className="catalyst-serif text-sm uppercase text-foreground">
+                      1609 — What was
+                    </h2>
+                    <div className="mt-3 flex items-baseline gap-3">
+                      <span className="font-mono text-3xl font-semibold tabular-nums">
+                        {BASELINE_SCORE.toFixed(1)}
+                      </span>
+                      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        {EPOCHS["1609"].provenance}
+                      </span>
+                    </div>
+                    <p className="catalyst-body mt-3 text-xs leading-relaxed text-muted-foreground">
+                      {EPOCHS["1609"].provenanceNote}
+                    </p>
+                  </section>
+                )}
+
+                {epoch === "future" && catalystUnlocked && (
+                  <CatalystFuturePanel
+                    cover={result.land_cover}
+                    bbox={result.bbox}
+                    onFutureChange={setCatalystFuture}
+                    onCompare={() => setComparing(true)}
+                    comparing={comparing}
+                  />
+                )}
+
                 <section>
                   <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Resilience score
@@ -527,6 +625,7 @@ export default function Analyze() {
                   <BaselineComparison
                     score={Number(result.absorption_score)}
                     className="mt-4"
+                    catalyst={{ unlocked: catalystUnlocked, onUnlock }}
                   />
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
