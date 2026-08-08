@@ -5,8 +5,7 @@ import { Logo } from "./Logo";
 import { SITE } from "@/lib/site";
 
 const links = [
-  { to: "/", label: "Overview", icon: Layers, end: true },
-  { to: "/analyze", label: "Analyze", icon: MapIcon },
+  { to: "/", label: "Map", icon: MapIcon, end: true },
   { to: "/dashboard", label: "Dashboard", icon: LineChart },
 ];
 
@@ -14,7 +13,7 @@ const links = [
 // fetching the chunk on hover/focus instead of after the click. Vite dedupes
 // these against the lazy() imports in App.tsx — same module, same chunk.
 const PREFETCH: Record<string, () => void> = {
-  "/analyze": () => void import("@/pages/Analyze"),
+  "/": () => void import("@/pages/Analyze"),
   "/dashboard": () => void import("@/pages/Dashboard"),
 };
 
