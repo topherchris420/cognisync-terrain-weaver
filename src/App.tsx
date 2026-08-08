@@ -7,8 +7,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import Index from "./pages/Index";
-
 // Route-level code splitting: Analyze pulls in MapLibre GL (~800 kB) and
 // Dashboard pulls in the feed UI — neither should weigh down the landing page.
 const Analyze = lazy(() => import("./pages/Analyze"));
@@ -40,8 +38,7 @@ const App = () => (
           <ScrollToTop />
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/analyze" element={<Analyze />} />
+              <Route path="/" element={<Analyze />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />

@@ -21,7 +21,7 @@ import { CatalystReveal } from "@/components/catalyst/CatalystReveal";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { CatalystFuturePanel } from "@/components/catalyst/CatalystFuturePanel";
 import { useCatalystUnlocked } from "@/hooks/use-catalyst";
-import { EPOCHS, type Epoch } from "@/lib/catalyst";
+import { EPOCHS, type Epoch, solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
 import type { FutureState } from "@/lib/catalyst";
 import type { Scenario, InterventionKey } from "@/lib/scenario";
 import { EMPTY_SCENARIO } from "@/lib/scenario";
@@ -43,6 +43,7 @@ import {
   Link2,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useCinematicOnboarding } from "@/hooks/useCinematicOnboarding";
 import { supabase } from "@/integrations/supabase/client";
 import type { Map as MLMap } from "maplibre-gl";
 import type { AnalysisRecord } from "@/lib/types";
@@ -137,6 +138,69 @@ export default function Analyze() {
     () => (result ? parseBBox(result.bbox) : null),
     [result]
   );
+  
+  const cinematic = useCinematicOnboarding();
+  const cinematicState = cinematic.state;
+
+  // Cinematic Orchestrator
+  useEffect(() => {
+    if (!mapReady || !cinematic.isActive) return;
+
+    if (cinematicState === "FLYING_IN") {
+      mapInstance?.flyTo({ center: [-74.006, 40.7128], zoom: 15, duration: 2500 });
+      const timer = setTimeout(() => {
+        runAnalysis();
+      }, 2600);
+      return () => clearTimeout(timer);
+    }
+  }, [cinematicState, mapReady, mapInstance]);
+
+  useEffect(() => {
+    if (cinematicState === "FLYING_IN" && result) {
+      cinematic.advance("SIMULATING_CURRENT");
+    }
+  }, [result, cinematicState, cinematic]);
+
+  useEffect(() => {
+    if (cinematicState === "SIMULATING_CURRENT") {
+       runSimulation({ rainfall_mm: 50, resolution: 5, include_drainage: false });
+    }
+  }, [cinematicState]);
+
+  useEffect(() => {
+    if (cinematicState === "SIMULATING_CURRENT" && simResult) {
+      cinematic.advance("REDESIGNING");
+    }
+  }, [simResult, cinematicState, cinematic]);
+
+  useEffect(() => {
+    if (cinematicState === "REDESIGNING" && result) {
+       const timer = setTimeout(() => {
+         const areaM2 = bboxAreaKm2(parseBBox(result.bbox)!) * 1e6;
+         const solved = solveForTarget(result.land_cover, DEFAULT_TARGET_SCORE, areaM2, 500000);
+         setCatalystFuture({
+           scenario: solved.scenario,
+           future: projectFuture(result.land_cover, solved.scenario, areaM2)
+         });
+         setEpoch("future");
+         setComparing(true);
+         cinematic.advance("COMPARING_REALITIES");
+       }, 2000);
+       return () => clearTimeout(timer);
+    }
+  }, [cinematicState, result, cinematic]);
+
+  useEffect(() => {
+    if (cinematicState === "COMPARING_REALITIES") {
+       runSimulation({ rainfall_mm: 50, resolution: 5, include_drainage: false });
+       const timer = setTimeout(() => {
+         cinematic.advance("FINISHED");
+         unlockCatalystNow();
+       }, 5000);
+       return () => clearTimeout(timer);
+    }
+  }, [cinematicState, cinematic, unlockCatalystNow]);
+
   const simDisabledReason = useMemo(() => {
     if (!analyzedBBox) return null;
     const area = bboxAreaKm2(analyzedBBox);
@@ -457,9 +521,9 @@ export default function Analyze() {
             />
           )}
 
-          {/* Floating chip: coords + share */}
-          <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
-            <button
+        {/* Floating chip: coords + share */}
+        <div className={cn("absolute bottom-3 right-3 flex items-center gap-1.5 transition-opacity duration-1000", cinematic.isActive ? "opacity-0" : "opacity-100")}>
+          <button
               onClick={copyShareLink}
               aria-label="Copy shareable link to this map view"
               title="Copy shareable link to this map view"
@@ -474,8 +538,27 @@ export default function Analyze() {
 
         </div>
 
+        {/* Cinematic Subtitles */}
+        {cinematic.isActive && (
+          <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-end pb-32">
+            <div className="bg-background/80 backdrop-blur-md border border-border px-8 py-4 rounded-full shadow-2xl reveal is-visible transition-all">
+               <p className="catalyst-serif text-lg text-foreground text-center">
+                 {cinematic.subtitle}
+               </p>
+            </div>
+            {cinematic.isFirstVisit && (
+               <Button variant="ghost" className="mt-4 pointer-events-auto text-muted-foreground hover:text-foreground" onClick={cinematic.skip}>
+                 Skip Intro
+               </Button>
+            )}
+          </div>
+        )}
+
         {/* Side panel */}
-        <div className="pointer-events-none absolute inset-y-0 left-0 p-4 flex flex-col justify-start z-10 w-full sm:w-auto">
+        <div className={cn(
+          "pointer-events-none absolute inset-y-0 left-0 p-4 flex flex-col justify-start z-10 w-full sm:w-auto transition-transform duration-1000 ease-in-out",
+          cinematic.isActive ? "-translate-x-[120%]" : "translate-x-0"
+        )}>
           <aside className="pointer-events-auto flex w-full sm:w-[420px] max-h-full flex-col overflow-y-auto rounded-xl bg-background/90 backdrop-blur-md border border-border shadow-2xl">
           <div className="border-b border-border p-5 panel">
             <h1 className="text-lg font-semibold">Run resilience scan</h1>
