@@ -465,7 +465,15 @@ export default function Analyze() {
            }));
            
            const fakeSim: any = {
-             metadata: { area_km2: 1, rainfall_mm: params.rainfall_mm, runoff_volume_m3: 5000, max_depth_m: 0.5 },
+             metadata: { 
+               area_km2: 1, 
+               processed_area_km2: 1,
+               cells_analyzed: 40000,
+               computation_time_ms: 150,
+               rainfall_mm: params.rainfall_mm, 
+               runoff_volume_m3: 5000, 
+               max_depth_m: 0.5 
+             },
              flow_paths: fakeFlowPaths,
              risk_zones: []
            };
