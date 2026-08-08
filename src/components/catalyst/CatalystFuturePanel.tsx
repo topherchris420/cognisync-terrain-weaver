@@ -64,6 +64,7 @@ export function CatalystFuturePanel({
 }: Props) {
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [target, setTarget] = useState(DEFAULT_TARGET_SCORE);
+  const [budget, setBudget] = useState<number | "">("");
   const [simulated, setSimulated] = useState<FutureState | null>(null);
 
   const areaM2 = useMemo(() => recordAreaM2({ bbox }), [bbox]);
@@ -97,12 +98,12 @@ export function CatalystFuturePanel({
   }, []);
 
   const solve = () => {
-    const result = solveForTarget(cover, target);
+    const result = solveForTarget(cover, target, areaM2, budget === "" ? undefined : budget);
     setScenario(result.scenario);
     setSimulated(null);
   };
 
-  const solvePreview = useMemo(() => solveForTarget(cover, target), [cover, target]);
+  const solvePreview = useMemo(() => solveForTarget(cover, target, areaM2, budget === "" ? undefined : budget), [cover, target, areaM2, budget]);
   const verdict = simulated
     ? evaluateVerdict(simulated.impact.projectedScore, target)
     : null;
@@ -131,7 +132,7 @@ export function CatalystFuturePanel({
             htmlFor="catalyst-target"
             className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
           >
-            Hypothesis — reach a score of
+            Target score
           </Label>
           <Input
             id="catalyst-target"
@@ -142,6 +143,27 @@ export function CatalystFuturePanel({
             onChange={(e) => {
               const v = Number(e.target.value);
               setTarget(Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0);
+              setSimulated(null);
+            }}
+            className="h-8 w-24 font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="catalyst-budget"
+            className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
+          >
+            Max Budget ($)
+          </Label>
+          <Input
+            id="catalyst-budget"
+            type="number"
+            min={0}
+            placeholder="Unlimited"
+            value={budget}
+            onChange={(e) => {
+              const v = e.target.value === "" ? "" : Number(e.target.value);
+              setBudget(v);
               setSimulated(null);
             }}
             className="h-8 w-24 font-mono text-xs"
@@ -160,10 +182,9 @@ export function CatalystFuturePanel({
       </div>
       {!solvePreview.reachable && (
         <p className="catalyst-body mt-2 text-[11px] leading-relaxed text-warning">
-          Converting every eligible surface on this tile reaches{" "}
-          {solvePreview.ceilingScore.toFixed(1)} — a score of {target} is not
-          attainable here within this intervention set. That is a finding, not
-          an error.
+          {budget !== "" && solvePreview.achievedScore < target
+            ? `Target ${target} is unreachable with a $${formatCompactUSD(budget)} budget.`
+            : `Converting every eligible surface reaches ${solvePreview.ceilingScore.toFixed(1)}. A score of ${target} is unattainable here.`}
         </p>
       )}
 

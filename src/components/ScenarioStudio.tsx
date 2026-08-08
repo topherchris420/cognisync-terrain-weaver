@@ -8,7 +8,7 @@ import {
   Timer,
   TrendingUp,
 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
+import { PenTool } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,11 @@ import type { LandCover } from "@/lib/types";
 
 interface Props {
   cover: LandCover;
-  /** Raw bbox from the analysis record — used to size the site footprint. */
   bbox: unknown;
-  /** Fires with the current scenario whenever it changes (null when empty). */
-  onScenarioChange?: (payload: ScenarioExport | null) => void;
+  scenario: Scenario;
+  activeIntervention: InterventionKey | null;
+  onInterventionSelect: (key: InterventionKey) => void;
+  onScenarioExport?: (payload: ScenarioExport | null) => void;
 }
 
 const riskBadgeClass = (risk: string) =>
@@ -51,8 +52,7 @@ const riskBadgeClass = (risk: string) =>
  * stormwater retention, capital cost, and payback update live, using the
  * same transparent weights that produce the base score.
  */
-export function ScenarioStudio({ cover, bbox, onScenarioChange }: Props) {
-  const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
+export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onInterventionSelect, onScenarioExport }: Props) {
   const [rainfallMm, setRainfallMm] = useState(
     DEFAULT_ASSUMPTIONS.annualRainfallMm
   );
@@ -68,31 +68,16 @@ export function ScenarioStudio({ cover, bbox, onScenarioChange }: Props) {
   );
   const active = hasActiveInterventions(scenario);
 
-  // A new analysis means a new baseline — stale sliders would mislead.
   useEffect(() => {
-    setScenario(EMPTY_SCENARIO);
-  }, [cover]);
-
-  useEffect(() => {
-    onScenarioChange?.(active ? { scenario, impact, assumptions } : null);
-  }, [active, scenario, impact, assumptions, onScenarioChange]);
-
-  const setFraction = (key: (typeof INTERVENTION_ORDER)[number], pct: number) => {
-    setScenario((prev) => {
-      const next = { ...prev, [key]: pct / 100 };
-      // Keep same-source sliders honest in the UI: cap the one being moved
-      // so its source class can't exceed 100% conversion.
-      const source = INTERVENTIONS[key].source;
-      const others = INTERVENTION_ORDER.filter(
-        (k) => k !== key && INTERVENTIONS[k].source === source
-      ).reduce((sum, k) => sum + next[k], 0);
-      next[key] = Math.min(next[key], Math.max(0, 1 - others));
-      return next;
-    });
-  };
+    onScenarioExport?.(active ? { scenario, impact, assumptions } : null);
+  }, [active, scenario, impact, assumptions, onScenarioExport]);
 
   return (
     <div className="space-y-4">
+      <div className="text-xs text-muted-foreground mb-4">
+        Select a tool below and draw directly on the map to place interventions.
+        Costs and absorption impact update instantly based on the drawn area.
+      </div>
       {/* Intervention sliders */}
       <div className="space-y-4">
         {INTERVENTION_ORDER.map((key) => {
@@ -109,27 +94,28 @@ export function ScenarioStudio({ cover, bbox, onScenarioChange }: Props) {
                 >
                   {def.label}
                 </Label>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {pct}% of {def.source} · ${def.unitCostUSD}/m²
-                </span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {(scenario[key] * 100).toFixed(1)}% of {def.source} · ${def.unitCostUSD}/m²
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                  <Button
+                    variant={activeIntervention === key ? "default" : "outline"}
+                    size="sm"
+                    className="gap-2 shrink-0"
+                    onClick={() => onInterventionSelect(key)}
+                    disabled={disabled}
+                  >
+                    <PenTool className="h-3.5 w-3.5" />
+                    {activeIntervention === key ? "Drawing..." : "Draw"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {disabled
+                      ? `No ${def.source} detected in this tile.`
+                      : def.description}
+                  </p>
+                </div>
               </div>
-              <Slider
-                id={`slider-${key}`}
-                className="mt-2"
-                value={[pct]}
-                min={0}
-                max={100}
-                step={5}
-                disabled={disabled}
-                onValueChange={([v]) => setFraction(key, v)}
-                aria-label={`${def.label} — percent of ${def.source} converted`}
-              />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {disabled
-                  ? `No ${def.source} detected in this tile.`
-                  : def.description}
-              </p>
-            </div>
           );
         })}
       </div>
@@ -154,17 +140,7 @@ export function ScenarioStudio({ cover, bbox, onScenarioChange }: Props) {
           className="h-8 w-24 font-mono text-xs"
         />
         <span className="text-xs text-muted-foreground">mm / year</span>
-        {active && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto h-8 gap-1.5 text-xs"
-            onClick={() => setScenario(EMPTY_SCENARIO)}
-          >
-            <RotateCcw className="h-3 w-3" />
-            Reset
-          </Button>
-        )}
+        {/* Note: The reset button will need to communicate with MapEditor to clear drawn polygons, but for now we'll leave it hidden as direct editing makes it less critical */}
       </div>
 
       {/* Projection */}
@@ -177,7 +153,7 @@ export function ScenarioStudio({ cover, bbox, onScenarioChange }: Props) {
       >
         {!active ? (
           <p className="text-xs text-muted-foreground">
-            Drag a slider to model an intervention. The projected score,
+            Select a tool and draw on the map. The projected score,
             retention volume, and investment case update instantly.
           </p>
         ) : (

@@ -15,6 +15,7 @@ export interface FlowLayerHandle {
 }
 
 const FLOW_SOURCE_ID = "flow-paths-source";
+const FLOW_GLOW_LAYER_ID = "flow-paths-glow-layer";
 const FLOW_LAYER_ID = "flow-paths-layer";
 const FLOW_ANIMATION_LAYER_ID = "flow-paths-animation-layer";
 
@@ -61,6 +62,31 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     map.addSource(FLOW_SOURCE_ID, {
       type: "geojson",
       data: flowPathsToGeoJSON(flowPaths),
+    });
+
+    // Add glowing blur layer underneath
+    map.addLayer({
+      id: FLOW_GLOW_LAYER_ID,
+      type: "line",
+      source: FLOW_SOURCE_ID,
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#60a5fa",
+        "line-width": 8,
+        "line-blur": 6,
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["get", "volume_m3"],
+          0,
+          0.1,
+          1000,
+          0.6,
+        ],
+      },
     });
 
     // Add static line layer (base)
@@ -129,6 +155,9 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     if (map.getLayer(FLOW_LAYER_ID)) {
       map.removeLayer(FLOW_LAYER_ID);
     }
+    if (map.getLayer(FLOW_GLOW_LAYER_ID)) {
+      map.removeLayer(FLOW_GLOW_LAYER_ID);
+    }
 
     // Remove source
     if (map.getSource(FLOW_SOURCE_ID)) {
@@ -151,6 +180,32 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
         });
 
         // Add layers if they don't exist
+        if (!map.getLayer(FLOW_GLOW_LAYER_ID)) {
+          map.addLayer({
+            id: FLOW_GLOW_LAYER_ID,
+            type: "line",
+            source: FLOW_SOURCE_ID,
+            layout: {
+              "line-join": "round",
+              "line-cap": "round",
+            },
+            paint: {
+              "line-color": "#60a5fa",
+              "line-width": 8,
+              "line-blur": 6,
+              "line-opacity": [
+                "interpolate",
+                ["linear"],
+                ["get", "volume_m3"],
+                0,
+                0.1,
+                1000,
+                0.6,
+              ],
+            },
+          });
+        }
+
         if (!map.getLayer(FLOW_LAYER_ID)) {
           map.addLayer({
             id: FLOW_LAYER_ID,

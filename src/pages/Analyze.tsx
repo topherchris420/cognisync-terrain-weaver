@@ -23,7 +23,9 @@ import { CatalystFuturePanel } from "@/components/catalyst/CatalystFuturePanel";
 import { useCatalystUnlocked } from "@/hooks/use-catalyst";
 import { EPOCHS, type Epoch } from "@/lib/catalyst";
 import type { FutureState } from "@/lib/catalyst";
-import type { Scenario } from "@/lib/scenario";
+import type { Scenario, InterventionKey } from "@/lib/scenario";
+import { EMPTY_SCENARIO } from "@/lib/scenario";
+import { MapEditor } from "@/components/MapEditor";
 import { riskLabel } from "@/lib/absorption";
 import { BASELINE_SCORE } from "@/lib/baseline";
 import { Button } from "@/components/ui/button";
@@ -100,11 +102,12 @@ export default function Analyze() {
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<AnalysisRecord | null>(null);
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
-  const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(
-    null
-  );
+  const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(null);
+  const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
+  const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
+  const [futureSimResult, setFutureSimResult] = useState<SimulationResponse | null>(null);
 
   // ---- Catalyst: the hidden fourth layer of the map -----------------------
   const [catalystUnlocked, unlockCatalystNow] = useCatalystUnlocked();
@@ -222,6 +225,7 @@ export default function Analyze() {
     setCapturedTile(null);
     setScenarioExport(null);
     setSimResult(null);
+    setFutureSimResult(null);
     setCatalystFuture(null);
     setComparing(false);
     setEpoch("2026");
@@ -294,8 +298,10 @@ export default function Analyze() {
 
     setSimulating(true);
     setSimResult(null);
+    setFutureSimResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("run-simulation", {
+      // Run base simulation
+      const basePromise = supabase.functions.invoke("run-simulation", {
         body: {
           bbox: boundsToSimBBox(bounds),
           rainfall_mm: params.rainfall_mm,
@@ -303,6 +309,25 @@ export default function Analyze() {
           include_drainage: params.include_drainage,
         },
       });
+      
+      // If Catalyst future is active, run future simulation too
+      const promises = [basePromise];
+      // A full implementation would pass the counterfactual DEM modifications here.
+      // For now, we simulate the same terrain to demonstrate the UI capability.
+      if (catalystFuture) {
+         promises.push(supabase.functions.invoke("run-simulation", {
+            body: {
+              bbox: boundsToSimBBox(bounds),
+              rainfall_mm: params.rainfall_mm,
+              resolution: params.resolution,
+              include_drainage: params.include_drainage,
+              // In a real backend, we'd pass `scenario` here to apply it to the DEM.
+            },
+         }));
+      }
+
+      const results = await Promise.all(promises);
+      const { data, error } = results[0];
 
       if (error) {
         console.error("run-simulation failed:", error);
@@ -320,6 +345,11 @@ export default function Analyze() {
         return;
       }
       setSimResult(sim);
+      
+      if (results.length > 1 && !results[1].error) {
+         setFutureSimResult(results[1].data as SimulationResponse);
+      }
+
       toast.success("Simulation complete", {
         description: `${sim.risk_zones.length} risk zones and ${sim.flow_paths.length} flow paths mapped over ${params.rainfall_mm}mm of rain.`,
       });
@@ -355,6 +385,7 @@ export default function Analyze() {
     setCapturedTile(null);
     setScenarioExport(null);
     setSimResult(null);
+    setFutureSimResult(null);
     setCatalystFuture(null);
     setComparing(false);
     setEpoch("2026");
@@ -367,9 +398,9 @@ export default function Analyze() {
     <div className="flex min-h-screen flex-col">
       <AppNav />
 
-      <main id="main" className="flex-1 grid gap-0 lg:grid-cols-[1fr_400px] min-h-0">
+      <main id="main" className="relative flex-1 min-h-0">
         {/* Map */}
-        <div className="relative min-h-[420px] lg:min-h-0 border-b lg:border-b-0 lg:border-r border-border">
+        <div className="absolute inset-0">
           <MapView
             ref={mapRef}
             initialCenter={[initialView.lng, initialView.lat]}
@@ -385,6 +416,17 @@ export default function Analyze() {
           <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
           <FlowLayer map={mapInstance} flowPaths={simResult?.flow_paths ?? []} />
 
+          {/* Map Editor for direct spatial interventions */}
+          {result && !comparing && epoch === "2026" && (
+            <MapEditor
+              map={mapInstance}
+              bbox={result.bbox}
+              cover={result.land_cover}
+              onScenarioChange={(s) => setScenario(s)}
+              activeIntervention={activeIntervention}
+            />
+          )}
+
           {/* Catalyst: the epoch skin, the reveal, and the split comparison.
               All of it sits over the map — the map is never replaced. */}
           {!comparing && (
@@ -394,10 +436,12 @@ export default function Analyze() {
             <CompareRealities
               open={comparing && epoch === "future"}
               onClose={() => setComparing(false)}
+              baseMap={mapInstance}
               currentScore={catalystFuture.future.impact.baseScore}
               futureScore={catalystFuture.future.impact.projectedScore}
               currentRisk={riskLabel(catalystFuture.future.impact.baseRisk)}
               futureRisk={riskLabel(catalystFuture.future.risk)}
+              futureSimResult={futureSimResult}
             />
           )}
           <CatalystReveal open={revealing} onDone={() => setRevealing(false)} />
@@ -431,7 +475,8 @@ export default function Analyze() {
         </div>
 
         {/* Side panel */}
-        <aside className="flex min-h-0 flex-col overflow-y-auto bg-background">
+        <div className="pointer-events-none absolute inset-y-0 left-0 p-4 flex flex-col justify-start z-10 w-full sm:w-auto">
+          <aside className="pointer-events-auto flex w-full sm:w-[420px] max-h-full flex-col overflow-y-auto rounded-xl bg-background/90 backdrop-blur-md border border-border shadow-2xl">
           <div className="border-b border-border p-5 panel">
             <h1 className="text-lg font-semibold">Run resilience scan</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -686,7 +731,10 @@ export default function Analyze() {
                   <ScenarioStudio
                     cover={result.land_cover}
                     bbox={result.bbox}
-                    onScenarioChange={setScenarioExport}
+                    scenario={scenario}
+                    activeIntervention={activeIntervention}
+                    onInterventionSelect={(key) => setActiveIntervention(key === activeIntervention ? null : key)}
+                    onScenarioExport={setScenarioExport}
                   />
                 </section>
 
@@ -710,7 +758,8 @@ export default function Analyze() {
               </>
             )}
           </div>
-        </aside>
+          </aside>
+        </div>
       </main>
     </div>
   );

@@ -2,14 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import type { Map as MLMap } from "maplibre-gl";
+import { MapView } from "@/components/MapView";
+import { FlowLayer } from "@/components/FlowLayer";
+import type { SimulationResponse } from "@/lib/simulation-types";
+
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Headline figure for each side, e.g. "18.4" and "41.2". */
+  baseMap: MLMap | null;
   currentScore: number;
   futureScore: number;
   currentRisk: string;
   futureRisk: string;
+  futureSimResult?: SimulationResponse | null;
 }
 
 /**
@@ -24,14 +30,17 @@ interface Props {
 export function CompareRealities({
   open,
   onClose,
+  baseMap,
   currentScore,
   futureScore,
   currentRisk,
   futureRisk,
+  futureSimResult,
 }: Props) {
   const [pct, setPct] = useState(50);
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const [futureMap, setFutureMap] = useState<MLMap | null>(null);
 
   const moveTo = useCallback((clientX: number) => {
     const rect = wrapRef.current?.getBoundingClientRect();
@@ -58,16 +67,79 @@ export function CompareRealities({
     };
   }, [open, moveTo]);
 
+  // Sync maps
+  useEffect(() => {
+    if (!baseMap || !futureMap || !open) return;
+
+    let isSyncingLeft = false;
+    let isSyncingRight = false;
+
+    const onLeftMove = () => {
+      if (isSyncingRight) return;
+      isSyncingLeft = true;
+      futureMap.jumpTo({
+        center: baseMap.getCenter(),
+        zoom: baseMap.getZoom(),
+        bearing: baseMap.getBearing(),
+        pitch: baseMap.getPitch(),
+      });
+      isSyncingLeft = false;
+    };
+
+    const onRightMove = () => {
+      if (isSyncingLeft) return;
+      isSyncingRight = true;
+      baseMap.jumpTo({
+        center: futureMap.getCenter(),
+        zoom: futureMap.getZoom(),
+        bearing: futureMap.getBearing(),
+        pitch: futureMap.getPitch(),
+      });
+      isSyncingRight = false;
+    };
+
+    baseMap.on("move", onLeftMove);
+    futureMap.on("move", onRightMove);
+
+    // Initial sync
+    futureMap.jumpTo({
+      center: baseMap.getCenter(),
+      zoom: baseMap.getZoom(),
+      bearing: baseMap.getBearing(),
+      pitch: baseMap.getPitch(),
+    });
+
+    return () => {
+      baseMap.off("move", onLeftMove);
+      futureMap.off("move", onRightMove);
+    };
+  }, [baseMap, futureMap, open]);
+
   if (!open) return null;
 
   return (
     <div ref={wrapRef} className="absolute inset-0 z-20" data-testid="compare-realities">
-      {/* The future, clipped to the right of the handle. */}
       <div
-        className="epoch-veil epoch-veil-future"
+        className="absolute inset-0 overflow-hidden"
         style={{ clipPath: `inset(0 0 0 ${pct}%)` }}
-        aria-hidden="true"
-      />
+      >
+        <div className="absolute inset-0" style={{ width: "100vw", transform: `translateX(-${pct}vw)` }}>
+          <div className="absolute inset-0" style={{ width: "100vw", transform: `translateX(${pct}vw)` }}>
+            {baseMap && (
+               <MapView
+                 initialCenter={[baseMap.getCenter().lng, baseMap.getCenter().lat]}
+                 initialZoom={baseMap.getZoom()}
+                 onReady={(m) => setFutureMap(m.getMap())}
+               />
+            )}
+            <FlowLayer map={futureMap} flowPaths={futureSimResult?.flow_paths ?? []} />
+            <div
+              className="epoch-veil epoch-veil-future"
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Side plates */}
       <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border bg-background/85 px-2.5 py-1.5 backdrop-blur">

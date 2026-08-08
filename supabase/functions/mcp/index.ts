@@ -3,6 +3,6 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:C:\\Users\\chris\\cognisync-terrain-weaver\\src\\lib\\mcp\\index.ts";
+import mcp from "npm:C:\\Users\\chris\\.gemini\\antigravity\\scratch\\cognisync-terrain-weaver\\src\\lib\\mcp\\index.ts";
 import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.26.1/stacks/supabase";
 Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));

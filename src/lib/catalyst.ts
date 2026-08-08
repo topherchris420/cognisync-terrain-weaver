@@ -162,7 +162,7 @@ export interface SolveResult {
  * The answer is verified through `projectScore`, the same function the
  * Scenario Studio uses, so the solver can never disagree with the sliders.
  */
-export function solveForTarget(cover: LandCover, target: number): SolveResult {
+export function solveForTarget(cover: LandCover, target: number, areaM2?: number, maxBudgetUSD?: number): SolveResult {
   const baseScore = projectScore(cover, EMPTY_SCENARIO);
   const ceiling = { ...EMPTY_SCENARIO } as Scenario;
   // Ceiling: spend each source class entirely on its most effective option.
@@ -181,9 +181,13 @@ export function solveForTarget(cover: LandCover, target: number): SolveResult {
   const scenario: Scenario = { ...EMPTY_SCENARIO };
   const used: InterventionKey[] = [];
   const capacity = new Map<LandCoverKey, number>();
+  let spentBudget = 0;
 
   let needed = target - baseScore;
-  if (needed > 0) {
+  // If target is already met but budget is specified and we want to maximize score, we could change the loop condition.
+  // But standard "reduce flood risk under $X" implies finding a solution that meets target and costs < $X.
+  // Or, if target is not reachable, get as close as possible within budget.
+  if (needed > 0 || maxBudgetUSD) {
     const order = [...INTERVENTION_ORDER].sort(
       (a, b) => efficiency(b) - efficiency(a)
     );
@@ -202,14 +206,29 @@ export function solveForTarget(cover: LandCover, target: number): SolveResult {
       if (lift <= 0) continue;
 
       const gainPerFraction = share * lift * 100;
-      const fractionNeeded = needed / gainPerFraction;
-      const fraction = Math.min(room, fractionNeeded);
+      let fractionNeeded = needed > 0 ? needed / gainPerFraction : 0;
+      
+      // If we are just maximizing score within budget, we need as much fraction as possible
+      if (needed <= 0 && maxBudgetUSD) fractionNeeded = room;
+
+      let fraction = Math.min(room, fractionNeeded);
+      
+      // Budget constraint
+      const costPerFraction = (areaM2 || 0) * share * def.unitCostUSD;
+      if (maxBudgetUSD && costPerFraction > 0) {
+         const affordableFraction = Math.max(0, maxBudgetUSD - spentBudget) / costPerFraction;
+         fraction = Math.min(fraction, affordableFraction);
+      }
+
       if (fraction <= 0) continue;
 
       scenario[key] = fraction;
       capacity.set(def.source, spent + fraction);
       used.push(key);
       needed -= fraction * gainPerFraction;
+      spentBudget += fraction * costPerFraction;
+      
+      if (maxBudgetUSD && spentBudget >= maxBudgetUSD - 0.01) break;
     }
   }
 
