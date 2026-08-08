@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { classifyFloodRisk } from "@/lib/absorption";
+import { CatalystSigil } from "@/components/catalyst/CatalystSigil";
 import {
   BASELINE_SCORE,
   BASELINE_SOURCE,
@@ -13,6 +14,12 @@ interface Props {
   className?: string;
   /** Hides the provenance footnote where the page already carries one. */
   compact?: boolean;
+  /**
+   * Turns the 1609 figure into the latch for the hidden Catalyst layer.
+   * Only the analysis workbench passes this — the marketing page shows the
+   * same panel, and a door there would lead nowhere.
+   */
+  catalyst?: { unlocked: boolean; onUnlock: () => void };
 }
 
 /**
@@ -23,7 +30,12 @@ interface Props {
  * The whole scale is drawn, both ends labelled, so the site's marker lands
  * somewhere the eye can read without knowing anything about runoff.
  */
-export function BaselineComparison({ score, className, compact = false }: Props) {
+export function BaselineComparison({
+  score,
+  className,
+  compact = false,
+  catalyst,
+}: Props) {
   const cmp = compareToBaseline(score);
   const risk = classifyFloodRisk(cmp.score);
   const headingId = useId();
@@ -54,7 +66,17 @@ export function BaselineComparison({ score, className, compact = false }: Props)
           Against the 1609 baseline
         </h3>
         <span className="font-mono text-xs text-muted-foreground">
-          est. {BASELINE_SCORE.toFixed(1)} before the city
+          est.{" "}
+          {catalyst ? (
+            <CatalystSigil
+              text={BASELINE_SCORE.toFixed(1)}
+              unlocked={catalyst.unlocked}
+              onUnlock={catalyst.onUnlock}
+            />
+          ) : (
+            BASELINE_SCORE.toFixed(1)
+          )}{" "}
+          before the city
         </span>
       </div>
 
