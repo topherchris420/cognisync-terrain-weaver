@@ -13,14 +13,8 @@ export function useCinematicOnboarding() {
   const [isFirstVisit, setIsFirstVisit] = useState(false);
 
   useEffect(() => {
-    const hasVisited = localStorage.getItem("mannahatta_visited");
-    if (!hasVisited) {
-      setIsFirstVisit(true);
-      setState("FLYING_IN");
-      localStorage.setItem("mannahatta_visited", "true");
-    } else {
-      setState("FINISHED");
-    }
+    setIsFirstVisit(true);
+    setState("FLYING_IN");
   }, []);
 
   const advance = useCallback((newState: CinematicState) => {
