@@ -202,6 +202,43 @@ export default function Analyze() {
     }
   }, [cinematicState, cinematic, unlockCatalystNow]);
 
+  // Historical map layer logic
+  useEffect(() => {
+    if (!mapInstance) return;
+    
+    const sourceId = "historical-tiles-source";
+    const layerId = "historical-tiles-layer";
+    
+    // Using Esri NatGeo map as a gorgeous vintage/historical topography placeholder
+    // If the 1609 XYZ tile server url is provided, just swap this URL.
+    const tileUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}";
+
+    if (!mapInstance.getSource(sourceId)) {
+      mapInstance.addSource(sourceId, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+      });
+
+      // Add underneath all other layers we control, but above the base satellite
+      mapInstance.addLayer({
+        id: layerId,
+        type: "raster",
+        source: sourceId,
+        paint: {
+          "raster-opacity": 0,
+          "raster-fade-duration": 600,
+        },
+      });
+    }
+
+    if (epoch === "past") {
+      mapInstance.setPaintProperty(layerId, "raster-opacity", 1);
+    } else {
+      mapInstance.setPaintProperty(layerId, "raster-opacity", 0);
+    }
+  }, [mapInstance, epoch]);
+
   const simDisabledReason = useMemo(() => {
     if (!analyzedBBox) return null;
     const area = bboxAreaKm2(analyzedBBox);
