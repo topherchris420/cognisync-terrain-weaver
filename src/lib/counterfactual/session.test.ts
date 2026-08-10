@@ -336,6 +336,31 @@ describe("counterfactual session reducer", () => {
     expect(selectProjectedStatus(next)).toBe("estimated");
   });
 
+  it("returns to the edit prompt when the selected tool is cleared before any edit", () => {
+    const storm = makeStorm();
+    let state = counterfactualReducer(createCounterfactualSession(), {
+      type: "ANALYSIS_SUCCEEDED",
+      analysis: makeAnalysis("untouched"),
+      baseline: makeBaseline(),
+      storm,
+    });
+
+    state = counterfactualReducer(state, {
+      type: "NOW_SIMULATION_SUCCEEDED",
+      result: makeSimulation(storm.hash, state.nowSurface!.surfaceHash),
+    });
+    state = counterfactualReducer(state, {
+      type: "TOOL_SELECTED",
+      tool: "bioswales",
+    });
+    state = counterfactualReducer(state, {
+      type: "TOOL_SELECTED",
+      tool: null,
+    });
+
+    expect(state.phase).toBe("edit-prompt");
+  });
+
   it("requires matching model versions and distinct surface hashes before comparing", () => {
     const storm = makeStorm({ hash: "storm:fixed" });
     let state = counterfactualReducer(createCounterfactualSession(), {

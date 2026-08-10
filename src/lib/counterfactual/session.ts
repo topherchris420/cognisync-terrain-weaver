@@ -101,9 +101,7 @@ function getEditPhase(
     return "edit";
   }
 
-  return possibleSurface.interventionHash === createEmptySurface("possible").interventionHash
-    ? "edit-prompt"
-    : "edit";
+  return possibleSurface.interventions.length === 0 ? "edit-prompt" : "edit";
 }
 
 function matchesSurface(
