@@ -42,7 +42,11 @@ function mergePolygons(
 ): GeoJSON.Feature<PolygonGeometry> | null {
   if (features.length === 0) return null;
   if (features.length === 1) return features[0];
-  return union(featureCollection(features));
+  try {
+    return union(featureCollection(features));
+  } catch {
+    return null;
+  }
 }
 
 function intersectionOf(
@@ -168,13 +172,27 @@ export function evaluateEligibility(
     buildings.map((candidate) => candidate.properties.sourceId)
   );
   const mergedBuildings = mergePolygons(buildings);
+  if (buildings.length > 0 && !mergedBuildings) {
+    return resultFrom(
+      null,
+      draft,
+      ["NO_ELIGIBILITY_LAYER"],
+      "low",
+      provenanceFor(context, sourceIds),
+      [FEASIBILITY_CAVEAT, "Building exclusions could not be resolved."]
+    );
+  }
   try {
     const invalid = mergedBuildings
       ? intersectionOf(draft, mergedBuildings)
       : null;
     const valid = differenceOf(draft, invalid);
     const reasonCodes: EligibilityResult["reasonCodes"] = [];
-    if (!context) reasonCodes.push("NO_ELIGIBILITY_LAYER");
+    const buildingExclusionsAvailable =
+      context?.loadedSourceIds.includes("nyc-building-footprints") ?? false;
+    if (!buildingExclusionsAvailable) {
+      reasonCodes.push("NO_ELIGIBILITY_LAYER");
+    }
     if (invalid && area(invalid) > 0.01) {
       reasonCodes.push("EXCLUDED_GEOMETRY");
     }
@@ -186,7 +204,7 @@ export function evaluateEligibility(
       provenanceFor(context, sourceIds),
       [
         FEASIBILITY_CAVEAT,
-        ...(!context
+        ...(!buildingExclusionsAvailable
           ? ["Building exclusions are unavailable for this place."]
           : []),
       ]

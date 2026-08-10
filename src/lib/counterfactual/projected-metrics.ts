@@ -9,6 +9,13 @@ import {
   type ScenarioImpact,
 } from "@/lib/scenario";
 import type { FloodRisk, LandCover } from "@/lib/types";
+import {
+  area as turfArea,
+  difference,
+  feature,
+  featureCollection,
+  union,
+} from "@turf/turf";
 import { stableHash } from "./hashing";
 import type { InterventionFeature } from "./types";
 
@@ -55,21 +62,60 @@ export function deriveScenarioFromFeatures(
     Number.isFinite(siteAreaM2) && siteAreaM2 > 0 ? siteAreaM2 : 0;
   if (area === 0) return scenario;
 
+  const claimedBySource = new Map<
+    string,
+    GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>
+  >();
   for (const key of INTERVENTION_ORDER) {
     const source = INTERVENTIONS[key].source;
     const availableAreaM2 = area * landShare(cover, source);
     if (availableAreaM2 <= 0) continue;
-    const editedAreaM2 = features.reduce((sum, candidate) => {
-      if (
-        candidate.type !== key ||
-        !candidate.eligibility.eligible ||
-        !candidate.eligibility.validGeometry
-      ) {
-        return sum;
+    const valid = features
+      .filter(
+        (candidate) =>
+          candidate.type === key &&
+          candidate.eligibility.eligible &&
+          candidate.eligibility.validGeometry
+      )
+      .map((candidate) => feature(candidate.eligibility.validGeometry!));
+    if (valid.length === 0) continue;
+    let merged = valid[0];
+    for (const candidate of valid.slice(1)) {
+      try {
+        merged =
+          union(featureCollection([merged, candidate])) ?? merged;
+      } catch {
+        // Skip malformed geometry rather than overstate unique edited area.
       }
-      return sum + Math.max(0, candidate.eligibility.validAreaM2);
-    }, 0);
+    }
+    const previouslyClaimed = claimedBySource.get(source);
+    let unclaimed: GeoJSON.Feature<
+      GeoJSON.Polygon | GeoJSON.MultiPolygon
+    > | null = merged;
+    if (previouslyClaimed) {
+      try {
+        unclaimed =
+          difference(featureCollection([merged, previouslyClaimed])) ??
+          null;
+      } catch {
+        unclaimed = null;
+      }
+    }
+    const editedAreaM2 = unclaimed ? turfArea(unclaimed) : 0;
     scenario[key] = editedAreaM2 / availableAreaM2;
+    if (previouslyClaimed) {
+      try {
+        claimedBySource.set(
+          source,
+          union(featureCollection([previouslyClaimed, merged])) ??
+            previouslyClaimed
+        );
+      } catch {
+        // Retain the prior claim: a failed union must not create extra area.
+      }
+    } else {
+      claimedBySource.set(source, merged);
+    }
   }
 
   return normalizeScenario(scenario);

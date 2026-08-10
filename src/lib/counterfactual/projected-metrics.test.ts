@@ -103,6 +103,24 @@ describe("immediate edit projection", () => {
     expect(scenario.street_trees + scenario.bioswales).toBeCloseTo(1);
   });
 
+  it("counts overlapping geometry only once in scenario economics", () => {
+    const one = deriveScenarioFromFeatures(
+      [makeFeature("one", "bioswales", 12_000)],
+      cover,
+      1_000_000
+    );
+    const duplicated = deriveScenarioFromFeatures(
+      [
+        makeFeature("one", "bioswales", 12_000),
+        makeFeature("two", "bioswales", 12_000),
+      ],
+      cover,
+      1_000_000
+    );
+
+    expect(duplicated.bioswales).toBeCloseTo(one.bioswales);
+  });
+
   it("hashes valid geometry deterministically and recognizes a matching rerun", () => {
     const first = projectEditMetrics({
       features,

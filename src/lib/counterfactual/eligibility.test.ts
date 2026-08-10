@@ -109,4 +109,30 @@ describe("intervention eligibility", () => {
       "No defensible wetland suitability layer is loaded for this place."
     );
   });
+
+  it("degrades safely when official eligibility polygons are malformed", () => {
+    const malformed = contextWith("buildings");
+    malformed.featureCollection.features = [0, 1].map((index) => ({
+      type: "Feature",
+      geometry: { type: "Polygon", coordinates: [] },
+      properties: {
+        featureId: `bad-${index}`,
+        surfaceClass: "buildings",
+        sourceId: "nyc-building-footprints",
+        confidence: "high",
+        scientificStatus: "observed",
+      },
+    }));
+
+    expect(() =>
+      evaluateEligibility(draft, "green_roofs", malformed)
+    ).not.toThrow();
+    const result = evaluateEligibility(
+      draft,
+      "green_roofs",
+      malformed
+    );
+    expect(result.eligible).toBe(false);
+    expect(result.confidence).toBe("low");
+  });
 });
