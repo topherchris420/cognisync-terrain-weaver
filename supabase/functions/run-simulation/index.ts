@@ -1,11 +1,17 @@
-// Edge function: run-simulation
-// Server-side hydrological runoff simulation with SRTM elevation data
-// - Accepts bbox, rainfall_mm, resolution, include_drainage
-// - Fetches elevation data from SRTM with fallback
-// - Calculates D8 flow accumulation and risk zones
-// - Caches results in simulation_cache table for 24h
-
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import {
+  HYDROLOGY_MODEL_VERSION,
+  RESOLUTION_GRID,
+  bboxAreaKm2,
+  validateSimulationRequest,
+  validateSimulationResponse,
+  type HydrologyProvenance,
+  type SimBBox,
+  type SimulationRequestV2,
+  type SimulationResolution,
+  type SimulationResponseV2,
+} from "../_shared/hydrology-contract.ts";
+import { runHydrology } from "../_shared/hydrology-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,503 +20,415 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// SRTM tile API base URL (OpenTopography Global DEM)
 const SRTM_API = "https://portal.opentopography.org/API/globaldem";
 
-// Resolution grid sizes
-const RESOLUTION_GRID: Record<string, number> = {
-  low: 30,
-  medium: 90,
-  high: 180,
-};
-
-// Largest area (km²) we'll simulate. The grid is a fixed size per resolution,
-// so a bigger box just means coarser cells; this caps it at a scale where the
-// runoff model still says something useful. Mirrored client-side in
-// src/lib/simulation.ts (MAX_SIMULATION_AREA_KM2).
-const MAX_AREA_KM2 = 50;
-
-interface BBox {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
-
-interface SimulationRequest {
-  bbox: BBox;
+interface LegacySimulationRequest {
+  bbox: SimBBox;
   rainfall_mm: number;
-  resolution: "low" | "medium" | "high";
+  resolution?: SimulationResolution;
   include_drainage: boolean;
 }
 
-interface FlowPath {
-  points: [number, number][];
-  volume_m3: number;
-  velocity_mps: number;
+interface ElevationResult {
+  elevation: number[][];
+  status: "observed" | "illustrative";
+  provenance: HydrologyProvenance;
 }
 
-interface RiskZone {
-  polygon: [number, number][];
-  level: "low" | "moderate" | "high" | "severe";
-  affected_area_km2: number;
-}
-
-interface ImpactPoint {
-  location: [number, number];
-  accumulated_volume_m3: number;
-  flood_depth_m: number;
-  risk_level: string;
-}
-
-interface SimulationResponse {
-  flow_paths: FlowPath[];
-  risk_zones: RiskZone[];
-  impact_points: ImpactPoint[];
-  metadata: {
-    processed_area_km2: number;
-    cells_analyzed: number;
-    computation_time_ms: number;
-  };
-}
+type SupabaseClient = ReturnType<typeof createClient>;
 
 function jsonError(status: number, message: string, details?: unknown) {
   return new Response(
     JSON.stringify({ error: message, details: details ?? null }),
-    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
   );
 }
 
-// Calculate approximate area in km² from bbox
-function calculateAreaKm2(bbox: BBox): number {
-  const latDiff = bbox.north - bbox.south;
-  const lngDiff = bbox.east - bbox.west;
-  // Approximate: 1 degree lat ~ 111 km, lng varies by latitude
-  const avgLat = (bbox.north + bbox.south) / 2;
-  const lngKm = lngDiff * 111 * Math.cos((avgLat * Math.PI) / 180);
-  const latKm = latDiff * 111;
-  return latKm * lngKm;
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-// Create fallback elevation grid using simple slope-from-coordinate approximation
-function createFallbackElevation(bbox: BBox, gridSize: number): number[][] {
-  const elevation: number[][] = [];
-  const latStep = (bbox.north - bbox.south) / gridSize;
-  const lngStep = (bbox.east - bbox.west) / gridSize;
-
-  // Base elevation decreases from north to south (simulating slope)
-  const baseElevation = 100; // meters
-  const slopeFactor = 50; // meters difference across the area
-
-  for (let i = 0; i < gridSize; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < gridSize; j++) {
-      const lat = bbox.south + i * latStep;
-      // Add some variation based on position
-      const elev = baseElevation - (i / gridSize) * slopeFactor + Math.sin(i * 0.5) * 5 + Math.cos(j * 0.3) * 3;
-      row.push(elev);
-    }
-    elevation.push(row);
-  }
-
-  return elevation;
+function isV2Request(value: unknown): boolean {
+  return isObject(value) && "storm" in value && "surface" in value;
 }
 
-// Fetch elevation data from SRTM via OpenTopography API
-async function fetchSRTMElevation(bbox: BBox, gridSize: number): Promise<number[][]> {
-  // Use OpenTopography API for SRTM data
-  const south = bbox.south.toFixed(4);
-  const north = bbox.north.toFixed(4);
-  const west = bbox.west.toFixed(4);
-  const east = bbox.east.toFixed(4);
-
-  const url = `${SRTM_API}?demtype=SRTMGL1&west=${west}&east=${east}&south=${south}&north=${north}&outputFormat=json&API_Key=${Deno.env.get("OPENTOPOGRAPHY_API_KEY") || ""}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "Accept": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`SRTM API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data || !data.globaldem) {
-      throw new Error("Invalid SRTM response");
-    }
-
-    // Convert to 2D array format
-    return data.globaldem;
-  } catch (error) {
-    console.warn("SRTM fetch failed, using fallback:", error);
-    throw error;
-  }
+function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
-// Main elevation fetch with fallback
-async function fetchElevationData(bbox: BBox, resolution: string): Promise<number[][]> {
-  const gridSize = RESOLUTION_GRID[resolution] || RESOLUTION_GRID.medium;
-
-  try {
-    // Try to fetch from SRTM
-    return await fetchSRTMElevation(bbox, gridSize);
-  } catch {
-    // Fall back to simple approximation
-    console.warn("SRTM unavailable, using slope-from-coordinate fallback");
-    return createFallbackElevation(bbox, gridSize);
+function validateLegacyRequest(value: unknown): LegacySimulationRequest {
+  if (!isObject(value) || !isObject(value.bbox)) {
+    throw new Error("Invalid or missing bbox.");
   }
+  const bbox = value.bbox;
+  if (
+    !finite(bbox.north) ||
+    !finite(bbox.south) ||
+    !finite(bbox.east) ||
+    !finite(bbox.west) ||
+    bbox.north <= bbox.south ||
+    bbox.east <= bbox.west
+  ) {
+    throw new Error("Invalid bbox coordinates.");
+  }
+  const normalizedBBox: SimBBox = {
+    north: bbox.north,
+    south: bbox.south,
+    east: bbox.east,
+    west: bbox.west,
+  };
+  if (bboxAreaKm2(normalizedBBox) > 50) {
+    throw new Error("Simulation area must be at most 50 km2.");
+  }
+  if (!finite(value.rainfall_mm) || value.rainfall_mm <= 0) {
+    throw new Error("rainfall_mm must be a positive finite number.");
+  }
+  const resolution = value.resolution ?? "medium";
+  if (
+    typeof resolution !== "string" ||
+    !(resolution in RESOLUTION_GRID)
+  ) {
+    throw new Error("Invalid simulation resolution.");
+  }
+  if (value.include_drainage !== false) {
+    throw new Error(
+      "Drainage is not implemented; include_drainage must be false."
+    );
+  }
+  return {
+    bbox: normalizedBBox,
+    rainfall_mm: value.rainfall_mm,
+    resolution: resolution as SimulationResolution,
+    include_drainage: false,
+  };
 }
 
-// Convert grid cell to lat/lng coordinates
-function cellToCoordinate(bbox: BBox, row: number, col: number, gridRows: number, gridCols: number): [number, number] {
-  const lat = bbox.south + (row / gridRows) * (bbox.north - bbox.south);
-  const lng = bbox.west + (col / gridCols) * (bbox.east - bbox.west);
-  return [lat, lng];
+function fallbackElevation(size: number): number[][] {
+  return Array.from({ length: size }, (_, row) =>
+    Array.from(
+      { length: size },
+      (_, col) =>
+        100 -
+        (row / size) * 50 +
+        Math.sin(row * 0.5) * 5 +
+        Math.cos(col * 0.3) * 3
+    )
+  );
 }
 
-// D8 flow direction: determine which neighbor receives flow from each cell
-function calculateFlowDirection(elevation: number[][], row: number, col: number): [number, number] {
-  const rows = elevation.length;
-  const cols = elevation[0].length;
-  const currentElev = elevation[row][col];
-
-  let maxSlope = -Infinity;
-  let flowDir: [number, number] = [row, col]; // Default: flow to self (sink)
-
-  // Check 8 neighbors (D8 algorithm)
-  const neighbors = [
-    [-1, -1], [-1, 0], [-1, 1],
-    [0, -1],           [0, 1],
-    [1, -1],  [1, 0],  [1, 1],
-  ];
-
-  for (const [dr, dc] of neighbors) {
-    const nr = row + dr;
-    const nc = col + dc;
-
-    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-      const neighborElev = elevation[nr][nc];
-      const distance = Math.sqrt(dr * dr + dc * dc); // Diagonal = sqrt(2)
-      const slope = (currentElev - neighborElev) / distance;
-
-      if (slope > maxSlope && slope > 0) {
-        maxSlope = slope;
-        flowDir = [nr, nc];
-      }
-    }
-  }
-
-  return flowDir;
-}
-
-// Calculate flow accumulation using D8 algorithm
-function calculateFlowAccumulation(
-  elevation: number[][],
-  rainfallMm: number,
-  bbox: BBox
-): { paths: FlowPath[]; riskZones: RiskZone[] } {
-  const rows = elevation.length;
-  const cols = elevation[0].length;
-
-  if (rows === 0 || cols === 0) {
-    return { paths: [], riskZones: [] };
-  }
-
-  // Calculate flow direction for each cell
-  const flowDir: [number, number][] = [];
-  for (let i = 0; i < rows; i++) {
-    const row: [number, number][] = [];
-    for (let j = 0; j < cols; j++) {
-      row.push(calculateFlowDirection(elevation, i, j));
-    }
-    flowDir.push(row);
-  }
-
-  // Initialize accumulation grid
-  const accumulation: number[][] = Array(rows).fill(null).map(() => Array(cols).fill(0));
-
-  // Calculate cell area in km²
-  const cellAreaKm2 = calculateAreaKm2(bbox) / (rows * cols);
-
-  // Add rainfall contribution to each cell (convert mm to m³)
-  const rainfallVolumeM3 = (rainfallMm / 1000) * cellAreaKm2 * 1e6; // mm -> m, km² -> m²
-
-  // Initialize with rainfall
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      accumulation[i][j] = rainfallVolumeM3;
-    }
-  }
-
-  // Propagate flow (iterative accumulation)
-  // Sort cells by elevation (high to low) for proper accumulation order
-  const cellElevations: { row: number; col: number; elev: number }[] = [];
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      cellElevations.push({ row: i, col: j, elev: elevation[i][j] });
-    }
-  }
-  cellElevations.sort((a, b) => b.elev - a.elev);
-
-  // Accumulate flow
-  for (const cell of cellElevations) {
-    const [toRow, toCol] = flowDir[cell.row][cell.col];
-    if (toRow !== cell.row || toCol !== cell.col) {
-      // Flow to neighbor
-      accumulation[toRow][toCol] += accumulation[cell.row][cell.col];
-    }
-  }
-
-  // Identify flow paths (cells with high accumulation)
-  const paths: FlowPath[] = [];
-  const pathThreshold = rainfallVolumeM3 * 5; // 5x rainfall threshold
-
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      if (accumulation[i][j] > pathThreshold) {
-        // Start a flow path from this cell
-        const path: [number, number][] = [];
-        let [r, c] = [i, j];
-        const visited = new Set<string>();
-
-        while (true) {
-          const key = `${r},${c}`;
-          if (visited.has(key)) break;
-          visited.add(key);
-
-          path.push(cellToCoordinate(bbox, r, c, rows, cols));
-
-          const [nextR, nextC] = flowDir[r][c];
-          if (nextR === r && nextC === c) break; // Sink
-          if (nextR < 0 || nextR >= rows || nextC < 0 || nextC >= cols) break;
-
-          r = nextR;
-          c = nextC;
-        }
-
-        if (path.length > 1) {
-          // Flow velocity from the head drop between the path's source (i,j)
-          // and its outlet (r,c), via Torricelli v = sqrt(2·g·h). Clamped to a
-          // sane channel range so flat terrain still reads as slow-moving flow.
-          const headDrop = Math.max(0, elevation[i][j] - elevation[r][c]);
-          const velocity = Math.min(10, Math.max(0.5, Math.sqrt(2 * 9.81 * headDrop)));
-          paths.push({
-            points: path,
-            volume_m3: accumulation[i][j],
-            velocity_mps: velocity,
-          });
-        }
-      }
-    }
-  }
-
-  // Calculate risk zones based on accumulation thresholds
-  const riskZones: RiskZone[] = [];
-  const allAccumulations = accumulation.flat().sort((a, b) => b - a);
-
-  // Define thresholds for risk levels (percentiles)
-  const severeThreshold = allAccumulations[Math.floor(allAccumulations.length * 0.95)] || pathThreshold * 3;
-  const highThreshold = allAccumulations[Math.floor(allAccumulations.length * 0.85)] || pathThreshold * 2;
-  const moderateThreshold = allAccumulations[Math.floor(allAccumulations.length * 0.70)] || pathThreshold * 1.5;
-
-  // Group high-accumulation cells into zones
-  const zoneGrid: (string | null)[][] = Array(rows).fill(null).map(() => Array(cols).fill(null));
-
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      if (accumulation[i][j] >= moderateThreshold) {
-        let level: "low" | "moderate" | "high" | "severe" = "low";
-        if (accumulation[i][j] >= severeThreshold) level = "severe";
-        else if (accumulation[i][j] >= highThreshold) level = "high";
-        else if (accumulation[i][j] >= moderateThreshold) level = "moderate";
-
-        const coord = cellToCoordinate(bbox, i, j, rows, cols);
-        zoneGrid[i][j] = level;
-
-        // Create simple polygon for this cell
-        const latStep = (bbox.north - bbox.south) / rows;
-        const lngStep = (bbox.east - bbox.west) / cols;
-
-        const polygon: [number, number][] = [
-          [bbox.south + i * latStep, bbox.west + j * lngStep],
-          [bbox.south + i * latStep, bbox.west + (j + 1) * lngStep],
-          [bbox.south + (i + 1) * latStep, bbox.west + (j + 1) * lngStep],
-          [bbox.south + (i + 1) * latStep, bbox.west + j * lngStep],
-          [bbox.south + i * latStep, bbox.west + j * lngStep],
-        ];
-
-        riskZones.push({
-          polygon,
-          level,
-          affected_area_km2: cellAreaKm2,
-        });
-      }
-    }
-  }
-
-  return { paths, riskZones };
-}
-
-// Check cache for previous result
-async function getCachedResult(
-  supabase: ReturnType<typeof createClient>,
-  bbox: BBox,
-  rainfallMm: number
-): Promise<SimulationResponse | null> {
-  const cacheExpiry = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from("simulation_cache")
-    .select("result, created_at")
-    .eq("bbox_north", bbox.north)
-    .eq("bbox_south", bbox.south)
-    .eq("bbox_east", bbox.east)
-    .eq("bbox_west", bbox.west)
-    .eq("rainfall_mm", rainfallMm)
-    .gt("created_at", cacheExpiry)
-    .limit(1);
-
-  if (error) {
-    console.warn("Cache lookup failed:", error);
+function numericGrid(value: unknown): number[][] | null {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    !value.every(
+      (row) =>
+        Array.isArray(row) &&
+        row.length > 0 &&
+        row.every((cell) => finite(cell))
+    )
+  ) {
     return null;
   }
-
-  return data && data.length > 0 ? data[0].result : null;
+  const width = value[0].length;
+  if (!value.every((row) => row.length === width)) return null;
+  return value as number[][];
 }
 
-// Cache simulation result
-async function cacheResult(
-  supabase: ReturnType<typeof createClient>,
-  bbox: BBox,
-  rainfallMm: number,
-  result: SimulationResponse
-): Promise<void> {
-  const { error } = await supabase
-    .from("simulation_cache")
-    .insert({
-      bbox_north: bbox.north,
-      bbox_south: bbox.south,
-      bbox_east: bbox.east,
-      bbox_west: bbox.west,
-      rainfall_mm: rainfallMm,
-      result,
-    });
+function resampleElevation(source: number[][], size: number): number[][] {
+  if (source.length === size && source[0].length === size) {
+    return source;
+  }
+  const sourceRows = source.length;
+  const sourceCols = source[0].length;
+  return Array.from({ length: size }, (_, row) =>
+    Array.from({ length: size }, (_, col) => {
+      const sourceRow = Math.min(
+        sourceRows - 1,
+        Math.floor((row / size) * sourceRows)
+      );
+      const sourceCol = Math.min(
+        sourceCols - 1,
+        Math.floor((col / size) * sourceCols)
+      );
+      return source[sourceRow][sourceCol];
+    })
+  );
+}
 
-  if (error) {
-    console.warn("Cache insert failed:", error);
+function elevationProvenance(
+  status: "observed" | "illustrative"
+): HydrologyProvenance {
+  if (status === "observed") {
+    return {
+      sourceId: "opentopography-srtmgl1",
+      title: "SRTM GL1 global elevation",
+      agency: "OpenTopography / NASA",
+      url: SRTM_API,
+      observedAt: "2000",
+      accessedAt: new Date().toISOString(),
+      spatialResolutionM: 30,
+      crs: "EPSG:4326",
+      confidence: "medium",
+      status: "observed",
+      caveats: [
+        "SRTM is a regional elevation surface, not a surveyed curb-scale terrain model.",
+      ],
+    };
+  }
+  return {
+    sourceId: "mannahatta-synthetic-slope-fallback",
+    title: "Deterministic slope-from-coordinate fallback",
+    agency: "Mannahatta",
+    url: "https://github.com/topherchris420/cognisync-terrain-weaver",
+    accessedAt: new Date().toISOString(),
+    confidence: "low",
+    status: "speculative",
+    caveats: [
+      "No live elevation response was available; this surface is illustrative only.",
+    ],
+  };
+}
+
+async function loadElevation(
+  bbox: SimBBox,
+  resolution: SimulationResolution
+): Promise<ElevationResult> {
+  const size = RESOLUTION_GRID[resolution];
+  const apiKey = Deno.env.get("OPENTOPOGRAPHY_API_KEY") ?? "";
+  const params = new URLSearchParams({
+    demtype: "SRTMGL1",
+    west: bbox.west.toFixed(4),
+    east: bbox.east.toFixed(4),
+    south: bbox.south.toFixed(4),
+    north: bbox.north.toFixed(4),
+    outputFormat: "json",
+    API_Key: apiKey,
+  });
+  try {
+    const response = await fetch(`${SRTM_API}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`OpenTopography returned ${response.status}.`);
+    }
+    const payload: unknown = await response.json();
+    const source =
+      isObject(payload) && "globaldem" in payload
+        ? numericGrid(payload.globaldem)
+        : null;
+    if (!source) throw new Error("OpenTopography returned no numeric grid.");
+    return {
+      elevation: resampleElevation(source, size),
+      status: "observed",
+      provenance: elevationProvenance("observed"),
+    };
+  } catch (error) {
+    console.warn("Elevation fetch failed; using illustrative fallback.", error);
+    return {
+      elevation: fallbackElevation(size),
+      status: "illustrative",
+      provenance: elevationProvenance("illustrative"),
+    };
   }
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
+async function cachedV2(
+  supabase: SupabaseClient,
+  request: SimulationRequestV2
+): Promise<SimulationResponseV2 | null> {
+  const { data, error } = await supabase
+    .from("simulation_cache")
+    .select("result")
+    .eq("bbox_north", request.bbox.north)
+    .eq("bbox_south", request.bbox.south)
+    .eq("bbox_east", request.bbox.east)
+    .eq("bbox_west", request.bbox.west)
+    .eq("storm_hash", request.storm.hash)
+    .eq("surface_hash", request.surface.surfaceHash)
+    .eq("model_version", HYDROLOGY_MODEL_VERSION)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1);
+  if (error) {
+    console.warn("Counterfactual cache lookup failed.", error);
+    return null;
+  }
+  if (!data || data.length === 0) return null;
+  try {
+    const result = validateSimulationResponse(data[0].result);
+    if (
+      result.stormHash !== request.storm.hash ||
+      result.surfaceHash !== request.surface.surfaceHash ||
+      result.modelVersion !== HYDROLOGY_MODEL_VERSION
+    ) {
+      console.warn("Ignoring cache row with mismatched simulation identity.");
+      return null;
+    }
+    return result;
+  } catch (error) {
+    console.warn("Ignoring invalid cached hydrology response.", error);
+    return null;
+  }
+}
+
+async function cacheV2(
+  supabase: SupabaseClient,
+  request: SimulationRequestV2,
+  result: SimulationResponseV2
+): Promise<void> {
+  const expiresAt = new Date(
+    Date.now() + 24 * 60 * 60 * 1000
+  ).toISOString();
+  const { error } = await supabase.from("simulation_cache").insert({
+    bbox_north: request.bbox.north,
+    bbox_south: request.bbox.south,
+    bbox_east: request.bbox.east,
+    bbox_west: request.bbox.west,
+    rainfall_mm: request.storm.rainfallDepthMm,
+    storm_hash: request.storm.hash,
+    surface_hash: request.surface.surfaceHash,
+    model_version: HYDROLOGY_MODEL_VERSION,
+    expires_at: expiresAt,
+    result,
+  });
+  if (error) console.warn("Counterfactual cache insert failed.", error);
+}
+
+function legacySurfaceProvenance(): HydrologyProvenance {
+  return {
+    sourceId: "legacy-unscoped-surface",
+    title: "Legacy unscoped simulation surface",
+    agency: "Mannahatta",
+    url: "https://github.com/topherchris420/cognisync-terrain-weaver",
+    accessedAt: new Date().toISOString(),
+    confidence: "low",
+    status: "projected",
+    caveats: [
+      "Legacy requests do not carry a comparable surface identity.",
+    ],
+  };
+}
+
+function adaptLegacyRequest(
+  legacy: LegacySimulationRequest
+): SimulationRequestV2 {
+  const resolution = legacy.resolution ?? "medium";
+  const size = RESOLUTION_GRID[resolution];
+  return {
+    bbox: legacy.bbox,
+    storm: {
+      id: "legacy-storm",
+      rainfallDepthMm: legacy.rainfall_mm,
+      durationMinutes: 60,
+      distribution: "uniform",
+      resolution,
+      includeDrainage: false,
+      hash: "legacy-unscoped-storm",
+    },
+    surface: {
+      id: "now",
+      surfaceHash: "legacy-unscoped-surface",
+      baselineLayerHash: "legacy-unscoped-baseline",
+      modifiers: {
+        bbox: legacy.bbox,
+        rows: size,
+        cols: size,
+        cells: [],
+      },
+      provenance: [legacySurfaceProvenance()],
+    },
+  };
+}
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
-  if (req.method !== "POST") {
-    return jsonError(405, "Method not allowed");
+  if (request.method !== "POST") {
+    return jsonError(405, "Method not allowed.");
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  if (!supabaseUrl || !supabaseServiceKey) {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
     return jsonError(500, "Supabase server credentials are missing.");
   }
+  const supabase = createClient(supabaseUrl, serviceKey);
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  let body: SimulationRequest;
+  let body: unknown;
   try {
-    body = (await req.json()) as SimulationRequest;
+    body = await request.json();
   } catch {
     return jsonError(400, "Invalid JSON body.");
   }
 
-  const { bbox, rainfall_mm, resolution, include_drainage } = body;
-
-  // Validate required fields
-  if (!bbox || typeof bbox.north !== "number" || typeof bbox.south !== "number" ||
-      typeof bbox.east !== "number" || typeof bbox.west !== "number") {
-    return jsonError(400, "Invalid or missing bbox.");
-  }
-
-  if (typeof rainfall_mm !== "number" || rainfall_mm <= 0) {
-    return jsonError(400, "Invalid rainfall_mm. Must be a positive number.");
-  }
-
-  // Validate bbox coordinates
-  if (bbox.north <= bbox.south || bbox.east <= bbox.west) {
-    return jsonError(400, "Invalid bbox: north must be greater than south, east must be greater than west.");
-  }
-
-  if (bbox.north > 90 || bbox.south < -90 || bbox.east > 180 || bbox.west < -180) {
-    return jsonError(400, "Invalid bbox: coordinates out of range.");
-  }
-
-  // Validate area
-  const areaKm2 = calculateAreaKm2(bbox);
-  if (areaKm2 > MAX_AREA_KM2) {
-    return jsonError(
-      400,
-      `Area too large (${areaKm2.toFixed(0)} km²). Please zoom in to under ${MAX_AREA_KM2} km².`,
-    );
-  }
-
-  // Validate resolution
-  if (resolution && !["low", "medium", "high"].includes(resolution)) {
-    return jsonError(400, "Invalid resolution. Must be 'low', 'medium', or 'high'.");
-  }
-
   try {
-    // Check cache first
-    const cached = await getCachedResult(supabase, bbox, rainfall_mm);
-    if (cached) {
-      return new Response(JSON.stringify(cached), {
+    if (isV2Request(body)) {
+      const simulationRequest = validateSimulationRequest(body);
+      const cached = await cachedV2(supabase, simulationRequest);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Cache-Hit": "true",
+          },
+        });
+      }
+      const start = Date.now();
+      const elevation = await loadElevation(
+        simulationRequest.bbox,
+        simulationRequest.storm.resolution
+      );
+      const result = runHydrology({
+        request: simulationRequest,
+        elevation: elevation.elevation,
+        elevationProvenance: elevation.provenance,
+        elevationStatus: elevation.status,
+      });
+      result.metadata.computation_time_ms = Date.now() - start;
+      await cacheV2(supabase, simulationRequest, result);
+      return new Response(JSON.stringify(result), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Hit": "true" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const startTime = Date.now();
-
-    // Fetch elevation data
-    const elevation = await fetchElevationData(bbox, resolution || "medium");
-
-    // Calculate flow accumulation and risk zones
-    const { paths, riskZones } = calculateFlowAccumulation(elevation, rainfall_mm, bbox);
-
-    const cellsAnalyzed = elevation.length * elevation[0].length;
-
-    const result: SimulationResponse = {
-      flow_paths: paths,
-      risk_zones: riskZones,
-      impact_points: [], // Populated on-demand when user clicks
-      metadata: {
-        processed_area_km2: Math.round(areaKm2 * 100) / 100,
-        cells_analyzed: cellsAnalyzed,
-        computation_time_ms: Date.now() - startTime,
-      },
-    };
-
-    // Cache the result
-    await cacheResult(supabase, bbox, rainfall_mm, result);
-
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const legacy = validateLegacyRequest(body);
+    const simulationRequest = adaptLegacyRequest(legacy);
+    const elevation = await loadElevation(
+      simulationRequest.bbox,
+      simulationRequest.storm.resolution
+    );
+    const start = Date.now();
+    const result = runHydrology({
+      request: simulationRequest,
+      elevation: elevation.elevation,
+      elevationProvenance: elevation.provenance,
+      elevationStatus: elevation.status,
     });
-  } catch (thrown) {
-    const error = thrown as Error;
-    console.error("Simulation error:", error);
-
-    if (error.message.includes("Area not supported")) {
-      return jsonError(400, error.message);
-    }
-
-    return jsonError(500, "Simulation failed.", error.message);
+    return new Response(
+      JSON.stringify({
+        flow_paths: result.flow_paths,
+        risk_zones: result.risk_zones,
+        impact_points: result.impact_points,
+        metadata: {
+          ...result.metadata,
+          computation_time_ms: Date.now() - start,
+        },
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Simulation failed.";
+    console.error("Simulation request failed.", error);
+    return jsonError(400, message);
   }
 });

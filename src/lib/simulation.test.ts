@@ -6,9 +6,15 @@ import {
   runoffCoefficient,
   estimateRunoffVolumeM3,
   getFlowColor,
+  runPairedRealitySimulation,
+  runRealitySimulation,
 } from "./simulation";
 import { bboxAreaKm2, type BBox } from "./geo";
 import type { LandCover } from "./types";
+import type {
+  SimulationRequestV2,
+  SimulationResponseV2,
+} from "./simulation-types";
 
 // A ~1km-ish box near Manhattan used across the volume tests.
 const BOX: BBox = [
@@ -124,5 +130,158 @@ describe("getFlowColor", () => {
 describe("MAX_SIMULATION_AREA_KM2", () => {
   it("is a positive, practical cap", () => {
     expect(MAX_SIMULATION_AREA_KM2).toBeGreaterThan(1);
+  });
+});
+
+const provenance = {
+  sourceId: "test-source",
+  title: "Test source",
+  agency: "Test",
+  url: "https://example.test/source",
+  accessedAt: "2026-08-10",
+  confidence: "high" as const,
+  status: "observed" as const,
+  caveats: [],
+};
+
+function realityRequest(
+  id: "now" | "possible",
+  surfaceHash = `surface:${id}`
+): SimulationRequestV2 {
+  return {
+    bbox: boundsToSimBBox(BOX),
+    storm: {
+      id: "storm:test",
+      rainfallDepthMm: 50,
+      durationMinutes: 60,
+      distribution: "uniform",
+      resolution: "low",
+      includeDrainage: false,
+      hash: "storm:fixed",
+    },
+    surface: {
+      id,
+      surfaceHash,
+      baselineLayerHash: "baseline:fixed",
+      modifiers: {
+        bbox: boundsToSimBBox(BOX),
+        rows: 30,
+        cols: 30,
+        cells: [],
+      },
+      provenance: [provenance],
+    },
+  };
+}
+
+function responseFor(request: SimulationRequestV2): SimulationResponseV2 {
+  return {
+    flow_paths: [
+      {
+        points: [
+          [-74, 40.75],
+          [-73.999, 40.751],
+        ],
+        volume_m3: 12,
+        velocity_mps: 1,
+      },
+    ],
+    risk_zones: [],
+    impact_points: [],
+    metadata: {
+      processed_area_km2: 1,
+      cells_analyzed: 900,
+      computation_time_ms: 5,
+    },
+    stormHash: request.storm.hash,
+    surfaceHash: request.surface.surfaceHash,
+    modelVersion: "mannahatta-d8-surface-v2",
+    waterBalance: {
+      rainfallM3: 100,
+      infiltratedM3: 20,
+      storedM3: 0,
+      runoffM3: 80,
+      closureErrorM3: 0,
+    },
+    optimizationClaimsAllowed: true,
+    warnings: [],
+    provenance: [provenance],
+  };
+}
+
+describe("reality simulation client", () => {
+  it("validates and maps a V2 response to the canonical reality shape", async () => {
+    const request = realityRequest("now");
+    const result = await runRealitySimulation(request, async (received) => {
+      expect(received).toBe(request);
+      return responseFor(request);
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        stormHash: "storm:fixed",
+        surfaceHash: "surface:now",
+        modelVersion: "mannahatta-d8-surface-v2",
+        flowPaths: responseFor(request).flow_paths,
+      })
+    );
+  });
+
+  it("fails closed when the response identities do not match the request", async () => {
+    const request = realityRequest("now");
+    await expect(
+      runRealitySimulation(request, async () => ({
+        ...responseFor(request),
+        stormHash: "storm:other",
+      }))
+    ).rejects.toThrow(/storm identity/i);
+  });
+
+  it("fails closed on an unsupported model or open water balance", async () => {
+    const request = realityRequest("now");
+    await expect(
+      runRealitySimulation(request, async () => ({
+        ...responseFor(request),
+        modelVersion: "unreviewed-model",
+      }))
+    ).rejects.toThrow(/model identity/i);
+
+    await expect(
+      runRealitySimulation(request, async () => ({
+        ...responseFor(request),
+        waterBalance: {
+          ...responseFor(request).waterBalance,
+          runoffM3: 70,
+        },
+      }))
+    ).rejects.toThrow(/water balance does not close/i);
+  });
+
+  it("runs distinct surfaces under one immutable storm", async () => {
+    const now = realityRequest("now");
+    const possible = realityRequest("possible");
+    const [nowResult, possibleResult] =
+      await runPairedRealitySimulation(
+        now,
+        possible,
+        async (request) => responseFor(request)
+      );
+
+    expect(nowResult.stormHash).toBe(possibleResult.stormHash);
+    expect(nowResult.surfaceHash).not.toBe(possibleResult.surfaceHash);
+  });
+
+  it("rejects a pair before transport when storm or baseline identity differs", async () => {
+    const now = realityRequest("now");
+    const possible = realityRequest("possible");
+    possible.storm = { ...possible.storm, hash: "storm:other" };
+    const transport = vi.fn(async (request: SimulationRequestV2) =>
+      responseFor(request)
+    );
+
+    await expect(
+      runPairedRealitySimulation(now, possible, transport)
+    ).rejects.toThrow(/same storm/i);
+    expect(transport).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,14 @@ import type { LandCoverKey } from "@/lib/types";
 import type { BBox } from "@/lib/geo";
 import { bboxAreaKm2 } from "@/lib/geo";
 import type { SimulationRequest } from "@/lib/simulation-types";
+import {
+  HYDROLOGY_MODEL_VERSION,
+  validateSimulationRequest,
+  validateSimulationResponse,
+  type SimulationRequestV2,
+} from "@/lib/simulation-types";
+import type { RealitySimulation } from "@/lib/counterfactual/types";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Runoff coefficient per land-cover class: the fraction of incident rain that
@@ -78,4 +86,119 @@ export function getFlowColor(intensity: number): string {
   const clamped = Math.min(1, Math.max(0, intensity));
   const opacity = clamped * 0.8 + 0.2; // 0.2 floor so faint flows stay visible
   return `rgba(59, 130, 246, ${opacity})`; // Blue-500
+}
+
+export type SimulationTransport = (
+  request: SimulationRequestV2
+) => Promise<unknown>;
+
+async function invokeSimulationEdge(
+  request: SimulationRequestV2
+): Promise<unknown> {
+  const { data, error } = await supabase.functions.invoke("run-simulation", {
+    body: request,
+  });
+  if (error) {
+    throw new Error(error.message || "Hydrology simulation failed.");
+  }
+  return data;
+}
+
+function sameBBox(
+  left: SimulationRequestV2["bbox"],
+  right: SimulationRequestV2["bbox"]
+): boolean {
+  return (
+    left.north === right.north &&
+    left.south === right.south &&
+    left.east === right.east &&
+    left.west === right.west
+  );
+}
+
+function sameStorm(
+  left: SimulationRequestV2["storm"],
+  right: SimulationRequestV2["storm"]
+): boolean {
+  return (
+    left.hash === right.hash &&
+    left.id === right.id &&
+    left.rainfallDepthMm === right.rainfallDepthMm &&
+    left.durationMinutes === right.durationMinutes &&
+    left.distribution === right.distribution &&
+    left.resolution === right.resolution &&
+    left.includeDrainage === right.includeDrainage
+  );
+}
+
+export async function runRealitySimulation(
+  requestValue: SimulationRequestV2,
+  transport: SimulationTransport = invokeSimulationEdge
+): Promise<RealitySimulation> {
+  const request = validateSimulationRequest(requestValue);
+  const response = validateSimulationResponse(await transport(request));
+  if (response.stormHash !== request.storm.hash) {
+    throw new Error("Simulation response storm identity does not match request.");
+  }
+  if (response.surfaceHash !== request.surface.surfaceHash) {
+    throw new Error(
+      "Simulation response surface identity does not match request."
+    );
+  }
+  if (response.modelVersion !== HYDROLOGY_MODEL_VERSION) {
+    throw new Error("Simulation response model identity is unsupported.");
+  }
+  return {
+    stormHash: response.stormHash,
+    surfaceHash: response.surfaceHash,
+    modelVersion: response.modelVersion,
+    flowPaths: response.flow_paths,
+    riskZones: response.risk_zones,
+    impactPoints: response.impact_points,
+    waterBalance: response.waterBalance,
+    optimizationClaimsAllowed: response.optimizationClaimsAllowed,
+    warnings: response.warnings,
+    provenance: response.provenance,
+  };
+}
+
+export async function runPairedRealitySimulation(
+  nowValue: SimulationRequestV2,
+  possibleValue: SimulationRequestV2,
+  transport: SimulationTransport = invokeSimulationEdge
+): Promise<[RealitySimulation, RealitySimulation]> {
+  const now = validateSimulationRequest(nowValue);
+  const possible = validateSimulationRequest(possibleValue);
+  if (now.surface.id !== "now" || possible.surface.id !== "possible") {
+    throw new Error("Paired simulation requires NOW and POSSIBLE surfaces.");
+  }
+  if (!sameStorm(now.storm, possible.storm)) {
+    throw new Error("Paired realities must use the same storm.");
+  }
+  if (
+    !sameBBox(now.bbox, possible.bbox) ||
+    now.surface.baselineLayerHash !== possible.surface.baselineLayerHash
+  ) {
+    throw new Error(
+      "Paired realities must use the same bbox and baseline elevation identity."
+    );
+  }
+  if (now.surface.surfaceHash === possible.surface.surfaceHash) {
+    throw new Error(
+      "Paired realities require distinct NOW and POSSIBLE surface identities."
+    );
+  }
+  const [nowResult, possibleResult] = await Promise.all([
+    runRealitySimulation(now, transport),
+    runRealitySimulation(possible, transport),
+  ]);
+  if (
+    nowResult.stormHash !== possibleResult.stormHash ||
+    nowResult.modelVersion !== possibleResult.modelVersion
+  ) {
+    throw new Error(
+      "Paired simulation responses do not share one storm and model identity."
+    );
+  }
+  return [nowResult, possibleResult];
 }
