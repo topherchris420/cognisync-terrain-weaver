@@ -127,10 +127,15 @@ export function normalizeSpatialContext(
   const failedSourceIds = unique(
     validated.flatMap((response) => response.failedSourceIds)
   );
+  const upstreamCoverageIsPartial = validated.some(
+    (response) => response.coverage.status !== "complete"
+  );
   const coverageStatus =
     loadedSourceIds.length === 0
       ? "unavailable"
-      : failedSourceIds.length > 0 || unclassifiedAreaM2 > 0.01
+      : upstreamCoverageIsPartial ||
+        failedSourceIds.length > 0 ||
+        unclassifiedAreaM2 > 0.01
       ? "partial"
       : "complete";
   const warnings = unique([

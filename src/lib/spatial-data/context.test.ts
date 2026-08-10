@@ -72,6 +72,28 @@ describe("spatial context normalization", () => {
     expect(tree?.geometry.type).toBe("Point");
   });
 
+  it("preserves upstream partial status even when loaded polygons fill the bbox", () => {
+    const result = normalizeSpatialContext([{
+      ...buildingResponse,
+      features: [{
+        ...buildingResponse.features[0],
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [bbox.west, bbox.south],
+            [bbox.east, bbox.south],
+            [bbox.east, bbox.north],
+            [bbox.west, bbox.north],
+            [bbox.west, bbox.south],
+          ]],
+        },
+      }],
+      failedSourceIds: [],
+    }], bbox);
+
+    expect(result.coverage.status).toBe("partial");
+  });
+
   it("forwards AbortSignal and validates the edge response", async () => {
     const signal = new AbortController().signal;
     const fetchMock = vi.fn().mockResolvedValue(
