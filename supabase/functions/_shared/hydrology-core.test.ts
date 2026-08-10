@@ -176,6 +176,20 @@ describe("surface-aware D8 hydrology", () => {
     expect(point[1]).toBeLessThanOrEqual(bbox.north);
   });
 
+  it("keeps row zero on the north edge of every spatial output", () => {
+    const elevation = Array.from({ length: 30 }, (_, row) =>
+      Array.from({ length: 30 }, () => row)
+    );
+    const result = runHydrology(input(30, { elevation }));
+    const riskLatitudes = result.risk_zones.flatMap((zone) =>
+      zone.polygon.map((point) => point[1])
+    );
+    const midpoint = (bbox.north + bbox.south) / 2;
+
+    expect(riskLatitudes.length).toBeGreaterThan(0);
+    expect(Math.min(...riskLatitudes)).toBeGreaterThan(midpoint);
+  });
+
   it("marks synthetic fallback elevation as illustrative and non-optimizable", () => {
     const result = runHydrology(
       input(30, { elevationStatus: "illustrative" })

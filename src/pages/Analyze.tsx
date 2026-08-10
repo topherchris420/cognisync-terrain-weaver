@@ -22,7 +22,7 @@ import { CatalystReveal } from "@/components/catalyst/CatalystReveal";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { CatalystFuturePanel } from "@/components/catalyst/CatalystFuturePanel";
 import { useCatalystUnlocked } from "@/hooks/use-catalyst";
-import { EPOCHS, type Epoch, solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
+import { EPOCHS, type Epoch } from "@/lib/catalyst";
 import type { FutureState } from "@/lib/catalyst";
 import type { Scenario, InterventionKey } from "@/lib/scenario";
 import { EMPTY_SCENARIO } from "@/lib/scenario";
@@ -44,14 +44,12 @@ import {
   Link2,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useCinematicOnboarding } from "@/hooks/useCinematicOnboarding";
 import { useCounterfactualSession } from "@/hooks/useCounterfactualSession";
 import { supabase } from "@/integrations/supabase/client";
 import type { Map as MLMap } from "maplibre-gl";
 import type { AnalysisRecord } from "@/lib/types";
 import type { GeocodeResult } from "@/lib/geocode";
 import type { ScenarioExport } from "@/lib/scenario";
-import type { SimulationResponse } from "@/lib/simulation-types";
 import {
   analysesToGeoJSON,
   bboxAreaKm2,
@@ -61,9 +59,99 @@ import {
   type BBox,
 } from "@/lib/geo";
 import { boundsToSimBBox, MAX_SIMULATION_AREA_KM2 } from "@/lib/simulation";
+import type {
+  DataProvenance,
+  InterventionFeature,
+  RealitySimulation,
+  RealitySurface,
+  StormDefinition,
+} from "@/lib/counterfactual/types";
+import type {
+  SimulationRequestV2,
+  SimulationResponse,
+} from "@/lib/simulation-types";
+import { stableHash } from "@/lib/counterfactual/hashing";
+import { buildRealitySurface } from "@/lib/counterfactual/modifiers";
+import { deriveScenarioFromFeatures } from "@/lib/counterfactual/projected-metrics";
+import {
+  loadSpatialContext,
+  type SpatialContextResult,
+} from "@/lib/spatial-data/context";
+import { runRealitySimulation } from "@/lib/simulation";
 import { toast } from "sonner";
 
 const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
+const GRID_SIZE = { low: 30, medium: 90, high: 180 } as const;
+
+export function buildStormDefinition(
+  rainfallDepthMm: number,
+  resolution: "low" | "medium" | "high"
+): StormDefinition {
+  const definition = {
+    rainfallDepthMm,
+    durationMinutes: 60,
+    distribution: "uniform" as const,
+    resolution,
+    includeDrainage: false as const,
+  };
+  const hash = stableHash(definition);
+  return {
+    id: `storm:${hash}`,
+    ...definition,
+    hash,
+  };
+}
+
+export function buildRealitySimulationRequest(
+  bbox: SimulationRequestV2["bbox"],
+  storm: StormDefinition,
+  surface: RealitySurface,
+  expectedElevationHash?: string
+): SimulationRequestV2 {
+  return {
+    bbox,
+    storm,
+    surface: {
+      id: surface.id,
+      surfaceHash: surface.surfaceHash,
+      baselineLayerHash: surface.baselineLayerHash,
+      modifiers: surface.modifiers,
+      provenance: surface.provenance,
+    },
+    ...(expectedElevationHash ? { expectedElevationHash } : {}),
+  };
+}
+
+function analysisProvenance(analysis: AnalysisRecord): DataProvenance {
+  return {
+    sourceId: `analysis:${analysis.id}`,
+    title: "Terrain analysis derived from captured map imagery",
+    agency: "Mannahatta analysis pipeline",
+    url: "https://github.com/topherchris420/cognisync-terrain-weaver",
+    observedAt: analysis.created_at,
+    accessedAt: analysis.created_at,
+    confidence: "low",
+    status: "derived",
+    caveats: [
+      "Whole-tile classification is supporting evidence; spatial intervention eligibility depends on separately loaded official layers.",
+    ],
+  };
+}
+
+function toLegacySimulation(
+  simulation: RealitySimulation
+): SimulationResponse {
+  return {
+    flow_paths: simulation.flowPaths,
+    risk_zones: simulation.riskZones,
+    impact_points: simulation.impactPoints,
+    metadata: {
+      processed_area_km2: simulation.metadata.processedAreaKm2,
+      cells_analyzed: simulation.metadata.cellsAnalyzed,
+      computation_time_ms: simulation.metadata.computationTimeMs,
+    },
+  };
+}
 
 /** Parse `?lat=&lng=&zoom=` into a validated viewport, or null if absent/invalid. */
 function viewFromParams(params: URLSearchParams) {
@@ -88,6 +176,8 @@ export default function Analyze() {
   usePageTitle("Analyze");
   const mapRef = useRef<MapViewHandle>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
+  const spatialAbortRef = useRef<AbortController | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = useMemo(
     () => viewFromParams(searchParams) ?? DEFAULT_VIEW,
@@ -160,105 +250,10 @@ export default function Analyze() {
     () => (result ? parseBBox(result.bbox) : null),
     [result]
   );
-  
-  const cinematic = useCinematicOnboarding();
-  const cinematicState = cinematic.state;
-
-  // Cinematic Orchestrator
-  useEffect(() => {
-    if (!mapReady || !cinematic.isActive) return;
-
-    if (cinematicState === "FLYING_IN") {
-      mapInstance?.flyTo({ center: [-74.006, 40.7128], zoom: 15, duration: 2500 });
-      const timer = setTimeout(() => {
-        runAnalysis();
-      }, 2600);
-      return () => clearTimeout(timer);
-    }
-  }, [cinematicState, mapReady, mapInstance]);
-
-  useEffect(() => {
-    if (cinematicState === "FLYING_IN" && result) {
-      cinematic.advance("SIMULATING_CURRENT");
-    }
-  }, [result, cinematicState, cinematic]);
-
-  useEffect(() => {
-    if (cinematicState === "SIMULATING_CURRENT") {
-       runSimulation({ rainfall_mm: 50, resolution: 5, include_drainage: false });
-    }
-  }, [cinematicState]);
-
-  useEffect(() => {
-    if (cinematicState === "SIMULATING_CURRENT" && simResult) {
-      cinematic.advance("REDESIGNING");
-    }
-  }, [simResult, cinematicState, cinematic]);
-
-  useEffect(() => {
-    if (cinematicState === "REDESIGNING" && result) {
-       const timer = setTimeout(() => {
-         const areaM2 = bboxAreaKm2(parseBBox(result.bbox)!) * 1e6;
-         const solved = solveForTarget(result.land_cover, DEFAULT_TARGET_SCORE, areaM2, 500000);
-         setCatalystFuture({
-           scenario: solved.scenario,
-           future: projectFuture(result.land_cover, solved.scenario, areaM2)
-         });
-         setEpoch("future");
-         setComparing(true);
-         cinematic.advance("COMPARING_REALITIES");
-       }, 2000);
-       return () => clearTimeout(timer);
-    }
-  }, [cinematicState, result, cinematic, setEpoch]);
-
-  useEffect(() => {
-    if (cinematicState === "COMPARING_REALITIES") {
-       runSimulation({ rainfall_mm: 50, resolution: 5, include_drainage: false });
-       const timer = setTimeout(() => {
-         cinematic.advance("FINISHED");
-         unlockCatalystNow();
-       }, 5000);
-       return () => clearTimeout(timer);
-    }
-  }, [cinematicState, cinematic, unlockCatalystNow]);
-
-  // Historical map layer logic
-  useEffect(() => {
-    if (!mapInstance) return;
-    
-    const sourceId = "historical-tiles-source";
-    const layerId = "historical-tiles-layer";
-    
-    // Using Esri NatGeo map as a gorgeous vintage/historical topography placeholder
-    // If the 1609 XYZ tile server url is provided, just swap this URL.
-    const tileUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}";
-
-    if (!mapInstance.getSource(sourceId)) {
-      mapInstance.addSource(sourceId, {
-        type: "raster",
-        tiles: [tileUrl],
-        tileSize: 256,
-      });
-
-      // Add underneath all other layers we control, but above the base satellite
-      mapInstance.addLayer({
-        id: layerId,
-        type: "raster",
-        source: sourceId,
-        paint: {
-          "raster-opacity": 0,
-          "raster-fade-duration": 600,
-        },
-      });
-    }
-
-    if (epoch === "past") {
-      mapInstance.setPaintProperty(layerId, "raster-opacity", 1);
-    } else {
-      mapInstance.setPaintProperty(layerId, "raster-opacity", 0);
-    }
-  }, [mapInstance, epoch]);
+  const overlaySimulation =
+    epoch === "future" && counterfactualState.possibleSimulation
+      ? counterfactualState.possibleSimulation
+      : counterfactualState.nowSimulation;
 
   const simDisabledReason = useMemo(() => {
     if (!analyzedBBox) return null;
@@ -343,6 +338,12 @@ export default function Analyze() {
 
   const runAnalysis = async () => {
     if (analyzing || !mapReady) return;
+    const requestId = crypto.randomUUID();
+    activeRequestIdRef.current = requestId;
+    spatialAbortRef.current?.abort();
+    const spatialAbort = new AbortController();
+    spatialAbortRef.current = spatialAbort;
+    dispatchCounterfactual({ type: "ANALYSIS_STARTED", requestId });
     setAnalyzing(true);
     setResult(null);
     setCapturedTile(null);
@@ -356,66 +357,108 @@ export default function Analyze() {
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
       if (!imageDataUrl) {
-        toast.error("Couldn't capture the map view. Try zooming or panning first.");
-        setAnalyzing(false);
-        return;
+        throw new Error(
+          "Couldn't capture the map view. Try zooming or panning first."
+        );
       }
-      // Surface the exact tile going to the model while the request is in flight.
       setCapturedTile(imageDataUrl);
       const bounds = mapRef.current?.getBounds() ?? null;
+      if (!bounds) throw new Error("Map bounds are unavailable.");
+      const simulationBBox = boundsToSimBBox(bounds);
 
-      const { data, error } = await supabase.functions.invoke("analyze-terrain", {
-        body: {
-          name: name.trim() || "Untitled site",
-          location_label: locationLabel.trim() || null,
-          center_lat: view.lat,
-          center_lng: view.lng,
-          zoom: view.zoom,
-          bbox: bounds,
-          image_data_url: imageDataUrl,
-        },
-      });
-
-      if (error) {
-        if (cinematic.isActive) {
-          // If we are in cinematic mode and the backend fails (or isn't configured),
-          // we silently fake the analysis to keep the orchestration flawless.
-          const fakeAnalysis = {
-            id: "cinematic",
+      const analysisPromise = supabase.functions.invoke("analyze-terrain", {
+          body: {
+            name: name.trim() || "Untitled site",
+            location_label: locationLabel.trim() || null,
             center_lat: view.lat,
             center_lng: view.lng,
             zoom: view.zoom,
-            bbox: bounds ? boundsToSimBBox(bounds).join(",") : "",
-            absorption_score: 42,
-            land_cover: { type: "FeatureCollection", features: [] },
-            created_at: new Date().toISOString()
-          };
-          setResult(fakeAnalysis as any);
-          setAnalyzing(false);
-          return;
-        }
+            bbox: bounds,
+            image_data_url: imageDataUrl,
+          },
+        });
+      const spatialPromise = loadSpatialContext(
+        simulationBBox,
+        spatialAbort.signal
+      ).then(
+        (context) => ({ ok: true as const, context }),
+        (error: unknown) => ({ ok: false as const, error })
+      );
+      const [{ data, error }, spatial] = await Promise.all([
+        analysisPromise,
+        spatialPromise,
+      ]);
+      if (activeRequestIdRef.current !== requestId) return;
 
-        console.error("analyze-terrain failed:", error);
-        toast.error(
-          error.message?.includes("429")
-            ? "Rate limit hit. Please wait a moment and try again."
-            : error.message?.includes("402")
-            ? "AI credits exhausted. Add credits in Cloud settings."
-            : "Analysis failed — see console for details."
-        );
+      if (error) {
+        dispatchCounterfactual({
+          type: "ANALYSIS_FAILED",
+          requestId,
+          message: error.message || "Terrain analysis failed.",
+        });
+        toast.error("Analysis failed. No result was fabricated.");
         return;
       }
 
       const analysis = (data as { analysis: AnalysisRecord }).analysis;
+      const provenance =
+        spatial.ok && spatial.context.provenance.length > 0
+          ? spatial.context.provenance
+          : [analysisProvenance(analysis)];
+      const baselineLayerHash = stableHash({
+        bbox: simulationBBox,
+        analysisId: analysis.id,
+        sources: provenance.map((item) => item.sourceId).sort(),
+      });
+      const baseline = buildRealitySurface({
+        id: "now",
+        baselineLayerHash,
+        bbox: simulationBBox,
+        rows: GRID_SIZE.medium,
+        cols: GRID_SIZE.medium,
+        features: [],
+        provenance,
+        warnings: spatial.ok
+          ? spatial.context.warnings
+          : ["Official spatial context is unavailable for this place."],
+      });
+      const storm = buildStormDefinition(50, "medium");
+      dispatchCounterfactual({
+        type: "ANALYSIS_SUCCEEDED",
+        analysis,
+        baseline,
+        storm,
+      });
+      if (spatial.ok) {
+        dispatchCounterfactual({
+          type: "SPATIAL_CONTEXT_SUCCEEDED",
+          requestId,
+          context: spatial.context,
+        });
+      } else {
+        dispatchCounterfactual({
+          type: "SPATIAL_CONTEXT_FAILED",
+          requestId,
+          message: "Official spatial context is unavailable for this place.",
+        });
+      }
       setResult(analysis);
       toast.success("Analysis complete", {
         description: `Absorption score: ${analysis.absorption_score}/100`,
       });
     } catch (e) {
-      console.error(e);
-      toast.error("Unexpected error running analysis.");
+      if (activeRequestIdRef.current !== requestId) return;
+      const message = e instanceof Error ? e.message : "Analysis failed.";
+      dispatchCounterfactual({
+        type: "ANALYSIS_FAILED",
+        requestId,
+        message,
+      });
+      toast.error(message);
     } finally {
-      setAnalyzing(false);
+      if (activeRequestIdRef.current === requestId) {
+        setAnalyzing(false);
+      }
     }
   };
 
@@ -424,6 +467,10 @@ export default function Analyze() {
   // + flood-risk zones that draw onto the map as overlays.
   const runSimulation = async (params: SimulationRunParams) => {
     if (simulating) return;
+    if (params.include_drainage) {
+      toast.error("Drainage is not implemented in this model.");
+      return;
+    }
     const bounds = mapRef.current?.getBounds() as BBox | null;
     if (!bounds) {
       toast.error("Map isn't ready yet — try again in a moment.");
@@ -438,103 +485,178 @@ export default function Analyze() {
     }
 
     setSimulating(true);
-    setSimResult(null);
-    setFutureSimResult(null);
+    const requestId = activeRequestIdRef.current;
+    const simulationReality =
+      counterfactualState.nowSimulation === null ? "now" : "possible";
     try {
-      // Run base simulation
-      const basePromise = supabase.functions.invoke("run-simulation", {
-        body: {
-          bbox: boundsToSimBBox(bounds),
-          rainfall_mm: params.rainfall_mm,
-          resolution: params.resolution,
-          include_drainage: params.include_drainage,
-        },
-      });
-      
-      // If Catalyst future is active, run future simulation too
-      const promises = [basePromise];
-      // A full implementation would pass the counterfactual DEM modifications here.
-      // For now, we simulate the same terrain to demonstrate the UI capability.
-      if (catalystFuture) {
-         promises.push(supabase.functions.invoke("run-simulation", {
-            body: {
-              bbox: boundsToSimBBox(bounds),
-              rainfall_mm: params.rainfall_mm,
-              resolution: params.resolution,
-              include_drainage: params.include_drainage,
-              // In a real backend, we'd pass `scenario` here to apply it to the DEM.
-            },
-         }));
+      const bbox = boundsToSimBBox(bounds);
+      const resolutionSize = GRID_SIZE[params.resolution];
+      const currentNow = counterfactualState.nowSurface;
+      const currentPossible = counterfactualState.possibleSurface;
+      if (!currentNow || !currentPossible || !counterfactualState.analysis) {
+        toast.error("Analyze this place before running a storm.");
+        return;
       }
-
-      const results = await Promise.all(promises);
-      const { data, error } = results[0];
-
-      if (error) {
-        if (cinematic.isActive) {
-           // Mock a visually stunning flow result if backend fails in cinematic mode
-           const fakeFlowPaths = Array.from({ length: 15 }).map((_, i) => ({
-             type: "Feature",
-             properties: { flow_accumulation: 1000 + i * 50, velocity_m_s: 1.5 + Math.random() },
-             geometry: {
-               type: "LineString",
-               coordinates: Array.from({ length: 5 }).map(() => [
-                 view.lng + (Math.random() - 0.5) * 0.008,
-                 view.lat + (Math.random() - 0.5) * 0.008
-               ])
-             }
-           }));
-           
-           const fakeSim: any = {
-             metadata: { 
-               area_km2: 1, 
-               processed_area_km2: 1,
-               cells_analyzed: 40000,
-               computation_time_ms: 150,
-               rainfall_mm: params.rainfall_mm, 
-               runoff_volume_m3: 5000, 
-               max_depth_m: 0.5 
-             },
-             flow_paths: fakeFlowPaths,
-             risk_zones: []
-           };
-           
-           setSimResult(fakeSim);
-           if (catalystFuture) setFutureSimResult(fakeSim);
-           setSimulating(false);
-           return;
-        }
-
-        console.error("run-simulation failed:", error);
-        toast.error(
-          error.message?.includes("429")
-            ? "Rate limit hit. Please wait a moment and try again."
-            : "Simulation failed — see console for details."
+      if (counterfactualState.nowSimulation === null) {
+        const storm = buildStormDefinition(
+          params.rainfall_mm,
+          params.resolution
         );
+        const nowSurface = buildRealitySurface({
+          id: "now",
+          baselineLayerHash: currentNow.baselineLayerHash,
+          bbox,
+          rows: resolutionSize,
+          cols: resolutionSize,
+          features: [],
+          provenance: currentNow.provenance,
+          warnings: currentNow.warnings,
+        });
+        const possibleSurface = buildRealitySurface({
+          id: "possible",
+          baselineLayerHash: currentNow.baselineLayerHash,
+          bbox,
+          rows: resolutionSize,
+          cols: resolutionSize,
+          features: currentPossible.interventions,
+          provenance: currentNow.provenance,
+          warnings: currentPossible.warnings,
+        });
+        dispatchCounterfactual({
+          type: "EXPERIMENT_CONFIGURED",
+          storm,
+          nowSurface,
+          possibleSurface,
+        });
+        setSimResult(null);
+        setFutureSimResult(null);
+        const simulation = await runRealitySimulation(
+          buildRealitySimulationRequest(bbox, storm, nowSurface)
+        );
+        if (
+          requestId !== null &&
+          activeRequestIdRef.current !== requestId
+        ) {
+          return;
+        }
+        dispatchCounterfactual({
+          type: "NOW_SIMULATION_SUCCEEDED",
+          result: simulation,
+        });
+        const display = toLegacySimulation(simulation);
+        setSimResult(display);
+        toast.success("Current-city storm complete", {
+          description: `${display.risk_zones.length} risk zones and ${display.flow_paths.length} computed flow paths.`,
+        });
         return;
       }
 
-      const sim = data as SimulationResponse;
-      if (!sim?.metadata) {
-        toast.error("Simulation returned no result.");
+      const storm = counterfactualState.storm;
+      const nowSimulation = counterfactualState.nowSimulation;
+      if (!storm || currentPossible.surfaceHash === currentNow.surfaceHash) {
+        toast.error("Change valid ground geometry before rerunning the storm.");
         return;
       }
-      setSimResult(sim);
-      
-      if (results.length > 1 && !results[1].error) {
-         setFutureSimResult(results[1].data as SimulationResponse);
+      dispatchCounterfactual({ type: "POSSIBLE_SIMULATION_STARTED" });
+      setFutureSimResult(null);
+      const possibleSimulation = await runRealitySimulation(
+        buildRealitySimulationRequest(
+          bbox,
+          storm,
+          currentPossible,
+          nowSimulation.elevationHash
+        )
+      );
+      if (
+        requestId !== null &&
+        activeRequestIdRef.current !== requestId
+      ) {
+        return;
       }
-
-      toast.success("Simulation complete", {
-        description: `${sim.risk_zones.length} risk zones and ${sim.flow_paths.length} flow paths mapped over ${params.rainfall_mm}mm of rain.`,
+      dispatchCounterfactual({
+        type: "POSSIBLE_SIMULATION_SUCCEEDED",
+        result: possibleSimulation,
+      });
+      const display = toLegacySimulation(possibleSimulation);
+      setFutureSimResult(display);
+      toast.success("Possible-city storm complete", {
+        description: "The identical storm was rerun on the edited surface.",
       });
     } catch (e) {
+      if (
+        requestId !== null &&
+        activeRequestIdRef.current !== requestId
+      ) {
+        return;
+      }
       console.error(e);
-      toast.error("Unexpected error running the simulation.");
+      const message =
+        e instanceof Error
+          ? e.message
+          : "Simulation failed. No result was fabricated.";
+      dispatchCounterfactual({
+        type: "SIMULATION_FAILED",
+        reality: simulationReality,
+        message,
+      });
+      toast.error(message);
     } finally {
       setSimulating(false);
     }
   };
+
+  const handleInterventionsChanged = useCallback(
+    (features: InterventionFeature[]) => {
+      const baseline = counterfactualState.nowSurface;
+      const currentPossible = counterfactualState.possibleSurface;
+      if (
+        !result ||
+        baseline.modifiers.rows === 0 ||
+        baseline.modifiers.cols === 0
+      ) {
+        return;
+      }
+      const bbox = currentPossible.modifiers.bbox;
+      const surface = buildRealitySurface({
+        id: "possible",
+        baselineLayerHash: baseline.baselineLayerHash,
+        bbox,
+        rows: currentPossible.modifiers.rows,
+        cols: currentPossible.modifiers.cols,
+        features,
+        provenance: baseline.provenance,
+        warnings: currentPossible.warnings,
+      });
+      dispatchCounterfactual({
+        type: "INTERVENTIONS_CHANGED",
+        features,
+        surface,
+      });
+      const areaM2 =
+        bboxAreaKm2([
+          [bbox.west, bbox.south],
+          [bbox.east, bbox.north],
+        ]) * 1e6;
+      setScenario(
+        deriveScenarioFromFeatures(features, result.land_cover, areaM2)
+      );
+      setFutureSimResult(null);
+    },
+    [
+      counterfactualState.nowSurface,
+      counterfactualState.possibleSurface,
+      dispatchCounterfactual,
+      result,
+    ]
+  );
+
+  useEffect(
+    () => () => {
+      spatialAbortRef.current?.abort();
+      activeRequestIdRef.current = null;
+    },
+    []
+  );
 
   // On small screens the panel renders below the fold — bring it into view when
   // work starts so the analysing progress is visible, and again when results land.
@@ -548,6 +670,17 @@ export default function Analyze() {
   // afterwards -- the label stays editable so it can't silently disagree with
   // the coordinates it gets stored beside.
   const goTo = (r: GeocodeResult & { zoom?: number }) => {
+    spatialAbortRef.current?.abort();
+    activeRequestIdRef.current = null;
+    dispatchCounterfactual({ type: "RESET" });
+    setResult(null);
+    setCapturedTile(null);
+    setScenarioExport(null);
+    setSimResult(null);
+    setFutureSimResult(null);
+    setCatalystFuture(null);
+    setComparing(false);
+    setEpoch("2026");
     mapRef.current?.flyTo(r.lat, r.lng, r.zoom ?? 14);
     setLocationLabel(r.label);
   };
@@ -556,6 +689,9 @@ export default function Analyze() {
   // the map sits above the fold, so scroll back up to it; on desktop the map
   // and form are always in view, so clearing the panel is enough.
   const resetScan = () => {
+    spatialAbortRef.current?.abort();
+    activeRequestIdRef.current = null;
+    dispatchCounterfactual({ type: "RESET" });
     setResult(null);
     setCapturedTile(null);
     setScenarioExport(null);
@@ -580,26 +716,36 @@ export default function Analyze() {
             ref={mapRef}
             initialCenter={[initialView.lng, initialView.lat]}
             initialZoom={initialView.zoom}
-            onReady={() => {
+            onReady={({ map }) => {
               setMapReady(true);
-              setMapInstance(mapRef.current?.getMap() ?? null);
+              setMapInstance(map);
+              dispatchCounterfactual({ type: "MAP_READY" });
             }}
             onViewChange={onViewChange}
           />
-          <div className="vignette transition-opacity duration-1000" style={{ opacity: cinematic.isActive ? 1 : 0.4 }} />
+          <div className="vignette opacity-40" />
 
           {/* Simulation overlays — render nothing until a simulation returns. */}
-          <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
-          <FlowLayer map={mapInstance} flowPaths={simResult?.flow_paths ?? []} />
+          <RiskHeatmap
+            map={mapInstance}
+            riskZones={overlaySimulation?.riskZones ?? []}
+          />
+          <FlowLayer
+            map={mapInstance}
+            flowPaths={overlaySimulation?.flowPaths ?? []}
+          />
 
           {/* Map Editor for direct spatial interventions */}
           {result && !comparing && epoch === "2026" && (
             <MapEditor
               map={mapInstance}
-              bbox={result.bbox}
-              cover={result.land_cover}
-              onScenarioChange={(s) => setScenario(s)}
+              bbox={counterfactualState.possibleSurface.modifiers.bbox}
+              context={
+                counterfactualState.spatialContext as SpatialContextResult | null
+              }
               activeIntervention={activeIntervention}
+              features={counterfactualState.possibleSurface.interventions}
+              onChange={handleInterventionsChanged}
             />
           )}
 
@@ -634,7 +780,7 @@ export default function Analyze() {
           )}
 
         {/* Floating chip: coords + share */}
-        <div className={cn("absolute bottom-3 right-3 flex items-center gap-1.5 transition-opacity duration-1000", cinematic.isActive ? "opacity-0" : "opacity-100")}>
+        <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
           <button
               onClick={copyShareLink}
               aria-label="Copy shareable link to this map view"
@@ -649,27 +795,8 @@ export default function Analyze() {
           </div>
         </div>
 
-        {/* Cinematic Subtitles */}
-        {cinematic.isActive && (
-          <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-end pb-32">
-            <div className="cinematic-glow bg-background/80 backdrop-blur-xl border border-border/50 px-10 py-5 rounded-full shadow-2xl reveal is-visible transition-all">
-               <p className="catalyst-serif text-xl font-medium text-gradient text-center">
-                 {cinematic.subtitle}
-               </p>
-            </div>
-            {cinematic.isFirstVisit && (
-               <Button variant="ghost" className="mt-4 pointer-events-auto text-muted-foreground hover:text-foreground" onClick={cinematic.skip}>
-                 Skip Intro
-               </Button>
-            )}
-          </div>
-        )}
-
         {/* Side panel */}
-        <div className={cn(
-          "pointer-events-none absolute inset-y-0 left-0 p-4 flex flex-col justify-start z-10 w-full sm:w-auto transition-transform duration-1000 ease-in-out",
-          cinematic.isActive ? "-translate-x-[120%]" : "translate-x-0"
-        )}>
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-full flex-col justify-start p-4 sm:w-auto">
           <aside className="pointer-events-auto flex w-full sm:w-[420px] max-h-full flex-col overflow-y-auto rounded-xl bg-background/90 backdrop-blur-md border border-border shadow-2xl">
           {!result && (
             <div className="border-b border-border p-5 panel bg-muted/10 relative overflow-hidden">

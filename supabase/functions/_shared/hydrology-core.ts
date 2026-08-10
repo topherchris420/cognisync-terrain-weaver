@@ -110,7 +110,7 @@ function cellCenter(
   const longitudeStep = (bbox.east - bbox.west) / cols;
   return [
     bbox.west + (col + 0.5) * longitudeStep,
-    bbox.south + (row + 0.5) * latitudeStep,
+    bbox.north - (row + 0.5) * latitudeStep,
   ];
 }
 
@@ -125,8 +125,8 @@ function cellPolygon(
   const longitudeStep = (bbox.east - bbox.west) / cols;
   const west = bbox.west + col * longitudeStep;
   const east = west + longitudeStep;
-  const south = bbox.south + row * latitudeStep;
-  const north = south + latitudeStep;
+  const north = bbox.north - row * latitudeStep;
+  const south = north - latitudeStep;
   return [
     [west, south],
     [east, south],

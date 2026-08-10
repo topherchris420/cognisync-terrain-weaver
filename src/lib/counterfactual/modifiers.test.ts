@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { InterventionFeature } from "./types";
-import { rasterizeSurfaceModifiers } from "./modifiers";
+import {
+  buildRealitySurface,
+  rasterizeSurfaceModifiers,
+} from "./modifiers";
 
 const polygon: GeoJSON.Polygon = {
   type: "Polygon",
@@ -80,5 +83,82 @@ describe("surface modifier rasterization", () => {
 
     expect(grid.cells).toHaveLength(32_400);
     expect(elapsedMs).toBeLessThan(150);
+  });
+});
+
+describe("canonical reality surface builder", () => {
+  const provenance = [{
+    sourceId: "test-surface",
+    title: "Test surface",
+    agency: "Test",
+    url: "https://example.test/surface",
+    accessedAt: "2026-08-10",
+    confidence: "high" as const,
+    status: "observed" as const,
+    caveats: [],
+  }];
+
+  it("keeps empty NOW and edited POSSIBLE on one baseline identity", () => {
+    const now = buildRealitySurface({
+      id: "now",
+      baselineLayerHash: "baseline:fixed",
+      bbox,
+      rows: 30,
+      cols: 30,
+      features: [],
+      provenance,
+      warnings: [],
+    });
+    const possible = buildRealitySurface({
+      id: "possible",
+      baselineLayerHash: "baseline:fixed",
+      bbox,
+      rows: 30,
+      cols: 30,
+      features: [feature("draw-id")],
+      provenance,
+      warnings: [],
+    });
+
+    expect(now.surfaceHash).not.toBe(possible.surfaceHash);
+    expect(now.baselineLayerHash).toBe(possible.baselineLayerHash);
+    expect(now.modifiers.cells).toEqual([]);
+    expect(possible.modifiers.cells).toHaveLength(900);
+  });
+
+  it("hashes physical geometry and bbox, not ephemeral editor IDs", () => {
+    const first = buildRealitySurface({
+      id: "possible",
+      baselineLayerHash: "baseline:fixed",
+      bbox,
+      rows: 30,
+      cols: 30,
+      features: [feature("one")],
+      provenance,
+      warnings: [],
+    });
+    const sameGround = buildRealitySurface({
+      id: "possible",
+      baselineLayerHash: "baseline:fixed",
+      bbox,
+      rows: 30,
+      cols: 30,
+      features: [feature("two")],
+      provenance,
+      warnings: [],
+    });
+    const movedViewport = buildRealitySurface({
+      id: "possible",
+      baselineLayerHash: "baseline:fixed",
+      bbox: { ...bbox, east: 1.1 },
+      rows: 30,
+      cols: 30,
+      features: [feature("one")],
+      provenance,
+      warnings: [],
+    });
+
+    expect(first.surfaceHash).toBe(sameGround.surfaceHash);
+    expect(first.surfaceHash).not.toBe(movedViewport.surfaceHash);
   });
 });

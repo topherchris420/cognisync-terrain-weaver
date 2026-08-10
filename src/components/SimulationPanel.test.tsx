@@ -44,8 +44,9 @@ describe("SimulationPanel", () => {
     expect(onRun).toHaveBeenCalledWith({
       rainfall_mm: 50,
       resolution: "medium",
-      include_drainage: true,
+      include_drainage: false,
     });
+    expect(screen.queryByText(/drainage/i)).not.toBeInTheDocument();
   });
 
   it("shows an instant runoff estimate when a bbox is available", () => {

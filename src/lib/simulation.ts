@@ -162,6 +162,11 @@ export async function runRealitySimulation(
     modelVersion: response.modelVersion,
     elevationHash: response.elevationHash,
     elevationStatus: response.elevationStatus,
+    metadata: {
+      processedAreaKm2: response.metadata.processed_area_km2,
+      cellsAnalyzed: response.metadata.cells_analyzed,
+      computationTimeMs: response.metadata.computation_time_ms,
+    },
     flowPaths: response.flow_paths,
     riskZones: response.risk_zones,
     impactPoints: response.impact_points,

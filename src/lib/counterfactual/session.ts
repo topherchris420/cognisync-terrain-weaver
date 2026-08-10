@@ -31,6 +31,12 @@ export type CounterfactualAction =
   | { type: "SPATIAL_CONTEXT_FAILED"; requestId: string; message: string }
   | { type: "TOOL_SELECTED"; tool: InterventionType | null }
   | {
+      type: "EXPERIMENT_CONFIGURED";
+      storm: StormDefinition;
+      nowSurface: RealitySurface;
+      possibleSurface: RealitySurface;
+    }
+  | {
       type: "INTERVENTIONS_CHANGED";
       features: InterventionFeature[];
       surface: RealitySurface;
@@ -38,6 +44,11 @@ export type CounterfactualAction =
   | { type: "NOW_SIMULATION_SUCCEEDED"; result: RealitySimulation }
   | { type: "POSSIBLE_SIMULATION_STARTED" }
   | { type: "POSSIBLE_SIMULATION_SUCCEEDED"; result: RealitySimulation }
+  | {
+      type: "SIMULATION_FAILED";
+      reality: "now" | "possible";
+      message: string;
+    }
   | { type: "STORM_PLAYBACK_CHANGED"; playing: boolean; progress: number }
   | { type: "TEMPORAL_CHANGED"; epoch: Epoch }
   | { type: "COMPARE_OPENED" }
@@ -284,6 +295,21 @@ export function counterfactualReducer(
         phase: getEditPhase(action.tool, state.possibleSurface),
       };
 
+    case "EXPERIMENT_CONFIGURED":
+      if (state.analysis === null || state.nowSimulation !== null) {
+        return state;
+      }
+      return {
+        ...state,
+        phase: "storm-now",
+        storm: action.storm,
+        nowSurface: cloneNowSurface(action.nowSurface),
+        possibleSurface: clonePossibleSurface(action.possibleSurface),
+        possibleSimulation: null,
+        compareOpen: false,
+        lastError: null,
+      };
+
     case "INTERVENTIONS_CHANGED": {
       const possibleSurface = clonePossibleSurface({
         ...action.surface,
@@ -338,6 +364,16 @@ export function counterfactualReducer(
         phase: state.compareOpen ? "compare" : "edit",
         possibleSimulation: action.result,
       });
+
+    case "SIMULATION_FAILED":
+      return {
+        ...state,
+        phase:
+          action.reality === "now"
+            ? "storm-now"
+            : getEditPhase(state.activeTool, state.possibleSurface),
+        lastError: action.message,
+      };
 
     case "STORM_PLAYBACK_CHANGED":
       return {

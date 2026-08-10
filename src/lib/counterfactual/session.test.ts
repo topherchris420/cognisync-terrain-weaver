@@ -105,6 +105,11 @@ function makeSimulation(
     modelVersion: "terrain-model@1",
     elevationHash: "fnv1a64:1111111111111111",
     elevationStatus: "observed",
+    metadata: {
+      processedAreaKm2: 1,
+      cellsAnalyzed: 900,
+      computationTimeMs: 5,
+    },
     flowPaths: [],
     riskZones: [],
     impactPoints: [],
@@ -431,6 +436,87 @@ describe("counterfactual session reducer", () => {
     });
 
     expect(selectProjectedStatus(state)).toBe("modeled");
+  });
+
+  it("locks experiment configuration once the NOW storm has completed", () => {
+    const initialStorm = makeStorm({ hash: "storm:initial" });
+    let state = counterfactualReducer(createCounterfactualSession(), {
+      type: "ANALYSIS_SUCCEEDED",
+      analysis: makeAnalysis("configured"),
+      baseline: makeBaseline(),
+      storm: initialStorm,
+    });
+    const configuredStorm = makeStorm({
+      hash: "storm:configured",
+      rainfallDepthMm: 75,
+      resolution: "high",
+    });
+    const configuredNow = makeSurface("now", {
+      surfaceHash: "surface:configured:now",
+    });
+    const configuredPossible = makeSurface("possible", {
+      surfaceHash: "surface:configured:possible",
+    });
+
+    state = counterfactualReducer(state, {
+      type: "EXPERIMENT_CONFIGURED",
+      storm: configuredStorm,
+      nowSurface: configuredNow,
+      possibleSurface: configuredPossible,
+    });
+
+    expect(state.storm).toBe(configuredStorm);
+    expect(state.nowSurface.surfaceHash).toBe("surface:configured:now");
+    expect(state.possibleSurface.surfaceHash).toBe(
+      "surface:configured:possible"
+    );
+
+    state = counterfactualReducer(state, {
+      type: "NOW_SIMULATION_SUCCEEDED",
+      result: makeSimulation(
+        configuredStorm.hash,
+        configuredNow.surfaceHash
+      ),
+    });
+    const locked = counterfactualReducer(state, {
+      type: "EXPERIMENT_CONFIGURED",
+      storm: makeStorm({ hash: "storm:replacement" }),
+      nowSurface: makeSurface("now", {
+        surfaceHash: "surface:replacement:now",
+      }),
+      possibleSurface: makeSurface("possible", {
+        surfaceHash: "surface:replacement:possible",
+      }),
+    });
+
+    expect(locked).toBe(state);
+    expect(locked.storm).toBe(configuredStorm);
+  });
+
+  it("returns to an honest recoverable phase when a simulation fails", () => {
+    const storm = makeStorm();
+    let state = counterfactualReducer(createCounterfactualSession(), {
+      type: "ANALYSIS_SUCCEEDED",
+      analysis: makeAnalysis("failed-storm"),
+      baseline: makeBaseline(),
+      storm,
+    });
+    state = counterfactualReducer(state, {
+      type: "NOW_SIMULATION_SUCCEEDED",
+      result: makeSimulation(storm.hash, state.nowSurface.surfaceHash),
+    });
+    state = counterfactualReducer(state, {
+      type: "POSSIBLE_SIMULATION_STARTED",
+    });
+    state = counterfactualReducer(state, {
+      type: "SIMULATION_FAILED",
+      reality: "possible",
+      message: "elevation unavailable",
+    });
+
+    expect(state.phase).toBe("edit-prompt");
+    expect(state.possibleSimulation).toBeNull();
+    expect(state.lastError).toBe("elevation unavailable");
   });
 
   it("reset clears location-bound evidence while preserving the viewport", () => {

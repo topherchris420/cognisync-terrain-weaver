@@ -1,9 +1,13 @@
 import { bbox as geometryBbox, booleanPointInPolygon } from "@turf/turf";
 import type {
+  DataProvenance,
   InterventionFeature,
+  RealitySurface,
   SurfaceModifierCell,
   SurfaceModifierGrid,
 } from "./types";
+import { stableHash } from "./hashing";
+import { combineProvenance } from "./provenance";
 
 interface Bounds {
   north: number;
@@ -125,4 +129,74 @@ export function rasterizeSurfaceModifiers(
   }
 
   return { bbox, rows, cols, cells };
+}
+
+export interface BuildRealitySurfaceInput {
+  id: "now" | "possible";
+  baselineLayerHash: string;
+  bbox: Bounds;
+  rows: number;
+  cols: number;
+  features: InterventionFeature[];
+  provenance: DataProvenance[];
+  warnings: string[];
+}
+
+function physicalInterventionIdentity(feature: InterventionFeature) {
+  return {
+    type: feature.type,
+    geometry: feature.geometry,
+    validGeometry: feature.eligibility.validGeometry,
+    invalidGeometry: feature.eligibility.invalidGeometry,
+    parameters: feature.parameters,
+    eligibility: {
+      eligible: feature.eligibility.eligible,
+      reasonCodes: [...feature.eligibility.reasonCodes].sort(),
+      confidence: feature.eligibility.confidence,
+    },
+  };
+}
+
+export function buildRealitySurface(
+  input: BuildRealitySurfaceInput
+): RealitySurface {
+  const physicalInterventions = input.features
+    .map(physicalInterventionIdentity)
+    .sort((left, right) =>
+      stableHash(left).localeCompare(stableHash(right))
+    );
+  const interventionHash = stableHash(physicalInterventions);
+  const modifiers = rasterizeSurfaceModifiers(
+    input.features,
+    input.bbox,
+    input.rows,
+    input.cols
+  );
+  const provenance = combineProvenance([
+    ...input.provenance,
+    ...input.features.flatMap((feature) => [
+      ...feature.provenance,
+      ...feature.eligibility.provenance,
+      ...feature.parameters.calibrationProvenance,
+    ]),
+  ]);
+  const surfaceHash = stableHash({
+    baselineLayerHash: input.baselineLayerHash,
+    bbox: input.bbox,
+    rows: input.rows,
+    cols: input.cols,
+    interventionHash,
+    cells: modifiers.cells,
+  });
+
+  return {
+    id: input.id,
+    baselineLayerHash: input.baselineLayerHash,
+    interventionHash,
+    surfaceHash,
+    interventions: [...input.features],
+    modifiers,
+    provenance,
+    warnings: Array.from(new Set(input.warnings)),
+  };
 }

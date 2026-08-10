@@ -115,6 +115,11 @@ export interface RealitySimulation {
   modelVersion: string;
   elevationHash: string;
   elevationStatus: "observed" | "illustrative";
+  metadata: {
+    processedAreaKm2: number;
+    cellsAnalyzed: number;
+    computationTimeMs: number;
+  };
   flowPaths: FlowPath[];
   riskZones: RiskZone[];
   impactPoints: ImpactPoint[];
