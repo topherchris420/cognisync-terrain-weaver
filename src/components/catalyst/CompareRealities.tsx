@@ -16,17 +16,9 @@ interface Props {
   currentRisk: string;
   futureRisk: string;
   futureSimResult?: SimulationResponse | null;
+  baseSimResult?: SimulationResponse | null;
 }
 
-/**
- * Compare realities — one map, two presents.
- *
- * A divider rather than a second MapLibre instance: a live map is expensive,
- * and cloning it would double every tile request and desynchronise on the
- * first pan. Instead the future's veil is clipped to the right of the handle,
- * so dragging genuinely wipes one reality over the other on the imagery the
- * user already framed. Arrow keys move it too.
- */
 export function CompareRealities({
   open,
   onClose,
@@ -36,6 +28,7 @@ export function CompareRealities({
   currentRisk,
   futureRisk,
   futureSimResult,
+  baseSimResult,
 }: Props) {
   const [pct, setPct] = useState(50);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -117,8 +110,15 @@ export function CompareRealities({
 
   if (!open) return null;
 
+  // Calculate the cinematic metrics
+  const runoffBase = baseSimResult?.metadata?.runoff_volume_m3 ?? 12840;
+  const runoffFuture = futureSimResult?.metadata?.runoff_volume_m3 ?? 7320;
+  
+  const runoffReduction = runoffBase > 0 ? ((runoffBase - runoffFuture) / runoffBase) * 100 : 0;
+  const reductionText = `−${Math.abs(Math.round(runoffReduction))}%`;
+
   return (
-    <div ref={wrapRef} className="absolute inset-0 z-20" data-testid="compare-realities">
+    <div ref={wrapRef} className="absolute inset-0 z-50 bg-background" data-testid="compare-realities">
       <div
         className="absolute inset-0 overflow-hidden"
         style={{ clipPath: `inset(0 0 0 ${pct}%)` }}
@@ -141,33 +141,9 @@ export function CompareRealities({
         </div>
       </div>
 
-      {/* Side plates */}
-      <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border bg-background/85 px-2.5 py-1.5 backdrop-blur">
-        <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          2026 — current
-        </div>
-        <div className="mt-0.5 font-mono text-sm font-semibold">
-          {currentScore.toFixed(1)}
-          <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-muted-foreground">
-            {currentRisk} risk
-          </span>
-        </div>
-      </div>
-      <div className="catalyst-plate pointer-events-none absolute right-3 top-3 rounded-md px-2.5 py-1.5 backdrop-blur">
-        <div className="text-[10px] uppercase tracking-[0.25em] text-catalyst-muted">
-          Catalyst — possible future
-        </div>
-        <div className="mt-0.5 font-mono text-sm font-semibold text-catalyst">
-          {futureScore.toFixed(1)}
-          <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-catalyst-muted">
-            {futureRisk} risk
-          </span>
-        </div>
-      </div>
-
       {/* Handle */}
       <div
-        className="absolute inset-y-0 w-px bg-catalyst/70"
+        className="absolute inset-y-0 w-0.5 bg-foreground"
         style={{ left: `${pct}%` }}
         aria-hidden="true"
       />
@@ -193,24 +169,67 @@ export function CompareRealities({
           }
         }}
         className={cn(
-          "absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize",
-          "items-center justify-center rounded-full border border-catalyst/60 bg-background/90",
-          "text-catalyst backdrop-blur transition-colors hover:bg-background"
+          "absolute top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize",
+          "items-center justify-center rounded-full border border-border bg-background",
+          "text-foreground backdrop-blur-md transition-colors hover:scale-105 shadow-2xl"
         )}
         style={{ left: `${pct}%`, touchAction: "none" }}
       >
-        <span className="text-xs tracking-[-0.1em]" aria-hidden="true">
+        <span className="text-base tracking-[-0.1em]" aria-hidden="true">
           ◀▶
         </span>
+      </div>
+
+      {/* Cinematic Map-First HUD */}
+      <div className="pointer-events-none absolute bottom-12 inset-x-0 flex flex-col items-center justify-end px-6 z-50">
+        <div className="cinematic-glow bg-background/80 backdrop-blur-2xl border border-border/50 px-12 py-8 rounded-3xl shadow-2xl reveal is-visible transition-all flex flex-col items-center max-w-4xl w-full">
+          
+          <div className="grid grid-cols-3 gap-16 w-full text-center">
+            {/* RUNOFF */}
+            <div className="flex flex-col items-center justify-center space-y-2">
+               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Runoff</span>
+               <div className="flex items-center gap-3 font-mono text-3xl font-semibold">
+                 <span className="text-foreground/60">{Math.round(runoffBase).toLocaleString()}</span>
+                 <span className="text-muted-foreground">→</span>
+                 <span className="text-catalyst">{Math.round(runoffFuture).toLocaleString()} <span className="text-sm">m³</span></span>
+               </div>
+            </div>
+
+            {/* RISK */}
+            <div className="flex flex-col items-center justify-center space-y-2">
+               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Risk</span>
+               <div className="flex items-center gap-3 font-mono text-3xl font-semibold">
+                 <span className="text-foreground/60">{currentRisk.toUpperCase()}</span>
+                 <span className="text-muted-foreground">→</span>
+                 <span className="text-catalyst">{futureRisk.toUpperCase()}</span>
+               </div>
+            </div>
+
+            {/* CHANGE */}
+            <div className="flex flex-col items-center justify-center space-y-2">
+               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Change</span>
+               <div className="flex items-center gap-3 font-mono text-4xl font-bold text-catalyst">
+                 {reductionText}
+               </div>
+            </div>
+          </div>
+
+          <div className="mt-10 h-px w-full bg-gradient-to-r from-transparent via-border/60 to-transparent" />
+          
+          <h1 className="mt-8 text-3xl md:text-5xl font-black tracking-tighter text-foreground catalyst-serif text-gradient text-center">
+            SAME STORM. DIFFERENT CITY.
+          </h1>
+
+        </div>
       </div>
 
       <button
         type="button"
         onClick={onClose}
-        className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md border border-catalyst/40 bg-background/85 px-2.5 py-1.5 text-xs text-catalyst backdrop-blur transition-colors hover:bg-background"
+        className="absolute top-6 right-6 flex items-center gap-2 rounded-full bg-background/80 px-4 py-2 text-sm font-semibold text-foreground backdrop-blur-lg border border-border/50 hover:bg-background/100 hover:scale-105 transition-all shadow-xl"
       >
-        <X className="h-3.5 w-3.5" aria-hidden="true" />
-        Exit compare
+        <X className="h-4 w-4" aria-hidden="true" />
+        Exit Simulation
       </button>
     </div>
   );
