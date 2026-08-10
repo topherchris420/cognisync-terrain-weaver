@@ -26,11 +26,11 @@ export type GeoJsonGeometry =
     }
   | {
       type: "Polygon";
-      coordinates: [Array<[number, number]>];
+      coordinates: Array<Array<[number, number]>>;
     }
   | {
       type: "MultiPolygon";
-      coordinates: Array<[Array<[number, number]>]>;
+      coordinates: Array<Array<Array<[number, number]>>>;
     }
   | {
       type: "LineString";

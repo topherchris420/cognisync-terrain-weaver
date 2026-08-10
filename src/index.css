@@ -184,6 +184,35 @@
     z-index: 5;
   }
 
+  /* Storm Mode — the sky over the site. Atmosphere only: it darkens the
+     imagery so the flow lines read, and never covers them. */
+  .storm-veil {
+    background:
+      radial-gradient(120% 80% at 50% 0%, hsl(215 40% 8% / 0.72), transparent 70%),
+      linear-gradient(180deg, hsl(215 45% 6% / 0.55), hsl(215 45% 6% / 0.22));
+  }
+
+  .storm-rain {
+    background-image: repeating-linear-gradient(
+      104deg,
+      transparent 0 7px,
+      hsl(200 40% 88% / 0.16) 7px 8px,
+      transparent 8px 15px
+    );
+    background-size: 100% 220px;
+    animation: storm-fall 0.75s linear infinite;
+    opacity: 0.55;
+    mix-blend-mode: screen;
+  }
+
+  @keyframes storm-fall {
+    to { background-position: -56px 220px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .storm-rain { animation: none; opacity: 0.28; }
+  }
+
   @keyframes shimmer {
     to { background-position: -200% center; }
   }

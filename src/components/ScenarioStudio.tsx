@@ -27,6 +27,7 @@ import {
   type Scenario,
   type ScenarioAssumptions,
   type ScenarioExport,
+  type InterventionKey,
 } from "@/lib/scenario";
 import type { LandCover } from "@/lib/types";
 
