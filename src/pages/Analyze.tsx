@@ -165,7 +165,7 @@ export default function Analyze() {
   const runoffBeforeM3 = useMemo(
     () =>
       result && analyzedBBox
-        ? estimateRunoffVolumeM3(result.land_cover, analyzedBBox, STORM_MM)
+        ? estimateRunoffVolumeM3(result.land_cover, STORM_MM, analyzedBBox)
         : 0,
     [result, analyzedBBox]
   );
