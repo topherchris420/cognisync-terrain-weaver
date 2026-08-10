@@ -39,3 +39,25 @@ export interface SimulationResponse {
     computation_time_ms: number;
   };
 }
+
+export {
+  HYDROLOGY_MODEL_VERSION,
+  validateSimulationRequest,
+  validateSimulationResponse,
+} from "../../supabase/functions/_shared/hydrology-contract";
+
+export type {
+  HydrologyFlowPath,
+  HydrologyImpactPoint,
+  HydrologyInput,
+  HydrologyModifierCell,
+  HydrologyModifierGrid,
+  HydrologyProvenance,
+  HydrologyRiskZone,
+  HydrologyStormDefinition,
+  SimBBox,
+  SimulationRequestV2,
+  SimulationResponseV2,
+  SimulationSurfaceInput,
+  WaterBalance,
+} from "../../supabase/functions/_shared/hydrology-contract";

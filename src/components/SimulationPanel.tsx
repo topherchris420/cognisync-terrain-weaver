@@ -66,7 +66,7 @@ export function SimulationPanel({
     onRunSimulation({
       rainfall_mm: rainfall[0],
       resolution: resolution as "low" | "medium" | "high",
-      include_drainage: true,
+      include_drainage: false,
     });
   };
 

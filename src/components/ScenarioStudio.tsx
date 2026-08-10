@@ -4,7 +4,6 @@ import {
   Banknote,
   Droplets,
   Info,
-  RotateCcw,
   Timer,
   TrendingUp,
 } from "lucide-react";
@@ -24,6 +23,7 @@ import {
   formatCompactUSD,
   formatVolumeM3,
   hasActiveInterventions,
+  type InterventionKey,
   type Scenario,
   type ScenarioAssumptions,
   type ScenarioExport,
@@ -48,7 +48,7 @@ const riskBadgeClass = (risk: string) =>
 
 /**
  * Scenario Studio — interactive what-if modeling over an analyzed tile.
- * Planners drag intervention sliders; the projected Urban Absorption Score,
+ * Geometry drawn on the map drives the projected Urban Absorption Score,
  * stormwater retention, capital cost, and payback update live, using the
  * same transparent weights that produce the base score.
  */
@@ -78,20 +78,16 @@ export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onIn
         Select a tool below and draw directly on the map to place interventions.
         Costs and absorption impact update instantly based on the drawn area.
       </div>
-      {/* Intervention sliders */}
+      {/* Map tool shortcuts; geometry remains canonical. */}
       <div className="space-y-4">
         {INTERVENTION_ORDER.map((key) => {
           const def = INTERVENTIONS[key];
           const sourceShare = Number(cover[def.source] ?? 0);
-          const pct = Math.round(scenario[key] * 100);
           const disabled = sourceShare <= 0;
           return (
             <div key={key} className={cn(disabled && "opacity-45")}>
               <div className="flex items-baseline justify-between gap-2">
-                <Label
-                  htmlFor={`slider-${key}`}
-                  className="text-sm font-medium"
-                >
+                <Label className="text-sm font-medium">
                   {def.label}
                 </Label>
                   <span className="font-mono text-xs text-muted-foreground">

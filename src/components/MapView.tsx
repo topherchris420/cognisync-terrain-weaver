@@ -3,6 +3,7 @@ import maplibregl, { Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, SatelliteDish } from "lucide-react";
+import type { MapCameraState } from "@/lib/counterfactual/types";
 
 export interface MapViewHandle {
   captureImage: () => Promise<string | null>;
@@ -10,14 +11,25 @@ export interface MapViewHandle {
   getCenter: () => { lat: number; lng: number };
   getZoom: () => number;
   flyTo: (lat: number, lng: number, zoom?: number) => void;
+  fitBounds: (
+    bounds: [[number, number], [number, number]],
+    padding?: number
+  ) => void;
   /** The live MapLibre instance, for overlay layers (flow paths, risk zones). */
   getMap: () => MLMap | null;
 }
 
-interface Props {
+export interface MapViewReadyPayload {
+  handle: MapViewHandle;
+  map: MLMap;
+}
+
+export interface MapViewProps {
   initialCenter?: [number, number]; // [lng, lat]
   initialZoom?: number;
-  onReady?: () => void;
+  camera?: MapCameraState;
+  onReady?: (payload: MapViewReadyPayload) => void;
+  onCameraChange?: (camera: MapCameraState) => void;
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
 }
 
@@ -109,12 +121,21 @@ type Status =
   | { kind: "ready" }
   | { kind: "failed"; reason: "imagery" | "webgl" };
 
-export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
-  { initialCenter = [-73.985, 40.758], initialZoom = 15, onReady, onViewChange },
+export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
+  {
+    initialCenter = [-73.985, 40.758],
+    initialZoom = 15,
+    camera,
+    onReady,
+    onCameraChange,
+    onViewChange,
+  },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
+  const readyHandleRef = useRef<MapViewHandle | null>(null);
+  const applyingControlledCameraRef = useRef(false);
   const [status, setStatus] = useState<Status>({ kind: "connecting", provider: 0 });
   const [attempt, setAttempt] = useState(0);
 
@@ -124,9 +145,13 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
   onReadyRef.current = onReady;
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
-  const viewRef = useRef<{ center: [number, number]; zoom: number }>({
+  const onCameraChangeRef = useRef(onCameraChange);
+  onCameraChangeRef.current = onCameraChange;
+  const viewRef = useRef<MapCameraState>({
     center: initialCenter,
     zoom: initialZoom,
+    bearing: 0,
+    pitch: 0,
   });
 
   useEffect(() => {
@@ -140,6 +165,8 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
         style: styleFor(PROVIDERS[0]),
         center: viewRef.current.center,
         zoom: viewRef.current.zoom,
+        bearing: viewRef.current.bearing,
+        pitch: viewRef.current.pitch,
         minZoom: 2,
         maxZoom: 19,
         // Required so we can read pixels off the canvas for AI analysis.
@@ -201,7 +228,8 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
       connected = true;
       window.clearTimeout(watchdog);
       setStatus({ kind: "ready" });
-      onReadyRef.current?.();
+      const handle = readyHandleRef.current;
+      if (handle) onReadyRef.current?.({ handle, map });
     });
 
     map.on("error", (e) => {
@@ -213,8 +241,23 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
 
     map.on("moveend", () => {
       const c = map.getCenter();
-      viewRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() };
-      onViewChangeRef.current?.({ lat: c.lat, lng: c.lng, zoom: map.getZoom() });
+      const nextCamera: MapCameraState = {
+        center: [c.lng, c.lat],
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+      viewRef.current = nextCamera;
+      if (applyingControlledCameraRef.current) {
+        applyingControlledCameraRef.current = false;
+        return;
+      }
+      onCameraChangeRef.current?.(nextCamera);
+      onViewChangeRef.current?.({
+        lat: c.lat,
+        lng: c.lng,
+        zoom: nextCamera.zoom,
+      });
     });
 
     mapRef.current = map;
@@ -226,6 +269,27 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
     };
   }, [attempt]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !camera) return;
+    const center = map.getCenter();
+    const changed =
+      Math.abs(center.lng - camera.center[0]) > 1e-7 ||
+      Math.abs(center.lat - camera.center[1]) > 1e-7 ||
+      Math.abs(map.getZoom() - camera.zoom) > 1e-7 ||
+      Math.abs(map.getBearing() - camera.bearing) > 1e-7 ||
+      Math.abs(map.getPitch() - camera.pitch) > 1e-7;
+    if (!changed) return;
+    applyingControlledCameraRef.current = true;
+    viewRef.current = camera;
+    map.jumpTo({
+      center: camera.center,
+      zoom: camera.zoom,
+      bearing: camera.bearing,
+      pitch: camera.pitch,
+    });
+  }, [camera]);
+
   const retry = () => {
     setStatus({ kind: "connecting", provider: 0 });
     setAttempt((a) => a + 1);
@@ -233,7 +297,8 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
 
   useImperativeHandle(
     ref,
-    () => ({
+    () => {
+      const handle: MapViewHandle = {
       async captureImage() {
         const map = mapRef.current;
         if (!map) return null;
@@ -277,11 +342,16 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
         ];
       },
       getCenter() {
-        const c = mapRef.current!.getCenter();
-        return { lat: c.lat, lng: c.lng };
+        const c = mapRef.current?.getCenter();
+        return c
+          ? { lat: c.lat, lng: c.lng }
+          : {
+              lat: viewRef.current.center[1],
+              lng: viewRef.current.center[0],
+            };
       },
       getZoom() {
-        return mapRef.current!.getZoom();
+        return mapRef.current?.getZoom() ?? viewRef.current.zoom;
       },
       flyTo(lat, lng, zoom) {
         mapRef.current?.flyTo({
@@ -290,10 +360,19 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
           essential: true,
         });
       },
+      fitBounds(bounds, padding = 48) {
+        mapRef.current?.fitBounds(bounds, {
+          padding,
+          essential: true,
+        });
+      },
       getMap() {
         return mapRef.current;
       },
-    }),
+      };
+      readyHandleRef.current = handle;
+      return handle;
+    },
     []
   );
 
