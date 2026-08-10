@@ -30,7 +30,50 @@ import { bboxAreaKm2, parseBBox, type BBox } from "@/lib/geo";
 import { boundsToSimBBox, MAX_SIMULATION_AREA_KM2 } from "@/lib/simulation";
 import { toast } from "sonner";
 
+import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
+import type { SimulationRequestV2 } from "@/lib/simulation-types";
+import { stableHash } from "@/lib/counterfactual/hashing";
+
 const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
+
+export function buildStormDefinition(
+  rainfallDepthMm: number,
+  resolution: "low" | "medium" | "high"
+): StormDefinition {
+  const definition = {
+    rainfallDepthMm,
+    durationMinutes: 60,
+    distribution: "uniform" as const,
+    resolution,
+    includeDrainage: false as const,
+  };
+  const hash = stableHash(definition);
+  return {
+    id: `storm:${hash}`,
+    ...definition,
+    hash,
+  };
+}
+
+export function buildRealitySimulationRequest(
+  bbox: SimulationRequestV2["bbox"],
+  storm: StormDefinition,
+  surface: RealitySurface,
+  expectedElevationHash?: string
+): SimulationRequestV2 {
+  return {
+    bbox,
+    storm,
+    surface: {
+      id: surface.id,
+      surfaceHash: surface.surfaceHash,
+      baselineLayerHash: surface.baselineLayerHash,
+      modifiers: surface.modifiers,
+      provenance: surface.provenance,
+    },
+    ...(expectedElevationHash ? { expectedElevationHash } : {}),
+  };
+}
 
 function viewFromParams(params: URLSearchParams) {
   const rawLat = params.get("lat");

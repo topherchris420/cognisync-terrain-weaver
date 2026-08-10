@@ -34,7 +34,7 @@ const App = () => (
             theme and renders white toasts over the dark UI on light-mode
             machines (no ThemeProvider is mounted to say otherwise). */}
         <Sonner theme="dark" />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ScrollToTop />
           <Suspense fallback={<PageLoader />}>
             <Routes>
