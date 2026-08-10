@@ -61,6 +61,11 @@ function canonicalize(value: unknown, seen: Set<object>): string {
       return `[${parts.join(",")}]`;
     }
 
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      return unsupported("non-plain JSON objects");
+    }
+
     const entries = Object.keys(value)
       .sort()
       .map((key) => `${JSON.stringify(key)}:${canonicalize((value as Record<string, unknown>)[key], seen)}`);

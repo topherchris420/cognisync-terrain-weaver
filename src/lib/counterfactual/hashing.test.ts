@@ -22,4 +22,17 @@ describe("stableHash", () => {
     expect(() => stableHash({ symbol: Symbol("x") })).toThrow(/symbol/i);
     expect(() => stableHash(cyclic)).toThrow(/cyclic/i);
   });
+
+  it("rejects non-plain objects", () => {
+    const nonPlainValues = [
+      new Date("2026-08-09T00:00:00Z"),
+      new Map([["a", 1]]),
+      new Set([1]),
+      /mannahatta/,
+    ];
+
+    for (const value of nonPlainValues) {
+      expect(() => stableHash(value)).toThrow(/plain JSON objects/i);
+    }
+  });
 });
