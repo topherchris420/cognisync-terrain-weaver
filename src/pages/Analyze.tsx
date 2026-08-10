@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useCinematicOnboarding } from "@/hooks/useCinematicOnboarding";
+import { useCounterfactualSession } from "@/hooks/useCounterfactualSession";
 import { supabase } from "@/integrations/supabase/client";
 import type { Map as MLMap } from "maplibre-gl";
 import type { AnalysisRecord } from "@/lib/types";
@@ -94,6 +95,10 @@ export default function Analyze() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
+  const {
+    state: counterfactualState,
+    dispatch: dispatchCounterfactual,
+  } = useCounterfactualSession();
 
   const [name, setName] = useState("Untitled site");
   const [locationLabel, setLocationLabel] = useState("");
@@ -105,7 +110,14 @@ export default function Analyze() {
   const [result, setResult] = useState<AnalysisRecord | null>(null);
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
   const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(null);
-  const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
+  const activeIntervention =
+    counterfactualState.activeTool as InterventionKey | null;
+  const setActiveIntervention = useCallback(
+    (tool: InterventionKey | null) => {
+      dispatchCounterfactual({ type: "TOOL_SELECTED", tool });
+    },
+    [dispatchCounterfactual]
+  );
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
@@ -114,7 +126,13 @@ export default function Analyze() {
   // ---- Catalyst: the hidden fourth layer of the map -----------------------
   const [catalystUnlocked, unlockCatalystNow] = useCatalystUnlocked();
   const [revealing, setRevealing] = useState(false);
-  const [epoch, setEpoch] = useState<Epoch>("2026");
+  const epoch = counterfactualState.epoch;
+  const setEpoch = useCallback(
+    (next: Epoch) => {
+      dispatchCounterfactual({ type: "TEMPORAL_CHANGED", epoch: next });
+    },
+    [dispatchCounterfactual]
+  );
   const [comparing, setComparing] = useState(false);
   const [catalystFuture, setCatalystFuture] = useState<{
     scenario: Scenario;
@@ -128,10 +146,13 @@ export default function Analyze() {
 
   // Leaving the future closes the comparison with it — a divider between two
   // presents makes no sense while looking at 1609.
-  const changeEpoch = useCallback((next: Epoch) => {
-    setEpoch(next);
-    if (next !== "future") setComparing(false);
-  }, []);
+  const changeEpoch = useCallback(
+    (next: Epoch) => {
+      setEpoch(next);
+      if (next !== "future") setComparing(false);
+    },
+    [setEpoch]
+  );
 
   // The analyzed footprint, if one was stored — drives the instant runoff
   // estimate and the "too large to simulate" guard on the panel.
@@ -189,7 +210,7 @@ export default function Analyze() {
        }, 2000);
        return () => clearTimeout(timer);
     }
-  }, [cinematicState, result, cinematic]);
+  }, [cinematicState, result, cinematic, setEpoch]);
 
   useEffect(() => {
     if (cinematicState === "COMPARING_REALITIES") {
