@@ -17,10 +17,18 @@ export const scientificStatusSchema = z.enum([
   "speculative",
 ]);
 
-const coordinateSchema = z.tuple([
-  z.number().finite().min(-180).max(180),
-  z.number().finite().min(-90).max(90),
-]);
+// zod v4 widens tuple outputs to optional members, which loses the exact
+// [lng, lat] pair the app models — validate the pair explicitly instead.
+const coordinateSchema = z.custom<[number, number]>(
+  (v) =>
+    Array.isArray(v) &&
+    v.length === 2 &&
+    Number.isFinite(v[0]) &&
+    Number.isFinite(v[1]) &&
+    Math.abs(Number(v[0])) <= 180 &&
+    Math.abs(Number(v[1])) <= 90,
+  { message: "Expected a [longitude, latitude] pair" }
+);
 
 export const geoJsonGeometrySchema = z.discriminatedUnion("type", [
   z.object({
@@ -41,8 +49,7 @@ export const geoJsonGeometrySchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const catalystActionSchema: z.ZodType<CatalystAction> =
-  z.discriminatedUnion("type", [
+export const catalystActionSchema = z.discriminatedUnion("type", [
     z.object({
       type: z.literal("scenario"),
       intervention: z.enum([
@@ -82,13 +89,13 @@ export const catalystActionSchema: z.ZodType<CatalystAction> =
         .max(8),
     }),
     z.object({
-      type: z.literal("custom"),
-      executable: z.literal(false),
-      description: z.string().min(1).max(2000),
-    }),
-  ]);
+    type: z.literal("custom"),
+    executable: z.literal(false),
+    description: z.string().min(1).max(2000),
+  }),
+]);
 
-export const catalystExperimentSchema: z.ZodType<CatalystExperiment> = z.object({
+export const catalystExperimentSchema = z.object({
   id: z.string().regex(/^MNH-CF-\d{4,}$/),
   hypothesis: z.string().min(1).max(2000),
   objective: z.string().min(1).max(1000),
@@ -135,5 +142,5 @@ export const catalystExperimentSchema: z.ZodType<CatalystExperiment> = z.object(
 });
 
 export function parseCatalystExperiment(raw: unknown): CatalystExperiment {
-  return catalystExperimentSchema.parse(raw);
+  return catalystExperimentSchema.parse(raw) as CatalystExperiment;
 }

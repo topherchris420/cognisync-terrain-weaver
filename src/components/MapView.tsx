@@ -17,7 +17,7 @@ export interface MapViewHandle {
 interface Props {
   initialCenter?: [number, number]; // [lng, lat]
   initialZoom?: number;
-  onReady?: () => void;
+  onReady?: (map: MLMap) => void;
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
 }
 
@@ -201,7 +201,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
       connected = true;
       window.clearTimeout(watchdog);
       setStatus({ kind: "ready" });
-      onReadyRef.current?.();
+      onReadyRef.current?.(map);
     });
 
     map.on("error", (e) => {

@@ -129,7 +129,7 @@ export function CompareRealities({
                <MapView
                  initialCenter={[baseMap.getCenter().lng, baseMap.getCenter().lat]}
                  initialZoom={baseMap.getZoom()}
-                 onReady={(m) => setFutureMap(m.getMap())}
+                 onReady={(m) => setFutureMap(m)}
                />
             )}
             <FlowLayer map={futureMap} flowPaths={futureSimResult?.flow_paths ?? []} />
