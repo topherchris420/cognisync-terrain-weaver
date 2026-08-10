@@ -113,6 +113,8 @@ export interface RealitySimulation {
   stormHash: string;
   surfaceHash: string;
   modelVersion: string;
+  elevationHash: string;
+  elevationStatus: "observed" | "illustrative";
   flowPaths: FlowPath[];
   riskZones: RiskZone[];
   impactPoints: ImpactPoint[];

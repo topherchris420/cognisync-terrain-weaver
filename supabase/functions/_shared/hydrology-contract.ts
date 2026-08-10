@@ -76,6 +76,7 @@ export interface SimulationRequestV2 {
   bbox: SimBBox;
   storm: HydrologyStormDefinition;
   surface: SimulationSurfaceInput;
+  expectedElevationHash?: string;
 }
 
 export interface HydrologyInput {
@@ -124,6 +125,8 @@ export interface SimulationResponseV2 {
   stormHash: string;
   surfaceHash: string;
   modelVersion: string;
+  elevationHash: string;
+  elevationStatus: "observed" | "illustrative";
   waterBalance: WaterBalance;
   optimizationClaimsAllowed: boolean;
   warnings: string[];
@@ -283,6 +286,9 @@ export function validateSimulationRequest(
   identity(surface.surfaceHash, "surface hash");
   identity(surface.baselineLayerHash, "baseline layer hash");
   validateProvenance(surface.provenance, "surface provenance");
+  if (candidate.expectedElevationHash !== undefined) {
+    identity(candidate.expectedElevationHash, "expected elevation hash");
+  }
 
   const modifiers = record(surface.modifiers, "surface modifiers");
   const modifierBBox = validateBBox(modifiers.bbox);
@@ -366,6 +372,13 @@ export function validateSimulationResponse(
   identity(candidate.stormHash, "response storm hash");
   identity(candidate.surfaceHash, "response surface hash");
   identity(candidate.modelVersion, "response model version");
+  identity(candidate.elevationHash, "response elevation hash");
+  if (
+    candidate.elevationStatus !== "observed" &&
+    candidate.elevationStatus !== "illustrative"
+  ) {
+    throw new Error("response elevation status is invalid.");
+  }
   if (
     !Array.isArray(candidate.flow_paths) ||
     !Array.isArray(candidate.risk_zones) ||

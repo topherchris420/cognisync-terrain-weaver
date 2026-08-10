@@ -13,6 +13,17 @@ import {
 
 type Receiver = [number, number];
 
+function elevationHash(elevation: number[][]): string {
+  const serialized = JSON.stringify(elevation);
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= BigInt(serialized.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return `fnv1a64:${hash.toString(16).padStart(16, "0")}`;
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -170,6 +181,15 @@ function combineProvenance(
 export function runHydrology(input: HydrologyInput): SimulationResponseV2 {
   const request = validateSimulationRequest(input.request);
   assertElevation(input);
+  const loadedElevationHash = elevationHash(input.elevation);
+  if (
+    request.expectedElevationHash !== undefined &&
+    request.expectedElevationHash !== loadedElevationHash
+  ) {
+    throw new Error(
+      "Loaded elevation identity does not match the paired NOW elevation."
+    );
+  }
   const { bbox, storm, surface } = request;
   const { rows, cols } = surface.modifiers;
   const cells = rows * cols;
@@ -362,6 +382,8 @@ export function runHydrology(input: HydrologyInput): SimulationResponseV2 {
     stormHash: storm.hash,
     surfaceHash: surface.surfaceHash,
     modelVersion: HYDROLOGY_MODEL_VERSION,
+    elevationHash: loadedElevationHash,
+    elevationStatus: input.elevationStatus,
     waterBalance: {
       rainfallM3,
       infiltratedM3,

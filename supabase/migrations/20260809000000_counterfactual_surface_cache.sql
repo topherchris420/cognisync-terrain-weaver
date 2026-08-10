@@ -6,6 +6,7 @@ ALTER TABLE public.simulation_cache
   ADD COLUMN IF NOT EXISTS storm_hash TEXT,
   ADD COLUMN IF NOT EXISTS surface_hash TEXT,
   ADD COLUMN IF NOT EXISTS model_version TEXT,
+  ADD COLUMN IF NOT EXISTS elevation_hash TEXT,
   ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
 
 UPDATE public.simulation_cache
@@ -20,11 +21,13 @@ CREATE INDEX IF NOT EXISTS simulation_cache_counterfactual_lookup
     storm_hash,
     surface_hash,
     model_version,
+    elevation_hash,
     expires_at
   )
   WHERE storm_hash IS NOT NULL
     AND surface_hash IS NOT NULL
-    AND model_version IS NOT NULL;
+    AND model_version IS NOT NULL
+    AND elevation_hash IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS simulation_cache_counterfactual_bbox
   ON public.simulation_cache (
@@ -34,8 +37,10 @@ CREATE INDEX IF NOT EXISTS simulation_cache_counterfactual_bbox
     bbox_west,
     storm_hash,
     surface_hash,
-    model_version
+    model_version,
+    elevation_hash
   )
   WHERE storm_hash IS NOT NULL
     AND surface_hash IS NOT NULL
-    AND model_version IS NOT NULL;
+    AND model_version IS NOT NULL
+    AND elevation_hash IS NOT NULL;

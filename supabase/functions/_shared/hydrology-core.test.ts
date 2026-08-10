@@ -82,6 +82,7 @@ describe("surface-aware D8 hydrology", () => {
 
     expect(second).toEqual(first);
     expect(first.modelVersion).toBe(HYDROLOGY_MODEL_VERSION);
+    expect(first.elevationHash).toMatch(/^fnv1a64:/);
     expect(first.flow_paths.length).toBeGreaterThan(0);
   });
 
@@ -183,6 +184,7 @@ describe("surface-aware D8 hydrology", () => {
       /illustrative synthetic elevation/i
     );
     expect(result.optimizationClaimsAllowed).toBe(false);
+    expect(result.elevationStatus).toBe("illustrative");
     expect(result.provenance).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -192,6 +194,12 @@ describe("surface-aware D8 hydrology", () => {
         }),
       ])
     );
+  });
+
+  it("fails closed when loaded elevation differs from the expected grid", () => {
+    const candidate = input();
+    candidate.request.expectedElevationHash = "fnv1a64:0000000000000000";
+    expect(() => runHydrology(candidate)).toThrow(/elevation identity/i);
   });
 });
 

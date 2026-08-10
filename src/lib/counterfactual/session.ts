@@ -139,7 +139,13 @@ function isModeledProjection(state: CounterfactualSession): boolean {
     return false;
   }
 
-  return state.nowSimulation.modelVersion === state.possibleSimulation.modelVersion;
+  return (
+    state.nowSimulation.modelVersion === state.possibleSimulation.modelVersion &&
+    state.nowSimulation.elevationHash ===
+      state.possibleSimulation.elevationHash &&
+    state.nowSimulation.elevationStatus ===
+      state.possibleSimulation.elevationStatus
+  );
 }
 
 function nextCompareState(state: CounterfactualSession): CounterfactualSession {
@@ -320,7 +326,9 @@ export function counterfactualReducer(
 
       if (
         state.nowSimulation !== null &&
-        state.nowSimulation.modelVersion !== action.result.modelVersion
+        (state.nowSimulation.modelVersion !== action.result.modelVersion ||
+          state.nowSimulation.elevationHash !== action.result.elevationHash ||
+          state.nowSimulation.elevationStatus !== action.result.elevationStatus)
       ) {
         return state;
       }

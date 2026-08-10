@@ -196,6 +196,8 @@ function responseFor(request: SimulationRequestV2): SimulationResponseV2 {
     stormHash: request.storm.hash,
     surfaceHash: request.surface.surfaceHash,
     modelVersion: "mannahatta-d8-surface-v2",
+    elevationHash: "fnv1a64:1111111111111111",
+    elevationStatus: "observed",
     waterBalance: {
       rainfallM3: 100,
       infiltratedM3: 20,
@@ -269,6 +271,23 @@ describe("reality simulation client", () => {
 
     expect(nowResult.stormHash).toBe(possibleResult.stormHash);
     expect(nowResult.surfaceHash).not.toBe(possibleResult.surfaceHash);
+    expect(nowResult.elevationHash).toBe(possibleResult.elevationHash);
+  });
+
+  it("rejects paired responses that do not prove identical elevation", async () => {
+    const now = realityRequest("now");
+    const possible = realityRequest("possible");
+    await expect(
+      runPairedRealitySimulation(now, possible, async (request) => ({
+        ...responseFor(request),
+        elevationHash:
+          request.surface.id === "now"
+            ? "fnv1a64:1111111111111111"
+            : "fnv1a64:2222222222222222",
+        elevationStatus:
+          request.surface.id === "now" ? "observed" : "illustrative",
+      }))
+    ).rejects.toThrow(/elevation identity/i);
   });
 
   it("rejects a pair before transport when storm or baseline identity differs", async () => {

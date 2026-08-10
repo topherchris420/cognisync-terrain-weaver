@@ -239,7 +239,7 @@ async function cachedV2(
   supabase: SupabaseClient,
   request: SimulationRequestV2
 ): Promise<SimulationResponseV2 | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("simulation_cache")
     .select("result")
     .eq("bbox_north", request.bbox.north)
@@ -249,8 +249,11 @@ async function cachedV2(
     .eq("storm_hash", request.storm.hash)
     .eq("surface_hash", request.surface.surfaceHash)
     .eq("model_version", HYDROLOGY_MODEL_VERSION)
-    .gt("expires_at", new Date().toISOString())
-    .limit(1);
+    .gt("expires_at", new Date().toISOString());
+  if (request.expectedElevationHash !== undefined) {
+    query = query.eq("elevation_hash", request.expectedElevationHash);
+  }
+  const { data, error } = await query.limit(1);
   if (error) {
     console.warn("Counterfactual cache lookup failed.", error);
     return null;
@@ -290,6 +293,7 @@ async function cacheV2(
     storm_hash: request.storm.hash,
     surface_hash: request.surface.surfaceHash,
     model_version: HYDROLOGY_MODEL_VERSION,
+    elevation_hash: result.elevationHash,
     expires_at: expiresAt,
     result,
   });

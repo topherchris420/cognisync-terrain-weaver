@@ -148,10 +148,20 @@ export async function runRealitySimulation(
   if (response.modelVersion !== HYDROLOGY_MODEL_VERSION) {
     throw new Error("Simulation response model identity is unsupported.");
   }
+  if (
+    request.expectedElevationHash !== undefined &&
+    response.elevationHash !== request.expectedElevationHash
+  ) {
+    throw new Error(
+      "Simulation response elevation identity does not match paired NOW."
+    );
+  }
   return {
     stormHash: response.stormHash,
     surfaceHash: response.surfaceHash,
     modelVersion: response.modelVersion,
+    elevationHash: response.elevationHash,
+    elevationStatus: response.elevationStatus,
     flowPaths: response.flow_paths,
     riskZones: response.risk_zones,
     impactPoints: response.impact_points,
@@ -188,16 +198,36 @@ export async function runPairedRealitySimulation(
       "Paired realities require distinct NOW and POSSIBLE surface identities."
     );
   }
-  const [nowResult, possibleResult] = await Promise.all([
-    runRealitySimulation(now, transport),
-    runRealitySimulation(possible, transport),
-  ]);
+  const nowResult = await runRealitySimulation(now, transport);
+  if (
+    possible.expectedElevationHash !== undefined &&
+    possible.expectedElevationHash !== nowResult.elevationHash
+  ) {
+    throw new Error(
+      "POSSIBLE request elevation identity does not match NOW."
+    );
+  }
+  const possibleResult = await runRealitySimulation(
+    {
+      ...possible,
+      expectedElevationHash: nowResult.elevationHash,
+    },
+    transport
+  );
   if (
     nowResult.stormHash !== possibleResult.stormHash ||
     nowResult.modelVersion !== possibleResult.modelVersion
   ) {
     throw new Error(
       "Paired simulation responses do not share one storm and model identity."
+    );
+  }
+  if (
+    nowResult.elevationHash !== possibleResult.elevationHash ||
+    nowResult.elevationStatus !== possibleResult.elevationStatus
+  ) {
+    throw new Error(
+      "Paired responses do not share one elevation identity and status."
     );
   }
   return [nowResult, possibleResult];

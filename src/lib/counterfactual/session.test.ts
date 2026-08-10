@@ -103,6 +103,8 @@ function makeSimulation(
     stormHash,
     surfaceHash,
     modelVersion: "terrain-model@1",
+    elevationHash: "fnv1a64:1111111111111111",
+    elevationStatus: "observed",
     flowPaths: [],
     riskZones: [],
     impactPoints: [],
@@ -361,7 +363,7 @@ describe("counterfactual session reducer", () => {
     expect(state.phase).toBe("edit-prompt");
   });
 
-  it("requires matching model versions and distinct surface hashes before comparing", () => {
+  it("requires matching model and elevation identities plus distinct surfaces", () => {
     const storm = makeStorm({ hash: "storm:fixed" });
     let state = counterfactualReducer(createCounterfactualSession(), {
       type: "ANALYSIS_SUCCEEDED",
@@ -385,6 +387,17 @@ describe("counterfactual session reducer", () => {
     });
 
     expect(selectCanCompare(state)).toBe(false);
+
+    state = counterfactualReducer(state, {
+      type: "POSSIBLE_SIMULATION_SUCCEEDED",
+      result: makeSimulation(storm.hash, state.possibleSurface!.surfaceHash, {
+        modelVersion: "terrain-model@1",
+        elevationHash: "fnv1a64:2222222222222222",
+      }),
+    });
+
+    expect(selectCanCompare(state)).toBe(false);
+    expect(state.possibleSimulation).toBeNull();
 
     state = counterfactualReducer(state, {
       type: "POSSIBLE_SIMULATION_SUCCEEDED",
