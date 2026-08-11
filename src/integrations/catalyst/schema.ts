@@ -17,10 +17,12 @@ export const scientificStatusSchema = z.enum([
   "speculative",
 ]);
 
+// Zod v4 widens tuple outputs to optional elements; the runtime check is exact,
+// so the output type is pinned back to a fixed [lng, lat] pair.
 const coordinateSchema = z.tuple([
   z.number().finite().min(-180).max(180),
   z.number().finite().min(-90).max(90),
-]);
+]) as unknown as z.ZodType<[number, number]>;
 
 export const geoJsonGeometrySchema = z.discriminatedUnion("type", [
   z.object({
