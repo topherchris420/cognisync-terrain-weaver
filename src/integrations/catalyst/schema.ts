@@ -17,10 +17,12 @@ export const scientificStatusSchema = z.enum([
   "speculative",
 ]);
 
+// Zod v4 widens tuple outputs to optional elements; the runtime check is exact,
+// so the output type is pinned back to a fixed [lng, lat] pair.
 const coordinateSchema = z.tuple([
   z.number().finite().min(-180).max(180),
   z.number().finite().min(-90).max(90),
-]);
+]) as unknown as z.ZodType<[number, number]>;
 
 export const geoJsonGeometrySchema = z.discriminatedUnion("type", [
   z.object({
@@ -41,8 +43,7 @@ export const geoJsonGeometrySchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const catalystActionSchema: z.ZodType<CatalystAction> =
-  z.discriminatedUnion("type", [
+const catalystActionUnion = z.discriminatedUnion("type", [
     z.object({
       type: z.literal("scenario"),
       intervention: z.enum([
@@ -87,6 +88,11 @@ export const catalystActionSchema: z.ZodType<CatalystAction> =
       description: z.string().min(1).max(2000),
     }),
   ]);
+
+// Runtime validation is exact; the declared output is pinned to the domain type
+// because Zod v4 widens tuple/array element types.
+export const catalystActionSchema =
+  catalystActionUnion as unknown as z.ZodType<CatalystAction>;
 
 export const catalystExperimentSchema: z.ZodType<CatalystExperiment> = z.object({
   id: z.string().regex(/^MNH-CF-\d{4,}$/),

@@ -8,7 +8,7 @@ import {
   type Scenario,
   type ScenarioImpact,
 } from "@/lib/scenario";
-import type { FloodRisk, LandCover } from "@/lib/types";
+import type { FloodRisk, LandCover, LandCoverKey } from "@/lib/types";
 import {
   area as turfArea,
   difference,
@@ -44,7 +44,7 @@ const LAND_KEYS = [
   "pavement",
 ] as const;
 
-function landShare(cover: LandCover, key: "buildings" | "pavement"): number {
+function landShare(cover: LandCover, key: LandCoverKey): number {
   const land = LAND_KEYS.reduce(
     (sum, candidate) => sum + (Number(cover[candidate]) || 0),
     0

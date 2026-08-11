@@ -33,6 +33,16 @@ import { toast } from "sonner";
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
 import type { SimulationRequestV2 } from "@/lib/simulation-types";
 import { stableHash } from "@/lib/counterfactual/hashing";
+import {
+  createStormSeal,
+  checkStormDeterminism,
+  type StormSeal,
+  type DeterminismReport,
+} from "@/lib/storm-identity";
+import { StormSealReadout } from "@/components/studio/StormSealReadout";
+
+const STORM_RAINFALL_MM = 50;
+const STORM_RESOLUTION = "low" as const;
 
 const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
 
@@ -112,6 +122,13 @@ export default function Analyze() {
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
   const [futureSimResult, setFutureSimResult] = useState<SimulationResponse | null>(null);
+  const [nowSeal, setNowSeal] = useState<StormSeal | null>(null);
+  const [possibleSeal, setPossibleSeal] = useState<StormSeal | null>(null);
+
+  const determinism: DeterminismReport | null = useMemo(
+    () => (nowSeal && possibleSeal ? checkStormDeterminism(nowSeal, possibleSeal) : null),
+    [nowSeal, possibleSeal]
+  );
   
   const [catalystFuture, setCatalystFuture] = useState<{
     scenario: Scenario;
@@ -164,6 +181,8 @@ export default function Analyze() {
     setSimResult(null);
     setFutureSimResult(null);
     setCatalystFuture(null);
+    setNowSeal(null);
+    setPossibleSeal(null);
     workflow.reset();
   };
 
@@ -175,6 +194,8 @@ export default function Analyze() {
     setSimResult(null);
     setFutureSimResult(null);
     setCatalystFuture(null);
+    setNowSeal(null);
+    setPossibleSeal(null);
 
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
@@ -228,14 +249,26 @@ export default function Analyze() {
     }
 
     try {
+      // One immutable storm definition drives every run; the rerun reuses the
+      // sealed NOW storm rather than building a fresh one.
+      const stormDefinition =
+        nowSeal?.storm ?? buildStormDefinition(STORM_RAINFALL_MM, STORM_RESOLUTION);
+      const seal = createStormSeal(stormDefinition);
+      if (isRerun) {
+        setPossibleSeal(seal);
+      } else {
+        setNowSeal(seal);
+        setPossibleSeal(null);
+      }
+
       // Simulate base (current) terrain
       const promises = [
         supabase.functions.invoke("run-simulation", {
           body: {
             bbox: boundsToSimBBox(bounds),
-            rainfall_mm: 50,
-            resolution: 5,
-            include_drainage: false,
+            rainfall_mm: stormDefinition.rainfallDepthMm,
+            resolution: stormDefinition.resolution,
+            include_drainage: stormDefinition.includeDrainage,
           },
         })
       ];
@@ -256,9 +289,9 @@ export default function Analyze() {
          promises.push(supabase.functions.invoke("run-simulation", {
             body: {
               bbox: boundsToSimBBox(bounds),
-              rainfall_mm: 50,
-              resolution: 5,
-              include_drainage: false,
+              rainfall_mm: stormDefinition.rainfallDepthMm,
+              resolution: stormDefinition.resolution,
+              include_drainage: stormDefinition.includeDrainage,
             },
          }));
       }
@@ -354,6 +387,15 @@ export default function Analyze() {
           )}
 
           {/* Floating Location Share Chip */}
+          {nowSeal && (
+            <StormSealReadout
+              seal={nowSeal}
+              rerunSeal={possibleSeal}
+              report={determinism}
+              className="absolute top-24 right-6 z-20 w-[320px] max-w-[90vw]"
+            />
+          )}
+
           {workflow.state !== "STORM" && workflow.state !== "RERUN_STORM" && workflow.state !== "COMPARE" && (
             <div className="absolute bottom-6 right-6 flex items-center gap-1.5 z-10">
               <button
@@ -490,7 +532,7 @@ export default function Analyze() {
                  <div className="bg-muted/30 rounded-xl p-4 mb-6 border border-border/40">
                     <div className="flex justify-between items-center mb-2">
                        <span className="text-xs uppercase tracking-wider text-muted-foreground">Est. Runoff</span>
-                       <span className="font-mono text-lg font-semibold">{Math.round(simResult.metadata.runoff_volume_m3).toLocaleString()} m³</span>
+                       <span className="font-mono text-lg font-semibold">{Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³</span>
                     </div>
                  </div>
 
@@ -521,15 +563,15 @@ export default function Analyze() {
                  
                  <div className="grid grid-cols-2 gap-2 mb-6">
                     <Button 
-                      variant={activeIntervention === "green_roof" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "green_roof" ? null : "green_roof")}
+                      variant={activeIntervention === "green_roofs" ? "default" : "outline"}
+                      onClick={() => setActiveIntervention(activeIntervention === "green_roofs" ? null : "green_roofs")}
                       className="w-full text-xs"
                     >
                        Green Roof
                     </Button>
                     <Button 
-                      variant={activeIntervention === "bioswale" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "bioswale" ? null : "bioswale")}
+                      variant={activeIntervention === "bioswales" ? "default" : "outline"}
+                      onClick={() => setActiveIntervention(activeIntervention === "bioswales" ? null : "bioswales")}
                       className="w-full text-xs"
                     >
                        Bioswale
@@ -542,8 +584,8 @@ export default function Analyze() {
                        Permeable Paving
                     </Button>
                     <Button 
-                      variant={activeIntervention === "urban_forest" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "urban_forest" ? null : "urban_forest")}
+                      variant={activeIntervention === "street_trees" ? "default" : "outline"}
+                      onClick={() => setActiveIntervention(activeIntervention === "street_trees" ? null : "street_trees")}
                       className="w-full text-xs"
                     >
                        Urban Forest
