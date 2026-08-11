@@ -387,6 +387,15 @@ export default function Analyze() {
           )}
 
           {/* Floating Location Share Chip */}
+          {nowSeal && (
+            <StormSealReadout
+              seal={nowSeal}
+              rerunSeal={possibleSeal}
+              report={determinism}
+              className="absolute top-24 right-6 z-20 w-[320px] max-w-[90vw]"
+            />
+          )}
+
           {workflow.state !== "STORM" && workflow.state !== "RERUN_STORM" && workflow.state !== "COMPARE" && (
             <div className="absolute bottom-6 right-6 flex items-center gap-1.5 z-10">
               <button
