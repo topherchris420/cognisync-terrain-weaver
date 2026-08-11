@@ -89,6 +89,11 @@ const catalystActionUnion = z.discriminatedUnion("type", [
     }),
   ]);
 
+// Runtime validation is exact; the declared output is pinned to the domain type
+// because Zod v4 widens tuple/array element types.
+export const catalystActionSchema =
+  catalystActionUnion as unknown as z.ZodType<CatalystAction>;
+
 export const catalystExperimentSchema: z.ZodType<CatalystExperiment> = z.object({
   id: z.string().regex(/^MNH-CF-\d{4,}$/),
   hypothesis: z.string().min(1).max(2000),
