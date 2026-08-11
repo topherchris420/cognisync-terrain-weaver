@@ -2,7 +2,377 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/lib/mcp/index.ts
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.26.1";
+
+// src/lib/mcp/tools/list-scans.ts
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z } from "npm:zod@^4";
+
+// src/lib/mcp/supabase.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.110.2";
+function runtimeEnv(name) {
+  const runtime = globalThis;
+  return runtime.Deno?.env?.get?.(name) ?? runtime.process?.env?.[name];
+}
+function configuredEnv(names) {
+  for (const name of names) {
+    const value = runtimeEnv(name)?.trim();
+    if (value) return value;
+  }
+  return void 0;
+}
+function supabaseProjectUrl() {
+  const url = configuredEnv(["SUPABASE_URL", "VITE_SUPABASE_URL"]);
+  if (!url) throw new Error("SUPABASE_URL (or VITE_SUPABASE_URL) is required");
+  return url;
+}
+function supabasePublishableKey() {
+  const direct = configuredEnv([
+    "SUPABASE_PUBLISHABLE_KEY",
+    "VITE_SUPABASE_PUBLISHABLE_KEY"
+  ]);
+  if (direct) return direct;
+  const keyset = runtimeEnv("SUPABASE_PUBLISHABLE_KEYS");
+  if (keyset) {
+    try {
+      const parsed = JSON.parse(keyset);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const keys = parsed;
+        const key = [keys.default, ...Object.values(keys)].find(
+          (v) => typeof v === "string" && v.trim().startsWith("sb_publishable_")
+        )?.trim();
+        if (key) return key;
+      }
+    } catch {
+    }
+  }
+  const legacy = configuredEnv(["SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"]);
+  if (legacy) return legacy;
+  throw new Error(
+    "SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEYS, or SUPABASE_ANON_KEY is required"
+  );
+}
+function supabaseAnon() {
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+function supabaseForUser(ctx) {
+  const token = ctx.getToken();
+  if (!token) throw new Error("supabaseForUser requires a verified OAuth token");
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+
+// src/lib/mcp/tools/list-scans.ts
+var list_scans_default = defineTool({
+  name: "list_scans",
+  title: "List terrain scans",
+  description: "List recent urban terrain scans with their Urban Absorption Score and flood-risk band, newest first.",
+  inputSchema: {
+    limit: z.number().int().min(1).max(50).default(10).describe("How many scans to return."),
+    flood_risk: z.enum(["low", "moderate", "high"]).optional().describe("Optional filter by flood-risk band.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit, flood_risk }) => {
+    let query = supabaseAnon().from("analyses").select(
+      "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,created_at"
+    ).order("created_at", { ascending: false }).limit(limit ?? 10);
+    if (flood_risk) query = query.eq("flood_risk", flood_risk);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
+      structuredContent: { scans: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-scan.ts
+import { defineTool as defineTool2, ToolError } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z2 } from "npm:zod@^4";
+var get_scan_default = defineTool2({
+  name: "get_scan",
+  title: "Get terrain scan",
+  description: "Fetch one terrain scan by id, including land-cover breakdown, absorption score, flood risk and climate-adaptation recommendations.",
+  inputSchema: { id: z2.string().uuid().describe("The scan id.") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }) => {
+    const { data, error } = await supabaseAnon().from("analyses").select("*").eq("id", id).maybeSingle();
+    if (error) throw new ToolError(error.message);
+    if (!data) throw new ToolError(`No scan found with id ${id}`);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      structuredContent: { scan: data }
+    };
+  }
+});
+
+// src/lib/mcp/tools/find-scans-near.ts
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z3 } from "npm:zod@^4";
+var EARTH_KM_PER_DEG = 111.32;
+var find_scans_near_default = defineTool3({
+  name: "find_scans_near",
+  title: "Find scans near a location",
+  description: "Find terrain scans whose map centre lies within a radius of the given latitude/longitude, sorted by distance.",
+  inputSchema: {
+    lat: z3.number().min(-90).max(90).describe("Latitude in decimal degrees."),
+    lng: z3.number().min(-180).max(180).describe("Longitude in decimal degrees."),
+    radius_km: z3.number().min(0.1).max(500).default(25).describe("Search radius in kilometres."),
+    limit: z3.number().int().min(1).max(50).default(10).describe("Maximum scans to return.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ lat, lng, radius_km, limit }) => {
+    const radius = radius_km ?? 25;
+    const latPad = radius / EARTH_KM_PER_DEG;
+    const lngPad = radius / (EARTH_KM_PER_DEG * Math.max(Math.cos(lat * Math.PI / 180), 0.01));
+    const { data, error } = await supabaseAnon().from("analyses").select(
+      "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,created_at"
+    ).gte("center_lat", lat - latPad).lte("center_lat", lat + latPad).gte("center_lng", lng - lngPad).lte("center_lng", lng + lngPad).limit(200);
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const scans = (data ?? []).map((row) => {
+      const dLat = (row.center_lat - lat) * EARTH_KM_PER_DEG;
+      const dLng = (row.center_lng - lng) * EARTH_KM_PER_DEG * Math.cos(lat * Math.PI / 180);
+      return { ...row, distance_km: Math.round(Math.hypot(dLat, dLng) * 100) / 100 };
+    }).filter((row) => row.distance_km <= radius).sort((a, b) => a.distance_km - b.distance_km).slice(0, limit ?? 10);
+    return {
+      content: [{ type: "text", text: JSON.stringify(scans, null, 2) }],
+      structuredContent: { scans }
+    };
+  }
+});
+
+// src/lib/mcp/tools/score-land-cover.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z4 } from "npm:zod@^4";
+import { classifyFloodRisk, computeAbsorptionScore } from "npm:@/lib/absorption";
+var score_land_cover_default = defineTool4({
+  name: "score_land_cover",
+  title: "Score a land-cover mix",
+  description: "Compute the Urban Absorption Score (0-100) and flood-risk band for a hypothetical land-cover mix. Percentages should roughly sum to 100.",
+  inputSchema: {
+    pavement: z4.number().min(0).max(100).describe("Pavement percentage."),
+    buildings: z4.number().min(0).max(100).describe("Building rooftop percentage."),
+    vegetation: z4.number().min(0).max(100).describe("Vegetation percentage."),
+    water: z4.number().min(0).max(100).describe("Open water percentage."),
+    soil: z4.number().min(0).max(100).describe("Bare soil percentage.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: (cover) => {
+    const score = computeAbsorptionScore(cover);
+    const risk = classifyFloodRisk(score);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Urban Absorption Score: ${score}/100 \u2014 flood risk: ${risk}.`
+        }
+      ],
+      structuredContent: { absorption_score: score, flood_risk: risk }
+    };
+  }
+});
+
+// src/lib/mcp/tools/create-analysis.ts
+import { defineTool as defineTool5, ToolError as ToolError2 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z5 } from "npm:zod@^4";
+import { classifyFloodRisk as classifyFloodRisk2, computeAbsorptionScore as computeAbsorptionScore2 } from "npm:@/lib/absorption";
+var recommendation = z5.object({
+  title: z5.string().min(1),
+  description: z5.string().min(1),
+  priority: z5.enum(["high", "medium", "low"]).default("medium"),
+  category: z5.enum(["green", "blue", "gray"]).default("green")
+});
+var create_analysis_default = defineTool5({
+  name: "create_analysis",
+  title: "Create terrain scan",
+  description: "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are computed server-side unless explicitly overridden.",
+  inputSchema: {
+    name: z5.string().trim().min(1).describe("Human-readable name for the scan."),
+    center_lat: z5.number().min(-90).max(90).describe("Latitude of the scan centre."),
+    center_lng: z5.number().min(-180).max(180).describe("Longitude of the scan centre."),
+    zoom: z5.number().min(0).max(24).default(15).describe("Map zoom level of the scan frame."),
+    location_label: z5.string().trim().min(1).optional().describe("Optional place label."),
+    pavement: z5.number().min(0).max(100).describe("Pavement percentage."),
+    buildings: z5.number().min(0).max(100).describe("Building rooftop percentage."),
+    vegetation: z5.number().min(0).max(100).describe("Vegetation percentage."),
+    water: z5.number().min(0).max(100).describe("Open water percentage."),
+    soil: z5.number().min(0).max(100).describe("Bare soil percentage."),
+    recommendations: z5.array(recommendation).max(12).optional().describe("Optional climate-adaptation interventions to store with the scan."),
+    ai_notes: z5.string().optional().describe("Optional analyst or model notes.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (input, ctx) => {
+    if (!ctx.isAuthenticated()) throw new ToolError2("Sign in to create a scan.");
+    const land_cover = {
+      pavement: input.pavement,
+      buildings: input.buildings,
+      vegetation: input.vegetation,
+      water: input.water,
+      soil: input.soil
+    };
+    const absorption_score = computeAbsorptionScore2(land_cover);
+    const flood_risk = classifyFloodRisk2(absorption_score);
+    const { data, error } = await supabaseForUser(ctx).from("analyses").insert({
+      user_id: ctx.getUserId(),
+      name: input.name,
+      location_label: input.location_label ?? null,
+      center_lat: input.center_lat,
+      center_lng: input.center_lng,
+      zoom: input.zoom,
+      land_cover,
+      absorption_score,
+      flood_risk,
+      recommendations: input.recommendations ?? [],
+      ai_notes: input.ai_notes ?? null,
+      status: "complete"
+    }).select().single();
+    if (error) throw new ToolError2(error.message);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Created scan "${data.name}" (${data.id}) \u2014 absorption ${absorption_score}/100, flood risk ${flood_risk}.`
+        }
+      ],
+      structuredContent: { scan: data }
+    };
+  }
+});
+
+// src/lib/mcp/tools/update-analysis.ts
+import { defineTool as defineTool6, ToolError as ToolError3 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z6 } from "npm:zod@^4";
+import { classifyFloodRisk as classifyFloodRisk3, computeAbsorptionScore as computeAbsorptionScore3 } from "npm:@/lib/absorption";
+var recommendation2 = z6.object({
+  title: z6.string().min(1),
+  description: z6.string().min(1),
+  priority: z6.enum(["high", "medium", "low"]).default("medium"),
+  category: z6.enum(["green", "blue", "gray"]).default("green")
+});
+var update_analysis_default = defineTool6({
+  name: "update_analysis",
+  title: "Update terrain scan",
+  description: "Update a terrain scan owned by the signed-in user. Supplying a full land-cover mix recomputes the Urban Absorption Score and flood-risk band.",
+  inputSchema: {
+    id: z6.string().uuid().describe("The scan id to update."),
+    name: z6.string().trim().min(1).optional(),
+    location_label: z6.string().trim().min(1).optional(),
+    ai_notes: z6.string().optional(),
+    pavement: z6.number().min(0).max(100).optional(),
+    buildings: z6.number().min(0).max(100).optional(),
+    vegetation: z6.number().min(0).max(100).optional(),
+    water: z6.number().min(0).max(100).optional(),
+    soil: z6.number().min(0).max(100).optional(),
+    recommendations: z6.array(recommendation2).max(12).optional()
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  handler: async (input, ctx) => {
+    if (!ctx.isAuthenticated()) throw new ToolError3("Sign in to update a scan.");
+    const patch = {};
+    if (input.name !== void 0) patch.name = input.name;
+    if (input.location_label !== void 0) patch.location_label = input.location_label;
+    if (input.ai_notes !== void 0) patch.ai_notes = input.ai_notes;
+    if (input.recommendations !== void 0) patch.recommendations = input.recommendations;
+    const cover = {
+      pavement: input.pavement,
+      buildings: input.buildings,
+      vegetation: input.vegetation,
+      water: input.water,
+      soil: input.soil
+    };
+    const given = Object.values(cover).filter((v) => v !== void 0).length;
+    if (given > 0 && given < 5) {
+      throw new ToolError3(
+        "Provide all five land-cover percentages (pavement, buildings, vegetation, water, soil) to change the mix."
+      );
+    }
+    if (given === 5) {
+      const land_cover = cover;
+      const score = computeAbsorptionScore3(land_cover);
+      patch.land_cover = land_cover;
+      patch.absorption_score = score;
+      patch.flood_risk = classifyFloodRisk3(score);
+    }
+    if (Object.keys(patch).length === 0) throw new ToolError3("Nothing to update.");
+    const { data, error } = await supabaseForUser(ctx).from("analyses").update(patch).eq("id", input.id).select().maybeSingle();
+    if (error) throw new ToolError3(error.message);
+    if (!data) throw new ToolError3("Scan not found, or it is not owned by you.");
+    return {
+      content: [{ type: "text", text: `Updated scan ${data.id}.` }],
+      structuredContent: { scan: data }
+    };
+  }
+});
+
+// src/lib/mcp/tools/delete-analysis.ts
+import { defineTool as defineTool7, ToolError as ToolError4 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z7 } from "npm:zod@^4";
+var delete_analysis_default = defineTool7({
+  name: "delete_analysis",
+  title: "Delete terrain scan",
+  description: "Permanently delete a terrain scan owned by the signed-in user.",
+  inputSchema: { id: z7.string().uuid().describe("The scan id to delete.") },
+  annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) throw new ToolError4("Sign in to delete a scan.");
+    const { data, error } = await supabaseForUser(ctx).from("analyses").delete().eq("id", id).select("id").maybeSingle();
+    if (error) throw new ToolError4(error.message);
+    if (!data) throw new ToolError4("Scan not found, or it is not owned by you.");
+    return {
+      content: [{ type: "text", text: `Deleted scan ${id}.` }],
+      structuredContent: { deleted_id: id }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-my-scans.ts
+import { defineTool as defineTool8, ToolError as ToolError5 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z8 } from "npm:zod@^4";
+var list_my_scans_default = defineTool8({
+  name: "list_my_scans",
+  title: "List my terrain scans",
+  description: "List terrain scans owned by the signed-in user, newest first.",
+  inputSchema: { limit: z8.number().int().min(1).max(50).default(10) },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit }, ctx) => {
+    if (!ctx.isAuthenticated()) throw new ToolError5("Sign in to list your scans.");
+    const { data, error } = await supabaseForUser(ctx).from("analyses").select("id,name,location_label,absorption_score,flood_risk,created_at").eq("user_id", ctx.getUserId()).order("created_at", { ascending: false }).limit(limit);
+    if (error) throw new ToolError5(error.message);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
+      structuredContent: { scans: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/index.ts
+var projectRef = "vrdazimblhnfddijtxsc";
+var mcp_default = defineMcp({
+  name: "cognisync-terrain-weaver",
+  title: "cognisync-terrain-weaver",
+  version: "0.2.0",
+  instructions: "Tools for the Urban Resilience Intelligence platform. Terrain scans classify satellite imagery into pavement, buildings, vegetation, water and soil, then derive an Urban Absorption Score (0-100) and a flood-risk band. Read: `list_scans`, `find_scans_near`, `get_scan`, `score_land_cover`. Write (acts as the signed-in user): `create_analysis` stores a new scan, `update_analysis` and `delete_analysis` manage scans you own, and `list_my_scans` lists them.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
+  tools: [
+    list_scans_default,
+    get_scan_default,
+    find_scans_near_default,
+    score_land_cover_default,
+    list_my_scans_default,
+    create_analysis_default,
+    update_analysis_default,
+    delete_analysis_default
+  ]
+});
+
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:C:\\Users\\chris\\.gemini\\antigravity\\scratch\\cognisync-terrain-weaver\\src\\lib\\mcp\\index.ts";
 import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.26.1/stacks/supabase";
-Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));
+Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));
