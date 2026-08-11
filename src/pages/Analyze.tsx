@@ -33,6 +33,16 @@ import { toast } from "sonner";
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
 import type { SimulationRequestV2 } from "@/lib/simulation-types";
 import { stableHash } from "@/lib/counterfactual/hashing";
+import {
+  createStormSeal,
+  checkStormDeterminism,
+  type StormSeal,
+  type DeterminismReport,
+} from "@/lib/storm-identity";
+import { StormSealReadout } from "@/components/studio/StormSealReadout";
+
+const STORM_RAINFALL_MM = 50;
+const STORM_RESOLUTION = "low" as const;
 
 const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
 
@@ -112,6 +122,13 @@ export default function Analyze() {
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
   const [futureSimResult, setFutureSimResult] = useState<SimulationResponse | null>(null);
+  const [nowSeal, setNowSeal] = useState<StormSeal | null>(null);
+  const [possibleSeal, setPossibleSeal] = useState<StormSeal | null>(null);
+
+  const determinism: DeterminismReport | null = useMemo(
+    () => (nowSeal && possibleSeal ? checkStormDeterminism(nowSeal, possibleSeal) : null),
+    [nowSeal, possibleSeal]
+  );
   
   const [catalystFuture, setCatalystFuture] = useState<{
     scenario: Scenario;
@@ -164,6 +181,8 @@ export default function Analyze() {
     setSimResult(null);
     setFutureSimResult(null);
     setCatalystFuture(null);
+    setNowSeal(null);
+    setPossibleSeal(null);
     workflow.reset();
   };
 
@@ -175,6 +194,8 @@ export default function Analyze() {
     setSimResult(null);
     setFutureSimResult(null);
     setCatalystFuture(null);
+    setNowSeal(null);
+    setPossibleSeal(null);
 
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
@@ -228,14 +249,26 @@ export default function Analyze() {
     }
 
     try {
+      // One immutable storm definition drives every run; the rerun reuses the
+      // sealed NOW storm rather than building a fresh one.
+      const stormDefinition =
+        nowSeal?.storm ?? buildStormDefinition(STORM_RAINFALL_MM, STORM_RESOLUTION);
+      const seal = createStormSeal(stormDefinition);
+      if (isRerun) {
+        setPossibleSeal(seal);
+      } else {
+        setNowSeal(seal);
+        setPossibleSeal(null);
+      }
+
       // Simulate base (current) terrain
       const promises = [
         supabase.functions.invoke("run-simulation", {
           body: {
             bbox: boundsToSimBBox(bounds),
-            rainfall_mm: 50,
-            resolution: 5,
-            include_drainage: false,
+            rainfall_mm: stormDefinition.rainfallDepthMm,
+            resolution: stormDefinition.resolution,
+            include_drainage: stormDefinition.includeDrainage,
           },
         })
       ];
@@ -256,9 +289,9 @@ export default function Analyze() {
          promises.push(supabase.functions.invoke("run-simulation", {
             body: {
               bbox: boundsToSimBBox(bounds),
-              rainfall_mm: 50,
-              resolution: 5,
-              include_drainage: false,
+              rainfall_mm: stormDefinition.rainfallDepthMm,
+              resolution: stormDefinition.resolution,
+              include_drainage: stormDefinition.includeDrainage,
             },
          }));
       }
