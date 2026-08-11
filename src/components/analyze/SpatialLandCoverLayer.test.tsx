@@ -62,7 +62,7 @@ describe("SpatialLandCoverLayer", () => {
     const click = onCalls.find(
       ([event, layer]) => event === "click" && String(layer).includes("tree-observations")
     );
-    click?.[2]({ features: [treeFeature] });
+    (click?.[2] as (event: unknown) => void)?.({ features: [treeFeature] });
     expect(onInspect).toHaveBeenCalledWith(expect.objectContaining({
       surfaceClass: "tree-observation",
       sourceId: "nyc-tree-inventory",

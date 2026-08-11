@@ -43,8 +43,7 @@ export const geoJsonGeometrySchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const catalystActionSchema: z.ZodType<CatalystAction> =
-  z.discriminatedUnion("type", [
+const catalystActionUnion = z.discriminatedUnion("type", [
     z.object({
       type: z.literal("scenario"),
       intervention: z.enum([
