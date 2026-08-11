@@ -21,7 +21,7 @@ describe("official spatial source registry", () => {
   it("keeps the six-inch raster catalog-only without a verified tile template", () => {
     const source = SPATIAL_SOURCE_REGISTRY["nyc-land-cover-2017-6in"];
     expect(source.availability).toBe("catalog-only");
-    expect(source.socrataResourceId).toBeUndefined();
+    expect("socrataResourceId" in source).toBe(false);
     expect(source.officialUrl).toMatch(/^https:/);
   });
 

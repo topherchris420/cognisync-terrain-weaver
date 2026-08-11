@@ -37,6 +37,8 @@ export interface SimulationResponse {
     processed_area_km2: number;
     cells_analyzed: number;
     computation_time_ms: number;
+    /** Total surface runoff volume for the storm, when the engine reports it. */
+    runoff_volume_m3?: number;
   };
 }
 

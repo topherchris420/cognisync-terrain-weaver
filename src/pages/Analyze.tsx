@@ -523,7 +523,7 @@ export default function Analyze() {
                  <div className="bg-muted/30 rounded-xl p-4 mb-6 border border-border/40">
                     <div className="flex justify-between items-center mb-2">
                        <span className="text-xs uppercase tracking-wider text-muted-foreground">Est. Runoff</span>
-                       <span className="font-mono text-lg font-semibold">{Math.round(simResult.metadata.runoff_volume_m3).toLocaleString()} m³</span>
+                       <span className="font-mono text-lg font-semibold">{Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³</span>
                     </div>
                  </div>
 
@@ -554,15 +554,15 @@ export default function Analyze() {
                  
                  <div className="grid grid-cols-2 gap-2 mb-6">
                     <Button 
-                      variant={activeIntervention === "green_roof" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "green_roof" ? null : "green_roof")}
+                      variant={activeIntervention === "green_roofs" ? "default" : "outline"}
+                      onClick={() => setActiveIntervention(activeIntervention === "green_roofs" ? null : "green_roofs")}
                       className="w-full text-xs"
                     >
                        Green Roof
                     </Button>
                     <Button 
-                      variant={activeIntervention === "bioswale" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "bioswale" ? null : "bioswale")}
+                      variant={activeIntervention === "bioswales" ? "default" : "outline"}
+                      onClick={() => setActiveIntervention(activeIntervention === "bioswales" ? null : "bioswales")}
                       className="w-full text-xs"
                     >
                        Bioswale
@@ -575,8 +575,8 @@ export default function Analyze() {
                        Permeable Paving
                     </Button>
                     <Button 
-                      variant={activeIntervention === "urban_forest" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "urban_forest" ? null : "urban_forest")}
+                      variant={activeIntervention === "street_trees" ? "default" : "outline"}
+                      onClick={() => setActiveIntervention(activeIntervention === "street_trees" ? null : "street_trees")}
                       className="w-full text-xs"
                     >
                        Urban Forest

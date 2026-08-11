@@ -55,9 +55,11 @@ describe("SpatialLandCoverLayer", () => {
       context={context}
       onInspect={onInspect}
     />);
-    const source = map.addSource.mock.calls[0][1] as { data: GeoJSON.FeatureCollection };
+    const addSourceCalls = map.addSource.mock.calls as unknown as unknown[][];
+    const source = addSourceCalls[0][1] as { data: GeoJSON.FeatureCollection };
     expect(source.data.features[0].geometry.type).toBe("Point");
-    const click = map.on.mock.calls.find(
+    const onCalls = map.on.mock.calls as unknown as unknown[][];
+    const click = onCalls.find(
       ([event, layer]) => event === "click" && String(layer).includes("tree-observations")
     );
     click?.[2]({ features: [treeFeature] });

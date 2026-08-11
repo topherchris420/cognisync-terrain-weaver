@@ -30,11 +30,11 @@ function polygonFeatures(
 ): GeoJSON.Feature<PolygonGeometry>[] {
   if (!context) return [];
   return context.featureCollection.features.filter(
-    (candidate): candidate is GeoJSON.Feature<PolygonGeometry> =>
+    (candidate) =>
       candidate.properties.surfaceClass === surfaceClass &&
       (candidate.geometry.type === "Polygon" ||
         candidate.geometry.type === "MultiPolygon")
-  );
+  ) as unknown as GeoJSON.Feature<PolygonGeometry>[];
 }
 
 function mergePolygons(
