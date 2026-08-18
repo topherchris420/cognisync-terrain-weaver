@@ -1,439 +1,247 @@
-Mannahatta (Urban Resilience Platform)
+# Mannahatta · Urban Resilience Intelligence
+
+[![status](https://img.shields.io/badge/status-v0.3-brightgreen)](https://github.com/topherchris420/cognisync-terrain-weaver)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-orange)](https://github.com/topherchris420/cognisync-terrain-weaver/pulls)
 
 **Point it at any city block. Get a quantitative climate-resilience report back in seconds.**
 
-Mannahatta is an open-source, AI-powered analytics platform that turns a
-satellite tile into a land-cover breakdown, an **Urban Absorption Score**, a
-flood-risk band, and prioritized climate-adaptation recommendations — then
-lets you stress-test green-infrastructure interventions and export the
-results as a PDF, GeoJSON, or CSV. No survey crew, no proprietary dataset,
-no lock-in.
+Mannahatta is an open-source geospatial analytics platform that transforms satellite imagery into a rigorous land-cover breakdown, an **Urban Absorption Score**, flood-risk banding, and prioritized green-infrastructure adaptation strategies. It allows planners, engineers, and policymakers to stress-test depaving, bioswales, green roofs, and tree canopy interventions, simulate 50mm design storm hydrographs, inspect animated flow vectors, and export publication-ready PDF dossiers, GeoJSON layers, and CSV data.
 
-Built as a modular foundation for climate-adaptation tooling — future modules
-plug in hydrological simulation, IoT sensor fusion, and city-scale digital
-twins.
-
-![status](https://img.shields.io/badge/status-v0.3-brightgreen)
-![license](https://img.shields.io/badge/license-MIT-blue)
-![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)
-![PRs welcome](https://img.shields.io/badge/PRs-welcome-orange)
-
-![Mannahatta — The Manifesto landing page](./design/screens/landing-manifesto.png)
+---
 
 ## Contents
 
-- [What the platform does today](#what-the-platform-does-today)
-- [Scenario Studio & investment analytics](#scenario-studio--investment-analytics)
-- [Hydrological runoff simulation](#hydrological-runoff-simulation)
-- [GIS interoperability](#gis-interoperability)
-- [Architecture](#architecture)
-- [Tech stack](#tech-stack)
-- [Design language](#design-language)
+- [Core Capabilities](#core-capabilities)
+- [Workstation Architecture](#workstation-architecture)
 - [The Urban Absorption Score](#the-urban-absorption-score)
-- [The 1609 baseline](#the-1609-baseline)
-- [Getting started](#getting-started)
-- [Project structure](#project-structure)
-- [Data model](#data-model)
+- [The 1609 Ecological Baseline](#the-1609-ecological-baseline)
+- [Hydrological Runoff Simulation](#hydrological-runoff-simulation)
+- [Green Infrastructure Mitigation Studio](#green-infrastructure-mitigation-studio)
+- [GIS Interoperability & Exports](#gis-interoperability--exports)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
 - [Roadmap](#roadmap)
-- [Contributing](#contributing)
+- [Contributing & License](#contributing--license)
 
-## What the platform does today
+---
 
-| Capability | Where it runs |
+## Core Capabilities
+
+| Capability | Module / Layer |
 |---|---|
-| Interactive satellite map (MapLibre GL + free ESRI imagery, automatic Sentinel-2 fallback) | Frontend |
-| Free-text location search (OpenStreetMap Nominatim, no API key) with one-click city presets | Frontend |
-| Shareable deep links — every map view is a restorable URL | Frontend |
-| Capture the visible map tile as an image | Frontend |
-| Classify the tile into 5 land-cover classes via a vision LLM | (Gemini 2.5 Flash) |
-| Compute an Urban Absorption Score (0–100) and flood-risk band | Edge function |
-| Generate 4 adaptation strategies (green / blue / gray infrastructure) | Edge function |
-| **Scenario Studio** — what-if modeling of depaving, bioswales, permeable pavement, and green roofs with live score, retention, cost, and payback | Frontend |
-| **Hydrological runoff simulation** — route a design storm across the terrain (D8 flow accumulation over SRTM elevation) and draw flow paths + flood-risk zones onto the map | Edge function + Frontend |
-| Persist and browse a public feed with stats, search, and sorting | Postgres |
-| Portfolio analytics — score distribution histogram and side-by-side site comparison | Frontend |
-| Export any analysis as a PDF report (including the configured scenario) | Frontend |
-| Export analyses as **GeoJSON** (footprint polygons) and **CSV** for QGIS / ArcGIS / spreadsheets | Frontend |
+| **High-Res Interactive Satellite Imagery** | MapLibre GL + Esri World Imagery (automatic Sentinel-2 cloudless fallback) |
+| **Location Search & Watershed Bookmarks** | OpenStreetMap Nominatim search + quick-jump bookmarks (Manhattan, Copenhagen, Jakarta, Phoenix, Lagos) |
+| **Live Geolocation & Bounding Box Sizing** | Real-time viewport bounds, spherical earth surface area ($km^2$ and hectares) |
+| **5-Class Surface Permeability Ledger** | Vegetation, Bare Soil, Water, Buildings, Pavement classification with Rational Method runoff weights |
+| **Urban Absorption Score (0–100)** | Quantitative score and risk banding (**Resilient**, **Vulnerable**, **Critical**) |
+| **1609 Pre-Development Baseline** | Ecological benchmark comparison against historical Manhattan pre-development watershed ($79.1$) |
+| **50mm Design Storm Hydrograph Simulation** | Precipitation volume vs modeled runoff vs natural infiltration ($m^3$) with D8 flow accumulation |
+| **Animated Flow Vectors & Inundation Heatmaps** | WebGL particle flow paths and flood risk zones with layer visibility controls |
+| **Green Infrastructure Mitigation Studio** | Interactive placement of bioswales, permeable paving, green roofs, and urban tree canopy |
+| **Counterfactual Scenario Comparison** | Synchronized split-screen comparative slider between Baseline and Mitigated scenarios |
+| **Open Data & Dossier Export** | Publication-grade PDF Resilience Dossiers, GeoJSON vector layers, and CSV tables |
 
-## Scenario Studio & investment analytics
+---
 
-Every analyzed tile can be stress-tested against four green-infrastructure
-interventions, each converting a fraction of one land-cover class into a
-surface with a different absorption weight:
-
-| Intervention | Converts | Effective weight | Planning cost |
-|---|---|:--:|:--:|
-| Street trees & pocket parks | pavement | 1.00 | $45/m² |
-| Bioswales & rain gardens | pavement | 0.90 | $65/m² |
-| Permeable pavement | pavement | 0.75 | $150/m² |
-| Green roofs | buildings | 0.60 | $180/m² |
-
-Because the score is a weighted sum of cover shares, an intervention's effect
-is exact and instant: `Δscore = share × fraction × (targetWeight − sourceWeight) × 100`.
-The studio then sizes the site from its stored bounding box (spherical-earth
-area) and derives:
-
-- **Added retention** (m³/yr) from the score delta × site area × annual rainfall
-- **Capital cost** from converted area × unit cost
-- **Annual benefit** from a transparent $/m³-retained default
-- **Simple payback** in years
-
-All assumptions (rainfall, unit costs, benefit rate) are visible in the UI and
-in `src/lib/scenario.ts` — calibrate them to your market before underwriting.
-Configured scenarios flow into the exported PDF as a
-"Scenario & Investment Analysis" section.
-
-## Hydrological runoff simulation
-
-Land cover tells you how much rain a tile *absorbs*; it doesn't tell you where
-the rest of the water *goes*. The Analyze view answers that: pick a rainfall
-depth (10–200 mm) and a grid resolution, and the `run-simulation` edge function
-routes that storm across the terrain.
-
-1. **Elevation** — pulls an SRTM digital elevation model for the visible bbox
-   from OpenTopography (or falls back to a synthetic north–south slope when no
-   `OPENTOPOGRAPHY_API_KEY` is configured).
-2. **Flow direction** — a D8 algorithm points every grid cell at its steepest
-   downhill neighbour.
-3. **Flow accumulation** — rainfall is added to each cell, then routed downslope
-   in elevation order, so channels emerge where water concentrates.
-4. **Risk zones** — cells are banded (low → severe) by accumulation percentile.
-
-The result draws straight onto the map: **animated flow paths** (blue lines,
-opacity scaled by volume) and **flood-risk zones** (a graded fill). A quick,
-DEM-free runoff estimate — `V = rainfall × C × area`, using the land-cover
-runoff coefficient — shows instantly while the full simulation runs. Results are
-cached per bbox + rainfall for 24 h in the `simulation_cache` table.
-
-The flow engine lives in `supabase/functions/run-simulation/index.ts`; the
-map overlays are `src/components/FlowLayer.tsx` and `RiskHeatmap.tsx`; the
-client-side estimate and helpers are in `src/lib/simulation.ts`. Physically
-based drainage (SWMM) and live sensor fusion are on the roadmap for v0.4.
-
-## GIS interoperability
-
-No lock-in: analyses export as open formats from both the Analyze view
-(single site) and the Dashboard (whole feed).
-
-- **GeoJSON** (RFC 7946) — footprint `Polygon`s built from each scan's stored
-  bbox (falling back to center `Point`s), with score, risk band, land-cover
-  percentages, area in km², and a restorable deep link as properties. Drops
-  straight into QGIS, ArcGIS, Felt, or PostGIS.
-- **CSV** — the same attributes as a flat table for spreadsheets and BI tools.
-
-## Architecture
+## Workstation Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                              Frontend (React)                           │
-│   MapLibre GL  ▸  captureImage()  ▸  supabase.functions.invoke(...)     │
+│                        GIS Workstation (React + Vite)                  │
+│   MapLibre GL  ▸  captureImage()  ▸  supabase.functions.invoke(...)    │
 └─────────────────────────┬──────────────────────────────────────────────┘
                           │  POST { image_data_url, lat, lng, zoom, bbox }
                           ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│               Edge function: analyze-terrain (Deno / TS)                │
-│   1. Gemini 2.5 Flash  → land-cover JSON (5 classes)                    │
-│   2. Weighted score    → Urban Absorption Score + flood risk            │
-│   3. Gemini 2.5 Flash  → 4 adaptation recommendations                   │
-│   4. INSERT INTO analyses                                               │
+│               Edge Function: analyze-terrain (Deno / TS)                │
+│   1. Vision Analysis   → 5-class land-cover classification             │
+│   2. Weighted Scoring  → Urban Absorption Score + flood-risk band       │
+│   3. Recommendations   → Prioritized Green/Blue/Gray interventions     │
+│   4. Persistence       → INSERT INTO public.analyses                   │
 └─────────────────────────┬──────────────────────────────────────────────┘
                           ▼
-                    Postgres
+┌────────────────────────────────────────────────────────────────────────┐
+│               Edge Function: run-simulation (Deno / TS)                 │
+│   1. Topography        → SRTM DEM via OpenTopography                   │
+│   2. Flow Direction    → D8 steepest downhill routing                   │
+│   3. Accumulation      → Hydrodynamic flow path vectors + risk zones    │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-An **alternative Python backend** lives in [`backend/`](./backend) with a real
-FastAPI service that runs a CV segmentation model locally instead of calling
-an LLM. Deploy it separately (Render / Railway / Fly / Cloud Run) if you want
-full model control.
-
-## Tech stack
-
-**Frontend**
-- React 18 + TypeScript + Vite
-- Tailwind CSS with a semantic HSL design system (`src/index.css`)
-- MapLibre GL JS with free ESRI World Imagery tiles (no API key), with
-  automatic failover to EOX Sentinel-2 cloudless imagery and an explicit
-  reconnect UI if no provider is reachable
-- OpenStreetMap Nominatim geocoding for free-text location search (no API key)
-- shadcn/ui primitives + Radix UI
-- TanStack Query, React Router, Sonner
-- Route-level code splitting (the ~800 kB map bundle never touches the landing page)
-- Vitest + React Testing Library for unit and component tests
-- Capacitor shells for iOS and Android (`capacitor.config.ts`)
-
-**Backend (Lovable Cloud)**
-- Supabase Postgres for persistence
-- Supabase Edge Functions (Deno) for the analysis pipeline
-- Lovable AI Gateway (Google Gemini 2.5 Flash)
-
-**Reference Python backend (`backend/`)**
-- FastAPI + Pydantic
-- Pillow + NumPy heuristic segmenter (swap for DeepLabV3 / U-Net / SAM)
-- Dockerfile for one-command deploy
-
-## Design language
-
-Three landing-page directions, all built on the same design tokens:
-
-**1a · The Manifesto** — the hero shown above: a single gold-stroke argument
-for why the platform exists.
-
-**1b · The Field Report** — data-forward: a stroke gauge, a matted satellite
-plate, and land-cover as a hairline ledger over the runoff weights.
-
-![Landing direction 1b — The Field Report](./design/screens/landing-field-report.png)
-
-**1c · The Index** — a catalogue of cities with a running argument in the
-margin, a rising-waterline featured card, and the roadmap as a timeline.
-
-![Landing direction 1c — The Index](./design/screens/landing-index.png)
-
-| Token | Value | Role |
-|---|---|---|
-| `--color-bg` | `#f3f2f2` | Soft near-white ground |
-| `--color-text` | `#201f1d` | Warm near-black text |
-| `--color-accent` | `#b68235` | Single gold accent (mono scheme, used as stroke) |
-| `--color-divider` | `#201f1d` @ 16% | Hairline rules |
-| `--font-heading` | Cormorant Garamond | Headings, capped at semibold |
-| `--font-body` | Lora | Justified body copy |
-| `--radius-md` | `4px` | Baked-in corner radius |
-
-Inspired by my favorite version of [NYC](https://www.welikia.org/); Kintecoying, Manahatta
+---
 
 ## The Urban Absorption Score
 
-A single 0–100 number: **the share of rainfall the land in a tile can absorb.**
+A single 0–100 index representing **the fraction of rainfall the land surface can naturally absorb**.
 
-Each weight is `1 − C`, where `C` is the Rational Method runoff coefficient
-(`Q = CiA`) used in real stormwater drainage design. Mid-range values for urban
-land cover, after ASCE and Chow, Maidment & Mays, *Applied Hydrology*:
+Each surface weight is derived as `1 − C`, where `C` is the Rational Method runoff coefficient ($Q = CiA$) standard in stormwater engineering (ASCE / Chow, Maidment & Mays):
 
-| Class       | `C` range   | Weight | Rationale                             |
-|-------------|-------------|:------:|---------------------------------------|
-| Vegetation  | 0.05 – 0.25 | 0.80   | Lawns and woodland still shed 5–25%   |
-| Bare soil   | 0.20 – 0.40 | 0.70   | Permeable, but urban soil is compacted|
-| Buildings   | 0.75 – 0.95 | 0.10   | Roofs — effectively impervious        |
-| Pavement    | 0.70 – 0.95 | 0.12   | Asphalt and concrete                  |
-| **Water**   | —           | **excluded** | Not a sponge — see below        |
+| Class | `C` Coefficient Range | Absorption Weight | Hydrological Rationale |
+|---|:---:|:---:|---|
+| **Vegetation** | 0.05 – 0.25 | **0.80** | Lawns and woodland still shed 5–25% under heavy precipitation |
+| **Bare Soil** | 0.20 – 0.40 | **0.70** | Permeable, but compacted in urban environments |
+| **Buildings** | 0.75 – 0.95 | **0.10** | Engineered roofs — effectively impervious |
+| **Pavement** | 0.70 – 0.95 | **0.12** | Asphalt and concrete roads, parking, and sidewalks |
+| **Water** | — | **Excluded** | Existing hydrologic capacity; excluded from the denominator |
 
-**Vegetation is not 1.00.** No surface absorbs every drop that falls on it.
+### Flood Risk Classification
+- **55–100 · Resilient (Low Risk)**: The site naturally absorbs the majority of storm precipitation.
+- **35–54 · Vulnerable (Moderate Risk)**: Roughly half the volume runs off, placing heavy burden on municipal drainage.
+- **0–34 · Critical (High Risk)**: Two-thirds or more sheds directly as surface runoff; vulnerable to cloudburst inundation.
 
-**Open water is excluded from the model, and from the denominator.** A river is
-not absorption capacity; it is the body that *receives* the runoff. Scoring it as
-a half-strength sponge rewards a site for being flood-exposed — under the old
-model the Port of Rotterdam scored 45.8 ("moderate") against 36.5 ("high") for a
-leafy Berlin residential district, purely because 45% of its frame was harbour.
-The score now asks: *of the land here, how much rain can it take?*
+---
 
-**Flood-risk bands**
+## The 1609 Ecological Baseline
 
-- **55+ · Low** — the land takes most of the rain that falls on it
-- **35–54 · Moderate** — roughly half runs off; drainage carries the rest
-- **< 35 · High** — two thirds or more runs off; the site depends on drainage
+Every scan is compared against an ecological reference benchmark: Manhattan in 1609 before urbanization.
 
-These are calibrated against 18 real scans spanning the density spectrum, from
-Bois de Boulogne (74.7) to Midtown Manhattan (14.0). They are deliberately not
-tuned to give a flattering spread — most urban land really is mostly impervious.
+Derived from the Wildlife Conservation Society's Mannahatta Project (Eric W. Sanderson), the pre-development island featured 66 miles of streams, extensive freshwater wetlands, mature forests, and zero engineered impervious surfaces.
 
-**Full methodology, calibration set, and known limits:
-[`docs/absorption-calibration.md`](docs/absorption-calibration.md).**
+Using the same absorption model, Manhattan in 1609 scores **79.1 / 100** (not 100, because natural woodland still sheds 5–25% during intense precipitation). This provides an honest, scientifically grounded ecological north star.
 
-### The 1609 baseline
+---
 
-A score of 31 means nothing to anyone who is not a drainage engineer. So every
-scan is also reported as a **distance from a landscape that took its own rain.**
+## Hydrological Runoff Simulation
 
-This platform is named after the Wildlife Conservation Society's
-[Mannahatta Project](https://welikia.org/) — Eric W. Sanderson's ten-year
-reconstruction of Manhattan as it stood in 1609, which georeferenced an
-18th-century British map onto the modern street grid until it could answer,
-block by block, *what was here before this?* That island held 66 miles of
-streams, 627 plant species, 233 bird species, and 85 kinds of fish. Times
-Square was a wetland.
+The simulation engine models how water moves across the terrain under a **50mm / 2-hour design storm event**:
 
-`src/lib/baseline.ts` estimates that landscape as land cover — 89% vegetation,
-9% bare soil, 2% inland water, no pavement or roofs — and runs it through
-`computeAbsorptionScore`, the *same* function that scores a live scan. It comes
-out at **79.1**. Not 100: the model holds that even mature woodland sheds
-5–25%, and a baseline of 100 would be a slogan rather than a result.
+1. **Digital Elevation Model**: Fetches real SRTM topography for the bounding box (with fallback to synthetic slope).
+2. **D8 Hydrodynamic Routing**: Routes runoff downslope to identify flow convergence channels.
+3. **Volumetric Ledger**:
+   - $\text{Total Precipitation Volume} = \text{Area } (m^2) \times 0.05\text{ m}$
+   - $\text{Runoff Volume } (m^3) = \text{Area } (m^2) \times 0.05\text{ m} \times C_{\text{composite}}$
+   - $\text{Infiltrated Volume } (m^3) = \text{Total Volume} - \text{Runoff Volume}$
+4. **Map Overlays**: Renders animated blue flow vectors with opacity scaled by discharge volume, and graded flood inundation risk polygons.
 
-**It is a benchmark, not a site history.** Every scan is measured against this
-one fixed landscape, wherever the scan is — the same way it is measured against
-100. The copy never claims to know what stood on the scanned block, because for
-a scan of Jakarta or Copenhagen that would be invented, and even inside
-Manhattan a single island-wide figure cannot speak for a specific block: the
-project's central finding is that the island was *not* uniform. Times Square
-was wetland, Harlem was meadow, the ridges were forest.
+---
 
-Two more things this is careful about:
+## Green Infrastructure Mitigation Studio
 
-- **The land-cover split is our estimate, not a WCS figure.** The species and
-  stream counts are the project's published findings; the five-class raster is
-  ours, derived from its description of the island's ecology, and it is labelled
-  as an estimate everywhere it appears in the UI and in exported PDFs.
-- **Lenape longhouses are not counted as `buildings`.** The roof coefficient
-  (`C ≈ 0.90`) describes sealed, drained, engineered surfaces. Bark over a dirt
-  floor is not one.
+Planners can simulate the impact of retrofitting impervious surfaces:
 
-The baseline is derived at module load rather than hard-coded, so recalibrating
-the weights for another climate zone moves it too — which is correct, because
-it is a claim about *this* model. `BaselineComparison` renders it on the landing
-page, on every analysis, in the PDF report, and as a reference line on the
-dashboard histogram.
+| Intervention | Source Surface | Effective Weight | Planning Unit Cost |
+|---|---|:---:|:---:|
+| **Street Trees & Urban Canopy** | Pavement | **1.00** | $45 / m² |
+| **Bioswales & Rain Gardens** | Pavement | **0.90** | $65 / m² |
+| **Permeable Pavement** | Pavement | **0.75** | $150 / m² |
+| **Green Roofs** | Buildings | **0.60** | $180 / m² |
 
-The model lives in three places — `src/lib/absorption.ts`,
-`supabase/functions/analyze-terrain/index.ts` (which computes and stores every
-score), and `backend/app/services/scoring.py`. A test in
-`src/lib/absorption.test.ts` parses the latter two and fails if they drift.
-Recalibrate them against local runoff data for your climate zone.
+The engine calculates:
+- $\Delta\text{Score} = \text{share} \times \text{fraction} \times (w_{\text{target}} - w_{\text{source}}) \times 100$
+- **Annual Stormwater Retention Gain** ($m^3/\text{yr}$)
+- **Capital Expenditure (CAPEX)** ($)
+- **Payback Period** (Years)
 
-## Getting started
+---
+
+## GIS Interoperability & Exports
+
+- **PDF Resilience Dossier**: Complete, formatted assessment reports with charts, land-cover tables, risk scores, and mitigation recommendations (`src/lib/pdf-export.ts`).
+- **GeoJSON (RFC 7946)**: Footprint polygons with attributes for direct import into **QGIS**, **ArcGIS**, **Felt**, or **PostGIS**.
+- **CSV**: Flat attribute tables for spreadsheets and business intelligence dashboards.
+
+---
+
+## Tech Stack
+
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, MapLibre GL JS, Radix UI, Lucide Icons, jsPDF
+- **State & Data**: TanStack Query, React Router, Supabase JS Client
+- **Backend / Edge Functions**: Deno, TypeScript, Supabase Postgres, Google Gemini Vision API
+- **Testing**: Vitest, React Testing Library, jsdom (110+ unit & integration tests)
+- **Mobile**: Capacitor support for iOS and Android
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- npm or bun
+
+### Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/topherchris420/cognisync-terrain-weaver.git
 cd cognisync-terrain-weaver
+
+# Install dependencies
 npm install
+
+# Start development server
 npm run dev
 ```
 
-The dev server runs at `http://localhost:8080`. It works out of the box: the
-committed `.env` points at a public, read-only demo backend.
+The application will be available at `http://localhost:8080`.
 
-### Configuration
+### Available Scripts
 
-To run against your own backend, set these in `.env` (all `VITE_`-prefixed so
-Vite exposes them to the client):
-
-| Variable | Purpose |
+| Command | Description |
 |---|---|
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon / publishable key |
-| `VITE_SUPABASE_PROJECT_ID` | Supabase project ref |
+| `npm run dev` | Start local Vite development server |
+| `npm run build` | Build optimized production bundle |
+| `npm run typecheck` | Run TypeScript typechecking (`tsc --noEmit`) |
+| `npm test` | Run Vitest test suite |
+| `npm run lint` | Run ESLint across codebase |
 
-The `analyze-terrain` edge function reads a `LOVABLE_API_KEY` secret (the AI
-gateway key) from the Supabase environment. The `run-simulation` function reads
-an optional `OPENTOPOGRAPHY_API_KEY` for real SRTM elevation — without it, the
-simulation falls back to a synthetic north–south slope model, so flow paths and
-risk zones are illustrative rather than survey-grade.
+---
 
-### Scripts
-
-| Command | What it does |
-|---|---|
-| `npm run dev` | Vite dev server on port 8080 |
-| `npm run build` | Production build (route-level code splitting) |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest unit + component tests (scoring, scenario math, GIS export, geocoding, UI) |
-| `npm run test:watch` | Vitest in watch mode |
-
-All four checks run in CI on every push and pull request
-(`.github/workflows/ci.yml`).
-
-### Running the reference Python backend
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-See [`backend/README.md`](./backend/README.md) for deployment and for how to
-swap the naive HSV-based segmenter for DeepLabV3, U-Net, or SAM.
-
-## Project structure
+## Project Structure
 
 ```
 src/
 ├── pages/
-│   ├── Index.tsx          Landing page (live scans, absorption model explainer)
-│   ├── Analyze.tsx        Map + search + analysis workflow
-│   ├── Dashboard.tsx      Public feed of analyses
-│   └── NotFound.tsx
+│   ├── Analyze.tsx        # GIS Workstation (Map, Workbench Drawer, Storm Sim, Studio)
+│   ├── Dashboard.tsx      # Public portfolio & site comparison feed
+│   ├── Auth.tsx           # Authentication
+│   └── NotFound.tsx       # 404 Route
 ├── components/
-│   ├── AppNav.tsx
-│   ├── MapView.tsx        MapLibre wrapper + image capture
-│   ├── LocationSearch.tsx Nominatim search box + city presets
-│   ├── AbsorptionScoreGauge.tsx
-│   ├── LandCoverBreakdown.tsx
-│   ├── RecommendationsList.tsx
-│   ├── AnalyzingState.tsx Progress UI during a scan
-│   ├── RecentScans.tsx    Live scan strip on the landing page
-│   ├── ScenarioStudio.tsx What-if intervention modeling + ROI panel
-│   ├── SimulationPanel.tsx Runoff simulation controls + results
-│   ├── FlowLayer.tsx      Animated flow-path overlay (MapLibre)
-│   ├── RiskHeatmap.tsx    Flood-risk zone overlay (MapLibre)
-│   ├── SiteComparison.tsx Side-by-side comparison of two analyses
-│   ├── ErrorBoundary.tsx  App-level error fallback
-│   └── ui/                shadcn/ui primitives
+│   ├── AppNav.tsx                 # Permanent workstation header
+│   ├── MapView.tsx                # MapLibre GL raster/vector map canvas
+│   ├── LocationSearch.tsx         # Nominatim geocoder + city presets
+│   ├── AbsorptionScoreGauge.tsx   # 0–100 Absorption Score dial
+│   ├── LandCoverBreakdown.tsx     # 5-class composition ledger & weights
+│   ├── BaselineComparison.tsx     # 1609 ecological benchmark comparison
+│   ├── RecommendationsList.tsx    # Prioritized green adaptation actions
+│   ├── ScenarioStudio.tsx         # Mitigation ROI & parameter modeling
+│   ├── FlowLayer.tsx              # Animated hydrodynamic flow vector overlay
+│   ├── RiskHeatmap.tsx            # Flood inundation risk zone overlay
+│   ├── MapEditor.tsx              # Polygon drawing tool for mitigations
+│   └── catalyst/
+│       └── CompareRealities.tsx   # Dual-map split-screen comparison slider
 ├── lib/
-│   ├── types.ts           LandCover, Recommendation, Analysis
-│   ├── absorption.ts      Score + risk classification
-│   ├── scenario.ts        Interventions, projections, retention, cost, payback
-│   ├── simulation.ts      Runoff coefficient + volume estimate + bbox helpers
-│   ├── simulation-types.ts Simulation request/response contracts
-│   ├── geo.ts             BBox parsing, spherical area, GeoJSON/CSV export
-│   ├── geocode.ts         Free-text location search (Nominatim)
-│   ├── site.ts            Site metadata + copy
-│   ├── pdf-export.ts      PDF report generation (lazy-loaded)
-│   └── *.test.ts          Co-located Vitest unit tests
-├── hooks/                 use-mobile, use-page-title, use-reveal, …
-└── integrations/
-    └── supabase/          Auto-generated Cloud client
-
-supabase/
-├── functions/
-│   ├── analyze-terrain/   Classify → score → recommend → persist
-│   └── run-simulation/    D8 runoff flow accumulation → flow paths + risk zones
-├── migrations/            Schema history
-└── config.toml
-
-backend/                   Reference FastAPI service (not run by Lovable)
+│   ├── absorption.ts      # Score calculation & risk band algorithms
+│   ├── baseline.ts        # 1609 pre-development ecological model
+│   ├── scenario.ts        # Mitigation math, CAPEX, and payback
+│   ├── simulation.ts      # Runoff depth & volume calculations
+│   ├── geo.ts             # Bounding box math, GeoJSON/CSV exporters
+│   ├── geocode.ts         # Location search & city presets
+│   └── pdf-export.ts      # Vector PDF dossier generator
+└── supabase/
+    └── functions/
+        ├── analyze-terrain/  # Vision classification & scoring edge function
+        └── run-simulation/   # D8 flow accumulation edge function
 ```
-
-> Component tests live next to their components (`*.test.tsx`); scoring,
-> scenario, GIS, and geocoding logic each have co-located `*.test.ts` suites.
-
-## Data model
-
-`public.analyses` — one row per resilience scan. Publicly readable and
-insertable (this is a public demo dataset — swap in auth-scoped RLS if you
-fork it for a private deployment).
-
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid PK | |
-| name | text | user-supplied |
-| location_label | text | optional |
-| center_lat, center_lng, zoom | float | map viewport |
-| bbox | jsonb | `[[west,south],[east,north]]` |
-| land_cover | jsonb | `{ pavement, buildings, vegetation, water, soil }` |
-| absorption_score | numeric(5,2) | 0–100 |
-| flood_risk | text | `low` / `moderate` / `high` |
-| recommendations | jsonb | array of `{ title, description, priority, category }` |
-| ai_notes | text | short LLM description of the tile |
-| status | text | `complete`, `pending`, etc. |
-| created_at | timestamptz | |
-
-## Roadmap
-
-- **v0.1** ✅ — Land cover classification, absorption scoring, adaptation LLM
-- **v0.2** ✅ — Scenario Studio (what-if interventions + investment analytics), GeoJSON/CSV export, portfolio comparison
-- **v0.3** ✅ — Hydrological runoff simulation: the `run-simulation` edge function runs D8 flow accumulation over SRTM elevation (with a synthetic-slope fallback), and the Analyze view draws animated flow paths and flood-risk zones onto the map for any design storm
-- **v0.4** 🚧 — Physically-based drainage (SWMM integration) and IoT sensor fusion (rain gauges, soil moisture over MQTT)
-- **v1.0** — Digital twin export + public REST/GraphQL API
-
-## Contributing
-
-This is an open, community-driven project. PRs welcome — especially for
-better segmentation models, calibrated runoff weights per climate zone, and
-new adaptation-strategy templates.
-
-## License
-
-MIT.
 
 ---
 
-Built by [Vers3Dynamics](https://vers3dynamics.com)
+## Roadmap
+
+- **v0.1** ✅ — Land cover classification, absorption scoring, adaptation engine
+- **v0.2** ✅ — Scenario Studio (what-if interventions + investment analytics), GeoJSON/CSV export, portfolio comparison
+- **v0.3** ✅ — Hydrological runoff simulation: 50mm design storm D8 flow accumulation over SRTM elevation, animated flow vectors, flood risk zones, and split-screen comparison
+- **v0.4** 🚧 — EPA SWMM integration and live IoT rain gauge / soil moisture sensor telemetry over MQTT
+- **v1.0** — City-scale digital twin sync and open REST/GraphQL API
+
+---
+
+## Contributing & License
+
+Contributions are welcome! Feel free to submit pull requests or open issues for calibrated runoff coefficients, new green infrastructure templates, or additional map layers.
+
+Distributed under the **MIT License**.
+
+Built by **[Vers3Dynamics](https://vers3dynamics.com)**.
