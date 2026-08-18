@@ -82,9 +82,10 @@ export function CatalystUnlock({
         <span
           aria-hidden="true"
           className={cn(
-            "inline-flex tabular-nums transition-[gap,letter-spacing] duration-[1900ms]",
+            "inline-flex tabular-nums transition-[gap,letter-spacing]",
             !reducedMotion && (holding || isUnlocked) ? "gap-1.5" : "gap-0"
           )}
+          style={{ transitionDuration: "1900ms" }}
         >
           {digits.map((digit, index) => (
             <span key={`${digit}-${index}`}>{digit}</span>

@@ -8,26 +8,62 @@ import { LocationSearch } from "@/components/LocationSearch";
 import { AnalyzingState } from "@/components/AnalyzingState";
 import { FlowLayer } from "@/components/FlowLayer";
 import { RiskHeatmap } from "@/components/RiskHeatmap";
+import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
+import { BaselineComparison } from "@/components/BaselineComparison";
+import { RecommendationsList } from "@/components/RecommendationsList";
+import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
 import type { FutureState } from "@/lib/catalyst";
-import type { Scenario, InterventionKey } from "@/lib/scenario";
+import type { Scenario, InterventionKey, ScenarioExport } from "@/lib/scenario";
 import { EMPTY_SCENARIO } from "@/lib/scenario";
 import { MapEditor } from "@/components/MapEditor";
 import { riskLabel } from "@/lib/absorption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Play, Sparkles, Droplets, Paintbrush, Link2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Loader2,
+  Play,
+  Droplets,
+  Paintbrush,
+  Link2,
+  MapPin,
+  FileText,
+  FileSpreadsheet,
+  FileJson,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  RotateCcw,
+  ArrowRight,
+  Sliders,
+  BarChart3,
+  Waves,
+  ShieldCheck,
+  Compass,
+} from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useWorkflow } from "@/hooks/useWorkflow";
 import { supabase } from "@/integrations/supabase/client";
 import type { Map as MLMap } from "maplibre-gl";
 import type { AnalysisRecord } from "@/lib/types";
-import type { GeocodeResult } from "@/lib/geocode";
+import { PRESETS, type GeocodeResult } from "@/lib/geocode";
 import type { SimulationResponse } from "@/lib/simulation-types";
-import { bboxAreaKm2, parseBBox, type BBox } from "@/lib/geo";
-import { boundsToSimBBox, MAX_SIMULATION_AREA_KM2 } from "@/lib/simulation";
+import {
+  bboxAreaKm2,
+  parseBBox,
+  analysesToCSV,
+  analysesToGeoJSON,
+  downloadTextFile,
+  exportFilename,
+  type BBox,
+} from "@/lib/geo";
+import { boundsToSimBBox } from "@/lib/simulation";
+import { generatePDFReport } from "@/lib/pdf-export";
 import { toast } from "sonner";
 
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
@@ -39,7 +75,6 @@ import {
   type StormSeal,
   type DeterminismReport,
 } from "@/lib/storm-identity";
-import { StormSealReadout } from "@/components/studio/StormSealReadout";
 
 const STORM_RAINFALL_MM = 50;
 const STORM_RESOLUTION = "low" as const;
@@ -110,8 +145,8 @@ export default function Analyze() {
     []
   );
 
-  const [name, setName] = useState("Untitled site");
-  const [locationLabel, setLocationLabel] = useState("");
+  const [name, setName] = useState("Lower Manhattan Watershed");
+  const [locationLabel, setLocationLabel] = useState("Manhattan, NY");
   const [view, setView] = useState(initialView);
   const [mapReady, setMapReady] = useState(false);
   const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
@@ -120,10 +155,19 @@ export default function Analyze() {
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
   const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
+  const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(null);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
   const [futureSimResult, setFutureSimResult] = useState<SimulationResponse | null>(null);
   const [nowSeal, setNowSeal] = useState<StormSeal | null>(null);
   const [possibleSeal, setPossibleSeal] = useState<StormSeal | null>(null);
+
+  // Layer visibility toggles
+  const [showFlowVectors, setShowFlowVectors] = useState(true);
+  const [showRiskHeatmap, setShowRiskHeatmap] = useState(true);
+
+  // Workbench drawer state
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<"overview" | "simulation" | "mitigation" | "compare" | "export">("overview");
 
   const determinism: DeterminismReport | null = useMemo(
     () => (nowSeal && possibleSeal ? checkStormDeterminism(nowSeal, possibleSeal) : null),
@@ -141,6 +185,16 @@ export default function Analyze() {
     () => (result ? parseBBox(result.bbox) : null),
     [result]
   );
+
+  const currentAreaKm2 = useMemo(() => {
+    if (result) {
+      const parsed = parseBBox(result.bbox);
+      if (parsed) return bboxAreaKm2(parsed);
+    }
+    const bounds = mapRef.current?.getBounds();
+    if (bounds) return bboxAreaKm2(bounds);
+    return 0.85;
+  }, [result, view]);
 
   const onViewChange = useCallback(
     (v: { lat: number; lng: number; zoom: number }) => {
@@ -164,15 +218,16 @@ export default function Analyze() {
     url.searchParams.set("zoom", view.zoom.toFixed(1));
     try {
       await navigator.clipboard.writeText(url.toString());
-      toast.success("Link copied");
+      toast.success("Location link copied to clipboard");
     } catch {
-      toast.error("Couldn't access the clipboard.");
+      toast.error("Couldn't access clipboard.");
     }
   };
 
   const goTo = (r: GeocodeResult & { zoom?: number }) => {
     mapRef.current?.flyTo(r.lat, r.lng, r.zoom ?? 14);
     setLocationLabel(r.label);
+    setName(r.label.split(",")[0] || "Custom Watershed");
   };
 
   const resetScan = () => {
@@ -183,24 +238,21 @@ export default function Analyze() {
     setCatalystFuture(null);
     setNowSeal(null);
     setPossibleSeal(null);
+    setActiveIntervention(null);
+    setScenario(EMPTY_SCENARIO);
     workflow.reset();
   };
 
   const runAnalysis = async () => {
     if (workflow.state === "ANALYZING" || !mapReady) return;
     workflow.advance("ANALYZING");
-    setResult(null);
-    setCapturedTile(null);
-    setSimResult(null);
-    setFutureSimResult(null);
-    setCatalystFuture(null);
-    setNowSeal(null);
-    setPossibleSeal(null);
+    setDrawerOpen(true);
+    setActiveTab("overview");
 
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
       if (!imageDataUrl) {
-        toast.error("Couldn't capture the map view. Try zooming or panning first.");
+        toast.error("Couldn't capture map imagery. Try zooming or panning.");
         workflow.advance("SEARCH");
         return;
       }
@@ -209,7 +261,7 @@ export default function Analyze() {
 
       const { data, error } = await supabase.functions.invoke("analyze-terrain", {
         body: {
-          name: name.trim() || "Untitled site",
+          name: name.trim() || "Analyzed Site",
           location_label: locationLabel.trim() || null,
           center_lat: view.lat,
           center_lng: view.lng,
@@ -221,7 +273,7 @@ export default function Analyze() {
 
       if (error) {
         console.error("analyze-terrain failed:", error);
-        toast.error("Analysis failed — see console for details.");
+        toast.error("Analysis service temporarily unavailable.");
         workflow.advance("SEARCH");
         return;
       }
@@ -229,9 +281,10 @@ export default function Analyze() {
       const analysis = (data as { analysis: AnalysisRecord }).analysis;
       setResult(analysis);
       workflow.advance("ANALYZED");
+      toast.success("Surface permeability analysis complete.");
     } catch (e) {
       console.error(e);
-      toast.error("Unexpected error running analysis.");
+      toast.error("Unexpected error during analysis.");
       workflow.advance("SEARCH");
     }
   };
@@ -243,14 +296,12 @@ export default function Analyze() {
 
     const bounds = mapRef.current?.getBounds() as BBox | null;
     if (!bounds) {
-      toast.error("Map isn't ready yet.");
+      toast.error("Map is initializing.");
       workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
       return;
     }
 
     try {
-      // One immutable storm definition drives every run; the rerun reuses the
-      // sealed NOW storm rather than building a fresh one.
       const stormDefinition =
         nowSeal?.storm ?? buildStormDefinition(STORM_RAINFALL_MM, STORM_RESOLUTION);
       const seal = createStormSeal(stormDefinition);
@@ -261,7 +312,6 @@ export default function Analyze() {
         setPossibleSeal(null);
       }
 
-      // Simulate base (current) terrain
       const promises = [
         supabase.functions.invoke("run-simulation", {
           body: {
@@ -273,27 +323,22 @@ export default function Analyze() {
         })
       ];
 
-      // Simulate future terrain if we are in rerun mode
       if (isRerun && result) {
-         const areaM2 = bboxAreaKm2(parseBBox(result.bbox)!) * 1e6;
-         // Generate Catalyst future internally based on our interventions (scenario)
-         // In real backend this would use the scenario, but we just use solveForTarget to mimic it
-         const solved = solveForTarget(result.land_cover, DEFAULT_TARGET_SCORE, areaM2, 500000);
-         
-         const newFuture = {
-           scenario: scenario,
-           future: projectFuture(result.land_cover, scenario, areaM2)
-         };
-         setCatalystFuture(newFuture);
+        const areaM2 = bboxAreaKm2(parseBBox(result.bbox)!) * 1e6;
+        const newFuture = {
+          scenario: scenario,
+          future: projectFuture(result.land_cover, scenario, areaM2)
+        };
+        setCatalystFuture(newFuture);
 
-         promises.push(supabase.functions.invoke("run-simulation", {
-            body: {
-              bbox: boundsToSimBBox(bounds),
-              rainfall_mm: stormDefinition.rainfallDepthMm,
-              resolution: stormDefinition.resolution,
-              include_drainage: stormDefinition.includeDrainage,
-            },
-         }));
+        promises.push(supabase.functions.invoke("run-simulation", {
+          body: {
+            bbox: boundsToSimBBox(bounds),
+            rainfall_mm: stormDefinition.rainfallDepthMm,
+            resolution: stormDefinition.resolution,
+            include_drainage: stormDefinition.includeDrainage,
+          },
+        }));
       }
 
       const results = await Promise.all(promises);
@@ -301,45 +346,74 @@ export default function Analyze() {
 
       if (error) {
         console.error("run-simulation failed:", error);
-        toast.error("Simulation failed.");
+        toast.error("Hydrologic simulation failed.");
         workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
         return;
       }
 
       const sim = data as SimulationResponse;
       setSimResult(sim);
+      setActiveTab("simulation");
       
       if (results.length > 1 && !results[1].error) {
-         setFutureSimResult(results[1].data as SimulationResponse);
-         workflow.advance("COMPARE");
+        setFutureSimResult(results[1].data as SimulationResponse);
+        workflow.advance("COMPARE");
+        setActiveTab("compare");
+        toast.success("Counterfactual simulation complete.");
       } else {
-         workflow.advance("STORM_COMPLETE");
+        workflow.advance("STORM_COMPLETE");
+        toast.success("50mm Design Storm modeled.");
       }
     } catch (e) {
       console.error(e);
-      toast.error("Unexpected error running the simulation.");
+      toast.error("Error executing hydrodynamic simulation.");
       workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
     }
   };
 
-  useEffect(() => {
-    if (workflow.state === "INTRO") {
-      const timer = setTimeout(() => {
-        workflow.advance("SEARCH");
-      }, 3500);
-      return () => clearTimeout(timer);
+  const handleExportPDF = () => {
+    if (!result) return;
+    try {
+      const doc = generatePDFReport(result, {
+        includeMapImage: Boolean(capturedTile),
+        scenario: scenarioExport ?? undefined,
+      });
+      doc.save(exportFilename(`${name || "resilience-report"}`, "pdf"));
+      toast.success("PDF Resilience Dossier generated.");
+    } catch (e) {
+      console.error(e);
+      toast.error("Error generating PDF dossier.");
     }
-  }, [workflow]);
+  };
+
+  const handleExportGeoJSON = () => {
+    if (!result) return;
+    downloadTextFile(
+      exportFilename(name || "mannahatta-site", "geojson"),
+      JSON.stringify(analysesToGeoJSON([result]), null, 2),
+      "application/geo+json"
+    );
+    toast.success("GeoJSON boundary exported.");
+  };
+
+  const handleExportCSV = () => {
+    if (!result) return;
+    downloadTextFile(
+      exportFilename(name || "mannahatta-site", "csv"),
+      analysesToCSV([result]),
+      "text/csv"
+    );
+    toast.success("CSV attribute table exported.");
+  };
 
   return (
-    <div className="flex min-h-screen flex-col overflow-hidden">
-      {/* Remove AppNav in storm/compare modes for maximum map focus */}
-      {workflow.state !== "STORM" && workflow.state !== "RERUN_STORM" && workflow.state !== "COMPARE" && workflow.state !== "INTRO" && (
-         <AppNav />
-      )}
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground">
+      {/* 1. Permanent Professional Workstation Topbar */}
+      <AppNav />
 
-      <main className="relative flex-1 min-h-0 w-full h-full">
-        {/* Map occupies full screen */}
+      {/* 2. Main GIS Viewport Area */}
+      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+        {/* Full-bleed Map Canvas */}
         <div className="absolute inset-0 w-full h-full">
           <MapView
             ref={mapRef}
@@ -352,15 +426,15 @@ export default function Analyze() {
             onViewChange={onViewChange}
           />
 
-          {/* Overlays */}
-          {(workflow.state === "STORM_COMPLETE" || workflow.state === "REDESIGN" || workflow.state === "COMPARE") && (
-            <>
-              <RiskHeatmap map={mapInstance} riskZones={simResult?.risk_zones ?? []} />
-              <FlowLayer map={mapInstance} flowPaths={simResult?.flow_paths ?? []} />
-            </>
+          {/* Hydrologic Inundation and Flow Vector Layers */}
+          {simResult && showRiskHeatmap && (
+            <RiskHeatmap map={mapInstance} riskZones={simResult.risk_zones ?? []} />
+          )}
+          {simResult && showFlowVectors && (
+            <FlowLayer map={mapInstance} flowPaths={simResult.flow_paths ?? []} />
           )}
 
-          {/* Redesign tools painted directly on the map */}
+          {/* Interactive Direct Map Editor for Mitigations */}
           {workflow.state === "REDESIGN" && result && (
             <MapEditor
               map={mapInstance}
@@ -371,10 +445,10 @@ export default function Analyze() {
             />
           )}
 
-          {/* Synchronized full-screen Comparison */}
-          {catalystFuture && (
+          {/* Split-Screen Comparative Mode */}
+          {catalystFuture && workflow.state === "COMPARE" && (
             <CompareRealities
-              open={workflow.state === "COMPARE"}
+              open={true}
               onClose={() => workflow.advance("REDESIGN")}
               baseMap={mapInstance}
               currentScore={catalystFuture.future.impact.baseScore}
@@ -385,225 +459,505 @@ export default function Analyze() {
               baseSimResult={simResult}
             />
           )}
-
-          {/* Floating Location Share Chip */}
-          {nowSeal && (
-            <StormSealReadout
-              seal={nowSeal}
-              rerunSeal={possibleSeal}
-              report={determinism}
-              className="absolute top-24 right-6 z-20 w-[320px] max-w-[90vw]"
-            />
-          )}
-
-          {workflow.state !== "STORM" && workflow.state !== "RERUN_STORM" && workflow.state !== "COMPARE" && (
-            <div className="absolute bottom-6 right-6 flex items-center gap-1.5 z-10">
-              <button
-                onClick={copyShareLink}
-                className="rounded-full border border-border/40 bg-background/60 backdrop-blur-md p-2 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors shadow-lg"
-              >
-                <Link2 className="h-4 w-4" />
-              </button>
-              <div className="pointer-events-none rounded-full border border-border/40 bg-background/60 backdrop-blur-md px-4 py-2 font-mono text-xs text-muted-foreground shadow-lg">
-                {view.lat.toFixed(4)}, {view.lng.toFixed(4)} · z{view.zoom.toFixed(1)}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* --- CONTEXTUAL HUDS --- */}
-
-        {/* 0. INTRO HUD */}
-        {workflow.state === "INTRO" && (
-          <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-end pb-32">
-            <div className="cinematic-glow bg-background/80 backdrop-blur-xl border border-border/50 px-10 py-5 rounded-full shadow-2xl reveal is-visible transition-all">
-               <p className="catalyst-serif text-xl font-medium text-gradient text-center">
-                 This is Mannahatta. A spatial counterfactual engine.
-               </p>
-            </div>
-            <Button variant="ghost" className="mt-4 pointer-events-auto text-muted-foreground hover:text-foreground" onClick={() => workflow.advance("SEARCH")}>
-              Skip Intro
-            </Button>
+        {/* 3. Top Floating Location Toolbar & Presets Bar */}
+        <div className="absolute top-4 left-4 right-4 md:left-6 md:right-auto z-30 flex flex-col md:flex-row items-stretch md:items-center gap-2 max-w-2xl">
+          <div className="w-full md:w-80 shadow-lg rounded-lg bg-card/95 backdrop-blur-md border border-border">
+            <LocationSearch onSelect={goTo} />
           </div>
-        )}
 
-        {/* 1. SEARCH HUD */}
-        {workflow.state === "SEARCH" && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] max-w-[90vw] z-10 transition-all duration-700 ease-in-out">
-            <div className="bg-background/90 backdrop-blur-2xl border border-border rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-               <h1 className="text-4xl font-bold tracking-tight mb-2 catalyst-serif text-gradient relative z-10 text-center">Mannahatta</h1>
-               <p className="text-sm text-center text-muted-foreground leading-relaxed relative z-10 mb-8">
-                 A spatial counterfactual engine. Where do you want to explore?
-               </p>
-               
-               <form
-                  className="space-y-4 relative z-10"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    runAnalysis();
-                  }}
-                >
-                  <div className="space-y-1.5">
-                    <LocationSearch onSelect={goTo} />
+          {/* Quick Watershed Jump Bookmarks */}
+          <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto p-1 rounded-lg bg-card/90 backdrop-blur-md border border-border shadow-md">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 flex items-center gap-1">
+              <Compass className="h-3 w-3" /> Bookmarks:
+            </span>
+            {PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => goTo(p)}
+                className="px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors whitespace-nowrap"
+              >
+                {p.label.split(",")[0]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 4. Live Bottom-Right GPS Status Readout */}
+        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+          <button
+            onClick={copyShareLink}
+            title="Copy coordinate link"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-md"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+          <div className="rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 font-mono text-xs text-muted-foreground shadow-md">
+            {view.lat.toFixed(4)}°N, {view.lng.toFixed(4)}°W · z{view.zoom.toFixed(1)}
+          </div>
+        </div>
+
+        {/* 5. Analysis Execution Floating Card (When no result is yet computed) */}
+        {!result && workflow.state !== "ANALYZING" && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-full max-w-md px-4">
+            <div className="panel rounded-xl border border-border p-5 shadow-2xl backdrop-blur-md">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary border border-primary/30">
+                    <Layers className="h-4 w-4" />
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5 hidden">
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Site name" />
-                     </div>
+                  <div>
+                    <h2 className="text-sm font-semibold">{locationLabel || "Target Region"}</h2>
+                    <p className="text-xs text-muted-foreground">Area: {currentAreaKm2.toFixed(2)} km²</p>
                   </div>
-
-                  <Button
-                    type="submit"
-                    disabled={!mapReady}
-                    size="lg"
-                    className="w-full glow-primary rounded-xl h-12 text-md mt-4"
-                  >
-                    {!mapReady ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading imagery…</>
-                    ) : (
-                      <><Sparkles className="mr-2 h-5 w-5" /> Analyze Terrain</>
-                    )}
-                  </Button>
-               </form>
-            </div>
-          </div>
-        )}
-
-        {/* 2. ANALYZING STATE */}
-        {workflow.state === "ANALYZING" && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] z-10 bg-background/90 backdrop-blur-xl border border-border rounded-2xl p-6 shadow-2xl">
-            <AnalyzingState tile={capturedTile} />
-          </div>
-        )}
-
-        {/* 3. ANALYZED HUD */}
-        {workflow.state === "ANALYZED" && result && (
-           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 sm:left-12 sm:translate-x-0 w-[380px] max-w-[90vw] z-10">
-              <div className="bg-background/90 backdrop-blur-2xl border border-border/60 rounded-3xl p-6 shadow-2xl reveal is-visible">
-                 <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h2 className="text-xl font-bold">{result.location_label || "Selected Region"}</h2>
-                      <p className="text-xs text-muted-foreground mt-1">Area Scanned: {bboxAreaKm2(parseBBox(result.bbox)!).toFixed(2)} km²</p>
-                    </div>
-                    <button onClick={resetScan} className="text-xs text-muted-foreground hover:text-foreground underline">Reset</button>
-                 </div>
-                 
-                 <div className="py-2">
-                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Absorption Capacity</h3>
-                   <AbsorptionScoreGauge score={Number(result.absorption_score)} />
-                 </div>
-
-                 <Button
-                    onClick={() => runSimulation(false)}
-                    size="lg"
-                    className="w-full glow-primary rounded-xl h-12 text-md mt-6"
-                  >
-                    <Droplets className="mr-2 h-5 w-5" /> Run 50mm Storm
-                  </Button>
-              </div>
-           </div>
-        )}
-
-        {/* 4. STORM / RERUN_STORM (Cinematic Minimal UI) */}
-        {(workflow.state === "STORM" || workflow.state === "RERUN_STORM") && (
-           <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-end pb-24">
-             <div className="cinematic-glow bg-background/80 backdrop-blur-xl border border-border/50 px-10 py-5 rounded-full shadow-2xl reveal is-visible transition-all">
-                <div className="flex items-center gap-3">
-                   <Loader2 className="h-5 w-5 animate-spin text-catalyst" />
-                   <p className="catalyst-serif text-xl font-medium text-gradient text-center">
-                     {workflow.state === "STORM" ? "Simulating a 50mm design storm on current terrain..." : "Simulating storm on modified terrain..."}
-                   </p>
                 </div>
-             </div>
-           </div>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                  Ready to Scan
+                </span>
+              </div>
+
+              <Button
+                onClick={runAnalysis}
+                disabled={!mapReady}
+                className="w-full rounded-lg h-11 text-sm font-medium"
+              >
+                {!mapReady ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Initializing satellite imagery…</>
+                ) : (
+                  <><Droplets className="mr-2 h-4 w-4 text-accent" /> Scan Surface Permeability</>
+                )}
+              </Button>
+            </div>
+          </div>
         )}
 
-        {/* 5. STORM_COMPLETE HUD */}
-        {workflow.state === "STORM_COMPLETE" && simResult && (
-           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 sm:left-12 sm:translate-x-0 w-[380px] max-w-[90vw] z-10">
-              <div className="bg-background/90 backdrop-blur-2xl border border-border/60 rounded-3xl p-6 shadow-2xl reveal is-visible">
-                 <h2 className="text-xl font-bold mb-1">Vulnerability Mapped</h2>
-                 <p className="text-sm text-muted-foreground mb-6">
-                    {simResult.risk_zones.length} high-risk zones detected.
-                 </p>
-                 
-                 <div className="bg-muted/30 rounded-xl p-4 mb-6 border border-border/40">
-                    <div className="flex justify-between items-center mb-2">
-                       <span className="text-xs uppercase tracking-wider text-muted-foreground">Est. Runoff</span>
-                       <span className="font-mono text-lg font-semibold">{Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³</span>
+        {/* 6. Active Scanning Progress Modal */}
+        {workflow.state === "ANALYZING" && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[400px] max-w-[90vw]">
+            <div className="panel rounded-xl border border-border p-6 shadow-2xl">
+              <AnalyzingState tile={capturedTile} />
+            </div>
+          </div>
+        )}
+
+        {/* 7. Active Simulation Banner */}
+        {(workflow.state === "STORM" || workflow.state === "RERUN_STORM") && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40">
+            <div className="panel rounded-full border border-primary/40 bg-card/95 px-6 py-3 shadow-2xl backdrop-blur-md flex items-center gap-3">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                {workflow.state === "STORM" ? "Simulating 50mm / 2-hr design storm hydrograph…" : "Simulating mitigated watershed response…"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 8. Docked Collapsible Workbench Drawer (When Analysis Results Exist) */}
+        {result && (
+          <aside
+            aria-label="Urban Resilience Workbench"
+            className={cn(
+              "absolute top-0 bottom-0 left-0 z-30 w-full sm:w-[460px] md:w-[480px] border-r border-border bg-card/95 backdrop-blur-xl shadow-2xl flex flex-col transition-transform duration-300 ease-in-out",
+              drawerOpen ? "translate-x-0" : "-translate-x-full"
+            )}
+          >
+            {/* Workbench Drawer Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/40 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/15 text-primary border border-primary/30">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold truncate leading-tight">
+                    {result.location_label || result.name}
+                  </h2>
+                  <p className="text-[11px] font-mono text-muted-foreground truncate">
+                    {bboxAreaKm2(parseBBox(result.bbox)!).toFixed(2)} km² · {Math.round(bboxAreaKm2(parseBBox(result.bbox)!) * 100)} ha
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetScan}
+                  className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
+                  title="Reset and clear analysis"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setDrawerOpen(false)}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  title="Collapse sidebar"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Workbench Navigation Tabs */}
+            <div className="border-b border-border bg-card px-2 shrink-0">
+              <Tabs
+                value={activeTab}
+                onValueChange={(val) => setActiveTab(val as typeof activeTab)}
+                className="w-full"
+              >
+                <TabsList className="grid grid-cols-5 h-9 bg-transparent p-0">
+                  <TabsTrigger
+                    value="overview"
+                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  >
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="simulation"
+                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  >
+                    Storm Sim
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="mitigation"
+                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  >
+                    Mitigation
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="compare"
+                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  >
+                    Compare
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="export"
+                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  >
+                    Export
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {/* Tab Contents Scroll Area */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              {/* TAB 1: OVERVIEW & LAND COVER */}
+              {activeTab === "overview" && (
+                <div className="space-y-6">
+                  {/* Absorption Score Gauge */}
+                  <div className="panel rounded-xl border border-border p-4">
+                    <AbsorptionScoreGauge score={Number(result.absorption_score)} />
+                  </div>
+
+                  {/* 5-Class Land Cover Composition Breakdown */}
+                  <div className="panel rounded-xl border border-border p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+                      Land-Cover Classification & Hydrologic Weights
+                    </h3>
+                    <LandCoverBreakdown cover={result.land_cover} />
+                  </div>
+
+                  {/* Pre-development Baseline Comparison */}
+                  <BaselineComparison score={Number(result.absorption_score)} />
+
+                  {/* Prioritized Climate Adaptation Recommendations */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Prioritized Interventions
+                    </h3>
+                    <RecommendationsList items={result.recommendations ?? []} />
+                  </div>
+
+                  {/* Quick Action to Trigger Simulation */}
+                  <Button
+                    onClick={() => {
+                      setActiveTab("simulation");
+                      runSimulation(false);
+                    }}
+                    className="w-full rounded-lg h-11 text-sm font-medium gap-2"
+                  >
+                    <Droplets className="h-4 w-4" /> Run 50mm Storm Simulation
+                  </Button>
+                </div>
+              )}
+
+              {/* TAB 2: STORMWATER RUNOFF SIMULATION */}
+              {activeTab === "simulation" && (
+                <div className="space-y-6">
+                  <div className="panel rounded-xl border border-border p-4 space-y-4">
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Design Storm Hydrograph
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        50 mm depth · 60-minute duration · Uniform spatial distribution
+                      </p>
                     </div>
-                 </div>
 
-                 <Button
-                    onClick={() => workflow.advance("REDESIGN")}
-                    size="lg"
-                    className="w-full bg-catalyst hover:bg-catalyst/90 text-catalyst-foreground rounded-xl h-12 text-md shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all hover:shadow-[0_0_30px_rgba(45,212,191,0.5)]"
-                  >
-                    <Paintbrush className="mr-2 h-5 w-5" /> Enter Redesign Mode
-                  </Button>
-              </div>
-           </div>
+                    {!simResult ? (
+                      <Button
+                        onClick={() => runSimulation(false)}
+                        disabled={workflow.state === "STORM"}
+                        className="w-full rounded-lg h-11 text-sm font-medium gap-2"
+                      >
+                        <Play className="h-4 w-4" /> Execute Simulation
+                      </Button>
+                    ) : (
+                      <div className="space-y-4 pt-2">
+                        {/* Simulation Metrics Grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-border bg-background/50 p-3">
+                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Est. Runoff Volume
+                            </span>
+                            <div className="mt-1 font-mono text-xl font-bold">
+                              {Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-border bg-background/50 p-3">
+                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Infiltrated Volume
+                            </span>
+                            <div className="mt-1 font-mono text-xl font-bold text-primary">
+                              {Math.round((currentAreaKm2 * 1e6 * 0.05) - (simResult.metadata.runoff_volume_m3 ?? 0)).toLocaleString()} m³
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-border bg-background/50 p-3">
+                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Risk Inundation Zones
+                            </span>
+                            <div className="mt-1 font-mono text-xl font-bold text-warning">
+                              {simResult.risk_zones.length} zones
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-border bg-background/50 p-3">
+                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Flow Path Vectors
+                            </span>
+                            <div className="mt-1 font-mono text-xl font-bold text-accent">
+                              {simResult.flow_paths.length} vectors
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Layer Visibility Controls */}
+                        <div className="border-t border-border/60 pt-3 space-y-2">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Map Visualization Layers
+                          </span>
+                          <div className="flex items-center justify-between text-xs py-1">
+                            <span className="text-foreground">Inundation Risk Heatmap</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowRiskHeatmap(!showRiskHeatmap)}
+                              className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                            >
+                              {showRiskHeatmap ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4" />}
+                              <span>{showRiskHeatmap ? "Visible" : "Hidden"}</span>
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between text-xs py-1">
+                            <span className="text-foreground">Flow Vectors (Animated)</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowFlowVectors(!showFlowVectors)}
+                              className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                            >
+                              {showFlowVectors ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4" />}
+                              <span>{showFlowVectors ? "Visible" : "Hidden"}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => {
+                            workflow.advance("REDESIGN");
+                            setActiveTab("mitigation");
+                          }}
+                          className="w-full rounded-lg h-10 text-xs font-medium gap-2"
+                        >
+                          <Paintbrush className="h-4 w-4" /> Open Mitigation Studio
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: GREEN INFRASTRUCTURE MITIGATION STUDIO */}
+              {activeTab === "mitigation" && (
+                <div className="space-y-6">
+                  <div className="panel rounded-xl border border-border p-4 space-y-4">
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Green Infrastructure Design
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select interventions to model permeable retrofits and calculate runoff reduction.
+                      </p>
+                    </div>
+
+                    <ScenarioStudio
+                      cover={result.land_cover}
+                      bbox={result.bbox}
+                      scenario={scenario}
+                      activeIntervention={activeIntervention}
+                      onInterventionSelect={(key) => {
+                        setActiveIntervention(activeIntervention === key ? null : key);
+                        if (workflow.state !== "REDESIGN") {
+                          workflow.advance("REDESIGN");
+                        }
+                      }}
+                      onScenarioExport={setScenarioExport}
+                    />
+
+                    <Button
+                      onClick={() => runSimulation(true)}
+                      className="w-full rounded-lg h-11 text-sm font-medium gap-2"
+                    >
+                      <Play className="h-4 w-4" /> Rerun Storm on Mitigated Surface
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: SCENARIO COMPARISON */}
+              {activeTab === "compare" && (
+                <div className="space-y-6">
+                  <div className="panel rounded-xl border border-border p-4 space-y-4">
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Baseline vs. Mitigated Comparison
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Side-by-side verification of water absorption gains under identical storm conditions.
+                      </p>
+                    </div>
+
+                    {catalystFuture ? (
+                      <div className="space-y-3 pt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-border bg-background/50 p-3">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Baseline Score</span>
+                            <div className="font-mono text-2xl font-bold">{catalystFuture.future.impact.baseScore.toFixed(0)}</div>
+                            <span className="text-xs text-muted-foreground">{riskLabel(catalystFuture.future.impact.baseRisk)}</span>
+                          </div>
+                          <div className="rounded-lg border border-border bg-background/50 p-3">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mitigated Score</span>
+                            <div className="font-mono text-2xl font-bold text-primary">
+                              {catalystFuture.future.impact.projectedScore.toFixed(0)}
+                            </div>
+                            <span className="text-xs text-primary font-medium">
+                              +{Math.round(catalystFuture.future.impact.scoreDelta)} pts
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-background/50 p-3">
+                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <span>Peak Stormwater Retention</span>
+                            <span className="font-mono font-semibold text-foreground">
+                              {catalystFuture.future.impact.retentionDeltaPct.toFixed(1)}% gain
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Estimated Investment</span>
+                            <span className="font-mono font-semibold text-foreground">
+                              ${Math.round(catalystFuture.future.impact.capexUSD).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => workflow.advance("COMPARE")}
+                          className="w-full rounded-lg h-10 text-xs font-medium gap-2"
+                        >
+                          <Compass className="h-4 w-4" /> Open Split-Screen Comparison
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground py-4 text-center">
+                        Configure interventions in the Mitigation tab and rerun the simulation to view comparative metrics.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: EXPORT & REPORTS */}
+              {activeTab === "export" && (
+                <div className="space-y-4">
+                  <div className="panel rounded-xl border border-border p-4 space-y-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Export Analysis Data & Reports
+                    </h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Download publication-ready resilience dossiers and geospatial layer data for policy, GIS, and civil engineering workflows.
+                    </p>
+
+                    <div className="space-y-2 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleExportPDF}
+                        className="w-full justify-start gap-2.5 h-11 text-xs"
+                      >
+                        <FileText className="h-4 w-4 text-primary" />
+                        <div className="text-left">
+                          <div className="font-medium">Download PDF Resilience Dossier</div>
+                          <div className="text-[10px] text-muted-foreground">Formatted report with charts and recommendations</div>
+                        </div>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleExportGeoJSON}
+                        className="w-full justify-start gap-2.5 h-11 text-xs"
+                      >
+                        <FileJson className="h-4 w-4 text-accent" />
+                        <div className="text-left">
+                          <div className="font-medium">Export GeoJSON Feature Layers</div>
+                          <div className="text-[10px] text-muted-foreground">Spatial boundary and land-cover polygons for QGIS/ArcGIS</div>
+                        </div>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleExportCSV}
+                        className="w-full justify-start gap-2.5 h-11 text-xs"
+                      >
+                        <FileSpreadsheet className="h-4 w-4 text-warning" />
+                        <div className="text-left">
+                          <div className="font-medium">Export Attribute Table (CSV)</div>
+                          <div className="text-[10px] text-muted-foreground">Tabular percentages and hydrologic scores</div>
+                        </div>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
         )}
 
-        {/* 6. REDESIGN MODE FLOATING PALETTE */}
-        {workflow.state === "REDESIGN" && (
-           <div className="absolute top-24 left-6 z-10 w-[320px]">
-              <div className="bg-background/90 backdrop-blur-xl border border-border/60 rounded-2xl p-5 shadow-2xl reveal is-visible">
-                 <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Intervention Palette</h3>
-                 <p className="text-xs text-muted-foreground mb-6">
-                    Select a tool and paint directly on the map to modify land cover and reduce runoff.
-                 </p>
-                 
-                 {/* MapEditor handles its own UI inside the map space in original, 
-                     but we want it integrated. However, MapEditor in this project renders
-                     its own floating palette if activeIntervention is provided. 
-                     We control activeIntervention here, so MapEditor binds to the map. */}
-                 
-                 <div className="grid grid-cols-2 gap-2 mb-6">
-                    <Button 
-                      variant={activeIntervention === "green_roofs" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "green_roofs" ? null : "green_roofs")}
-                      className="w-full text-xs"
-                    >
-                       Green Roof
-                    </Button>
-                    <Button 
-                      variant={activeIntervention === "bioswales" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "bioswales" ? null : "bioswales")}
-                      className="w-full text-xs"
-                    >
-                       Bioswale
-                    </Button>
-                    <Button 
-                      variant={activeIntervention === "permeable_pavement" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "permeable_pavement" ? null : "permeable_pavement")}
-                      className="w-full text-xs"
-                    >
-                       Permeable Paving
-                    </Button>
-                    <Button 
-                      variant={activeIntervention === "street_trees" ? "default" : "outline"}
-                      onClick={() => setActiveIntervention(activeIntervention === "street_trees" ? null : "street_trees")}
-                      className="w-full text-xs"
-                    >
-                       Urban Forest
-                    </Button>
-                 </div>
-
-                 <Button
-                    onClick={() => runSimulation(true)}
-                    size="lg"
-                    className="w-full glow-primary rounded-xl h-12 text-md"
-                  >
-                    <Play className="mr-2 h-5 w-5" /> Rerun Same Storm
-                  </Button>
-              </div>
-           </div>
+        {/* Expand Sidebar Tab Handle (when drawer is collapsed) */}
+        {result && !drawerOpen && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="absolute top-20 left-0 z-30 flex items-center gap-1.5 rounded-r-lg border border-l-0 border-border bg-card/95 px-3 py-2 text-xs font-medium text-foreground shadow-xl hover:bg-muted transition-colors backdrop-blur-md"
+            title="Open Analysis Panel"
+          >
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span>Analysis Panel</span>
+            <ChevronRight className="h-4 w-4" />
+          </button>
         )}
-
-      </main>
+      </div>
     </div>
   );
 }

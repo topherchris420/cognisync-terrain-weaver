@@ -12,7 +12,7 @@ export type WorkflowState =
   | "COMPARE";
 
 export function useWorkflow() {
-  const [state, setState] = useState<WorkflowState>("INTRO");
+  const [state, setState] = useState<WorkflowState>("SEARCH");
 
   const advance = useCallback((newState: WorkflowState) => {
     setState(newState);

@@ -21,7 +21,7 @@ import {
   FileJson,
   FileSpreadsheet,
   GaugeCircle,
-  Sparkles,
+  Layers,
   Search,
   AlertTriangle,
   RotateCcw,
@@ -441,7 +441,7 @@ export default function Dashboard() {
         {/* Empty feed */}
         {rows && rows.length === 0 && (
           <div className="rounded-xl border border-dashed border-border p-12 text-center">
-            <Sparkles className="mx-auto mb-3 h-6 w-6 text-primary" />
+            <Layers className="mx-auto mb-3 h-6 w-6 text-primary" />
             <h2 className="text-lg font-semibold">No analyses yet</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Be the first to scan a site and populate the public feed.
