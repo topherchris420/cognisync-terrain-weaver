@@ -202,7 +202,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
 
-      // 1. IoT Sensors Markers
+      // 1. USGS Streamgage Markers
       if (layers.showSensors) {
         state.sensors.forEach((sensor) => {
           const el = document.createElement("div");
@@ -210,16 +210,15 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
           
           const isCrit = sensor.status === "critical";
           const isWarn = sensor.status === "warning";
-          const colorClass = isCrit
-            ? "bg-rose-500 text-rose-100 ring-rose-400"
+          const bgClass = isCrit
+            ? "bg-destructive text-destructive-foreground ring-destructive/50"
             : isWarn
-            ? "bg-amber-500 text-amber-100 ring-amber-400"
-            : "bg-sky-500 text-sky-100 ring-sky-400";
+            ? "bg-amber-600 text-white ring-amber-500/50"
+            : "bg-primary text-primary-foreground ring-primary/40";
 
           el.innerHTML = `
             <div class="relative flex items-center justify-center">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${colorClass} opacity-60"></span>
-              <div class="relative inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${colorClass} ring-2 ring-background shadow-md">
+              <div class="relative inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${bgClass} ring-1 shadow-sm">
                 ${sensor.reading} ${sensor.unit.split(" ")[0]}
               </div>
             </div>
@@ -240,11 +239,11 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
         state.supply_nodes.forEach((node) => {
           const el = document.createElement("div");
           el.className = "cursor-pointer flex items-center justify-center";
-          const isShelter = node.type === "emergency_shelter";
+          const labelPrefix = node.type === "dpw_staging" ? "DPW" : node.type === "pump_station" ? "PUMP" : "SHELTER";
           
           el.innerHTML = `
-            <div class="px-2 py-1 rounded-md text-[11px] font-mono font-bold bg-slate-900/90 text-emerald-400 border border-emerald-500/50 shadow-xl flex items-center gap-1">
-              <span>${isShelter ? "🏠" : "📦"}</span>
+            <div class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-card text-foreground border border-border shadow-sm flex items-center gap-1">
+              <span class="text-primary font-bold">[${labelPrefix}]</span>
               <span>${node.name.split(" ")[0]}</span>
             </div>
           `;
@@ -258,14 +257,14 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
           markersRef.current.push(marker);
         });
 
-        // 3. Convoys Markers
+        // 3. Convoys / Equipment Units Markers
         state.convoys.forEach((convoy) => {
           const el = document.createElement("div");
-          el.className = "cursor-pointer flex items-center justify-center animate-bounce";
+          el.className = "cursor-pointer flex items-center justify-center";
           el.innerHTML = `
-            <div class="px-1.5 py-0.5 rounded bg-primary text-primary-foreground font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
-              <span>🚚</span>
-              <span>${convoy.callsign.split(" ")[1]}</span>
+            <div class="px-1.5 py-0.5 rounded bg-primary text-primary-foreground font-mono text-[10px] font-medium shadow-sm flex items-center gap-1">
+              <span>UNIT:</span>
+              <span>${convoy.callsign.split(" ")[1] || convoy.callsign}</span>
             </div>
           `;
 

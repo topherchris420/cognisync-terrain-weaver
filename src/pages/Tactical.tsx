@@ -10,7 +10,7 @@ export default function TacticalPage() {
   // Center coordinates from query params or default Manhattan
   const lat = parseFloat(searchParams.get("lat") || "40.7128");
   const lng = parseFloat(searchParams.get("lng") || "-74.006");
-  const label = searchParams.get("label") || "Manhattan Tactical Sector";
+  const label = searchParams.get("label") || "Manhattan Catchment Sector (EOC Grid)";
 
   // Mock flow paths & risk zones if navigated from simulation
   const [flowPaths, setFlowPaths] = useState<FlowPath[]>([]);

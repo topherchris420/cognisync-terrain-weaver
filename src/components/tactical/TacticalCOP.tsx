@@ -1,19 +1,12 @@
 import { useState, useRef, useCallback } from "react";
 import {
-  ShieldAlert,
   Radio,
   Navigation,
   Truck,
   CloudLightning,
-  Layers,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -43,7 +36,7 @@ export function TacticalCOP({
   initialCenter = [-74.006, 40.7128],
   flowPaths = [],
   riskZones = [],
-  locationLabel = "Sector Manhattan (Operational Grid)",
+  locationLabel = "Catchment Sector 01 (Mannahatta)",
 }: TacticalCOPProps) {
   const mapRef = useRef<TacticalMapViewHandle>(null);
 
@@ -94,28 +87,25 @@ export function TacticalCOP({
   return (
     <div className="relative w-full h-[calc(100vh-3.5rem)] bg-background flex flex-col overflow-hidden font-sans select-none">
       {/* Tactical Top Bar */}
-      <div className="h-12 border-b border-border/80 bg-background/95 backdrop-blur-xl px-4 flex items-center justify-between gap-4 z-20">
+      <div className="h-11 border-b border-border bg-card/80 backdrop-blur-md px-4 flex items-center justify-between gap-4 z-20">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-            </span>
-            <span className="font-mono font-bold text-xs uppercase tracking-wider text-foreground">
-              EOC TACTICAL COP
+            <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+            <span className="font-mono font-semibold text-xs uppercase tracking-wider text-foreground">
+              Emergency Operations Common Operating Picture
             </span>
           </div>
 
-          <Badge variant="outline" className="text-[11px] font-mono border-border/60 bg-muted/20 text-muted-foreground hidden sm:inline-flex">
+          <Badge variant="outline" className="text-[11px] font-mono border-border bg-muted/20 text-muted-foreground hidden sm:inline-flex">
             {locationLabel}
           </Badge>
         </div>
 
         {/* Tactical Controls & Weather Toggle */}
-        <div className="flex items-center gap-2.5">
-          <div className="hidden lg:flex items-center gap-1.5 bg-muted/20 px-2 py-1 rounded-md border border-border/50">
-            <CloudLightning className="h-3.5 w-3.5 text-sky-400" />
-            <span className="text-[11px] font-mono text-muted-foreground">Scenario:</span>
+        <div className="flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-1.5 bg-muted/20 px-2 py-0.5 rounded-md border border-border">
+            <CloudLightning className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[11px] font-mono text-muted-foreground">Precipitation Model:</span>
             <Select
               value={state.weather_intensity}
               onValueChange={(v) => setWeatherIntensity(v as TacticalCOPState["weather_intensity"])}
@@ -127,7 +117,7 @@ export function TacticalCOP({
                 <SelectItem value="normal">Baseline Calm</SelectItem>
                 <SelectItem value="tropical_storm">Tropical Storm</SelectItem>
                 <SelectItem value="cloudburst_50mm">50mm Cloudburst</SelectItem>
-                <SelectItem value="cat_4_hurricane">Cat 4 Hurricane</SelectItem>
+                <SelectItem value="cat_4_hurricane">Severe Storm Surge</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -158,7 +148,7 @@ export function TacticalCOP({
           </div>
 
           {/* Floating Incident Alert Feed (Bottom of Map) */}
-          <div className="absolute bottom-3 left-3 right-3 md:right-auto md:w-[480px] z-10 p-3 rounded-xl border border-border/80 bg-background/90 backdrop-blur-xl shadow-2xl">
+          <div className="absolute bottom-3 left-3 right-3 md:right-auto md:w-[460px] z-10 p-3 rounded-lg border border-border bg-card/90 backdrop-blur-md shadow-lg">
             <IncidentAlertFeed
               alerts={state.alerts}
               onAcknowledge={acknowledgeAlert}
@@ -167,25 +157,25 @@ export function TacticalCOP({
         </div>
 
         {/* Right Tactical Intelligence Workbench */}
-        <div className="w-full md:w-[380px] lg:w-[420px] h-full border-l border-border/80 bg-background/95 backdrop-blur-xl flex flex-col z-10 shadow-2xl">
-          <div className="p-3 border-b border-border/60">
+        <div className="w-full md:w-[380px] lg:w-[400px] h-full border-l border-border bg-card/95 backdrop-blur-md flex flex-col z-10 shadow-lg">
+          <div className="p-2.5 border-b border-border">
             <Tabs
               value={activeTab}
               onValueChange={(v) => setActiveTab(v as typeof activeTab)}
               className="w-full"
             >
-              <TabsList className="grid grid-cols-3 h-8 bg-muted/40 p-0.5">
+              <TabsList className="grid grid-cols-3 h-7 bg-muted/40 p-0.5">
                 <TabsTrigger value="telemetry" className="text-xs font-mono gap-1">
                   <Radio className="h-3 w-3" />
-                  Sensors
+                  Streamgages
                 </TabsTrigger>
                 <TabsTrigger value="transit" className="text-xs font-mono gap-1">
                   <Navigation className="h-3 w-3" />
-                  Transit
+                  Corridors
                 </TabsTrigger>
                 <TabsTrigger value="supply" className="text-xs font-mono gap-1">
                   <Truck className="h-3 w-3" />
-                  Supply
+                  Staging
                 </TabsTrigger>
               </TabsList>
             </Tabs>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ShieldCheck, Lock, Activity, Server, FileText, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Lock, Activity, Server, FileText, CheckCircle2, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { FEDRAMP_HIGH_CONTROLS, DEFAULT_GOVCLOUD_POSTURE, type AuditLogEntry } from "@/lib/tactical/compliance";
+import { MUNICIPAL_OPERATIONAL_CONTROLS, DEFAULT_GOVCLOUD_POSTURE, type AuditLogEntry } from "@/lib/tactical/compliance";
 
 interface GovCloudBadgeProps {
   auditLog: AuditLogEntry[];
@@ -25,26 +25,26 @@ export function GovCloudBadge({ auditLog }: GovCloudBadgeProps) {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 gap-2 bg-emerald-950/30 border-emerald-500/40 text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 transition-all font-mono text-xs shadow-sm"
+          className="h-7 gap-1.5 bg-muted/20 border-border/70 text-foreground/90 hover:bg-muted/40 hover:text-foreground transition-all font-mono text-xs shadow-none"
         >
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
-          <span className="font-semibold">FEDRAMP HIGH</span>
-          <span className="text-[10px] opacity-75 hidden sm:inline">| GovCloud US</span>
+          <span className="h-1.5 w-1.5 rounded-full bg-primary inline-block" />
+          <span className="font-medium">GIS & SCADA Node</span>
+          <span className="text-[10px] text-muted-foreground hidden sm:inline">| TLS 1.3</span>
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-3xl bg-background/95 border-border/80 backdrop-blur-2xl">
+      <DialogContent className="max-w-2xl bg-card border-border/80 backdrop-blur-2xl">
         <DialogHeader>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-              <ShieldCheck className="h-5 w-5" />
+            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-primary">
+              <Radio className="h-4 w-4" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-mono">
-                FedRAMP GovCloud Security Posture
+              <DialogTitle className="text-base font-mono">
+                Municipal Operations & SCADA Telemetry Node
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-mono">
-                Boundary Authorization ID: FEDRAMP-ATO-2026-0819 | DoD IL5 CUI Certified
+                USGS NWIS & NOAA Ingestion Node | Catchment Telemetry Active
               </DialogDescription>
             </div>
           </div>
@@ -52,54 +52,54 @@ export function GovCloudBadge({ auditLog }: GovCloudBadgeProps) {
 
         <div className="space-y-4 pt-2">
           {/* Posture Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="p-2.5 rounded-lg border border-border/60 bg-muted/20">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Server className="h-3.5 w-3.5 text-primary" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="p-2.5 rounded-md border border-border/50 bg-background/50">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono text-muted-foreground">
+                <Server className="h-3 w-3 text-primary" />
                 Infrastructure
               </div>
-              <p className="text-xs font-semibold mt-1 font-mono">{DEFAULT_GOVCLOUD_POSTURE.environment}</p>
+              <p className="text-xs font-medium mt-1 font-mono">{DEFAULT_GOVCLOUD_POSTURE.environment}</p>
             </div>
-            <div className="p-2.5 rounded-lg border border-border/60 bg-muted/20">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Lock className="h-3.5 w-3.5 text-emerald-400" />
-                Cryptography
+            <div className="p-2.5 rounded-md border border-border/50 bg-background/50">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono text-muted-foreground">
+                <Lock className="h-3 w-3 text-primary" />
+                Payload Security
               </div>
-              <p className="text-xs font-semibold mt-1 font-mono">FIPS 140-3 (HSM)</p>
+              <p className="text-xs font-medium mt-1 font-mono">TLS 1.3 / AES-256</p>
             </div>
-            <div className="p-2.5 rounded-lg border border-border/60 bg-muted/20">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Activity className="h-3.5 w-3.5 text-sky-400" />
-                Sovereignty
+            <div className="p-2.5 rounded-md border border-border/50 bg-background/50">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono text-muted-foreground">
+                <Activity className="h-3 w-3 text-primary" />
+                Telemetry Feed
               </div>
-              <p className="text-xs font-semibold mt-1 font-mono text-emerald-400">US Persons Only</p>
+              <p className="text-xs font-medium mt-1 font-mono">USGS & City SCADA</p>
             </div>
-            <div className="p-2.5 rounded-lg border border-border/60 bg-muted/20">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <CheckCircle2 className="h-3.5 w-3.5 text-purple-400" />
-                Audit Stream
+            <div className="p-2.5 rounded-md border border-border/50 bg-background/50">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono text-muted-foreground">
+                <CheckCircle2 className="h-3 w-3 text-primary" />
+                Audit Trail
               </div>
-              <p className="text-xs font-semibold mt-1 font-mono">Immutable / Zero-Trust</p>
+              <p className="text-xs font-medium mt-1 font-mono">Continuous Ledger</p>
             </div>
           </div>
 
-          {/* Security Controls */}
+          {/* Operational Controls */}
           <div>
-            <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+            <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5 font-mono">
               <FileText className="h-3.5 w-3.5" />
-              Enforced NIST SP 800-53 Rev. 5 Controls
+              Operational & Geospatial Protocols
             </h4>
             <div className="grid sm:grid-cols-2 gap-2">
-              {FEDRAMP_HIGH_CONTROLS.map((control) => (
+              {MUNICIPAL_OPERATIONAL_CONTROLS.map((control) => (
                 <div
                   key={control.id}
-                  className="p-2.5 rounded-lg border border-border/40 bg-muted/10 flex flex-col justify-between"
+                  className="p-2.5 rounded-md border border-border/40 bg-background/30 flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-xs font-bold text-primary">
                       {control.id}
                     </span>
-                    <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30">
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/60">
                       {control.status}
                     </Badge>
                   </div>
@@ -114,23 +114,23 @@ export function GovCloudBadge({ auditLog }: GovCloudBadgeProps) {
 
           {/* Immutable Audit Log Stream */}
           <div>
-            <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
-              <span>Zero-Trust Incident Dispatch Audit Stream</span>
-              <span className="font-mono text-[10px] text-emerald-400">● LIVE REPLICATION</span>
+            <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between font-mono">
+              <span>Incident Command & Dispatch Log</span>
+              <span className="text-[10px] text-primary">● LIVE AUDIT FEED</span>
             </h4>
-            <div className="h-40 overflow-y-auto rounded-lg border border-border/50 bg-black/40 p-2 font-mono text-[11px] space-y-1.5 scrollbar-thin">
+            <div className="h-36 overflow-y-auto rounded-md border border-border/50 bg-background/80 p-2 font-mono text-[11px] space-y-1 scrollbar-thin">
               {auditLog.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-start justify-between gap-2 p-1 rounded bg-muted/5 border-b border-border/20"
+                  className="flex items-start justify-between gap-2 p-1 rounded bg-muted/10 border-b border-border/20"
                 >
                   <div>
                     <span className="text-muted-foreground">{new Date(entry.timestamp).toLocaleTimeString()}</span>{" "}
-                    <span className="text-sky-400 font-semibold">[{entry.actor}]</span>{" "}
+                    <span className="text-primary font-medium">[{entry.actor}]</span>{" "}
                     <span className="text-foreground">{entry.action}</span>{" "}
                     <span className="text-muted-foreground">→ {entry.resource}</span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground/60 shrink-0">
+                  <span className="text-[10px] text-muted-foreground/50 shrink-0">
                     {entry.checksum.slice(0, 14)}...
                   </span>
                 </div>

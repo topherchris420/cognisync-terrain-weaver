@@ -1,27 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { generateAuditEntry, FEDRAMP_HIGH_CONTROLS, DEFAULT_GOVCLOUD_POSTURE } from "./compliance";
+import { generateAuditEntry, MUNICIPAL_OPERATIONAL_CONTROLS, DEFAULT_GOVCLOUD_POSTURE } from "./compliance";
 import { generateTacticalAssets } from "./generator";
 
-describe("FedRAMP GovCloud Compliance & Audit Log", () => {
+describe("Municipal EOC Posture & Audit Log", () => {
   it("generates deterministic checksummed audit log entries", () => {
     const entry = generateAuditEntry("EOC_DISPATCHER", "DISPATCH_SUPPLY", "CONVOY_ALPHA");
-    expect(entry.id).toMatch(/^AUDIT-/);
+    expect(entry.id).toMatch(/^EOC-/);
     expect(entry.actor).toBe("EOC_DISPATCHER");
     expect(entry.action).toBe("DISPATCH_SUPPLY");
-    expect(entry.classification).toBe("CUI // SP-EMERGENCY");
+    expect(entry.classification).toBe("OFFICIAL USE // INCIDENT LOG");
     expect(entry.checksum).toMatch(/^SHA256:/);
   });
 
-  it("contains standard FedRAMP High NIST 800-53 controls", () => {
-    expect(FEDRAMP_HIGH_CONTROLS.length).toBeGreaterThanOrEqual(4);
-    const sc13 = FEDRAMP_HIGH_CONTROLS.find((c) => c.id === "SC-13");
-    expect(sc13).toBeDefined();
-    expect(sc13?.status).toBe("Enforced (HSM)");
+  it("contains standard Municipal EOC operational controls", () => {
+    expect(MUNICIPAL_OPERATIONAL_CONTROLS.length).toBeGreaterThanOrEqual(4);
+    const sec2 = MUNICIPAL_OPERATIONAL_CONTROLS.find((c) => c.id === "SEC-2");
+    expect(sec2).toBeDefined();
+    expect(sec2?.status).toBe("TLS 1.3 Active");
   });
 
-  it("has default GovCloud FIPS 140 Level 3 posture", () => {
-    expect(DEFAULT_GOVCLOUD_POSTURE.fips_140_level).toBe(3);
-    expect(DEFAULT_GOVCLOUD_POSTURE.us_person_sovereignty).toBe(true);
+  it("has default municipal enterprise GIS posture", () => {
+    expect(DEFAULT_GOVCLOUD_POSTURE.environment).toBe("Municipal Enterprise GIS Node");
+    expect(DEFAULT_GOVCLOUD_POSTURE.telemetry_integrity).toBeDefined();
   });
 });
 

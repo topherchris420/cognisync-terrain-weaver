@@ -1,22 +1,25 @@
 /**
  * Tactical Common Operating Picture (COP) Domain Types
- * Designed for Emergency Operations Centers (EOC) and Disaster Response Logistics
- * Running on FedRAMP-compliant GovCloud infrastructure.
+ * Designed for Municipal Emergency Operations Centers (EOC),
+ * Stormwater Infrastructure Management, and Urban Flood Logistics.
  */
 
-export type SensorType = "rain_gauge" | "water_level" | "soil_moisture" | "storm_surge";
+export type SensorType = "usgs_streamgage" | "rain_gauge" | "water_level" | "soil_moisture" | "storm_surge";
 export type AlertSeverity = "info" | "advisory" | "watch" | "warning" | "emergency";
 export type CorridorStatus = "clear" | "congested" | "flooded" | "closed";
-export type SupplyNodeType = "fema_pod" | "logistics_staging" | "emergency_shelter" | "field_hospital";
+export type SupplyNodeType = "dpw_staging" | "evacuation_shelter" | "pump_station" | "logistics_staging";
 export type ConvoyStatus = "staged" | "en_route" | "rerouted" | "delivered" | "halted";
 
 export interface IoTSensor {
   id: string;
   name: string;
+  station_code: string; // e.g. "USGS-01374019" or "NYC-DEP-WL4"
   type: SensorType;
   coordinates: [number, number]; // [lng, lat]
   reading: number;
   unit: string;
+  stage_height_m?: number;
+  discharge_m3s?: number;
   threshold_warning: number;
   threshold_emergency: number;
   status: "normal" | "warning" | "critical" | "offline";
@@ -28,9 +31,11 @@ export interface IoTSensor {
 export interface TransitCorridor {
   id: string;
   name: string;
-  designation: string; // e.g. "Primary Evacuation Route A"
+  designation: string; // e.g. "Primary Evacuation Route 9A"
   status: CorridorStatus;
   capacity_pct: number;
+  inundation_depth_m: number;
+  flow_velocity_mps: number;
   coordinates: [number, number][]; // LineString coords [lng, lat]
   inundation_risk_score: number; // 0 (dry) to 100 (submerged)
   intersecting_flow_volume_m3: number;
@@ -40,7 +45,7 @@ export interface TransitCorridor {
 export interface SupplyItem {
   id: string;
   name: string;
-  category: "potable_water" | "mre_rations" | "medical" | "power_generators" | "sandbags";
+  category: "pumping_units" | "flood_barriers" | "sandbags" | "potable_water" | "power_generators" | "medical";
   quantity: number;
   unit: string;
 }
@@ -52,7 +57,7 @@ export interface SupplyNode {
   coordinates: [number, number]; // [lng, lat]
   current_occupancy?: number;
   max_capacity?: number;
-  days_of_supply: number; // Days of water/rations remaining
+  days_of_supply: number;
   inventory: SupplyItem[];
   status: "operational" | "strained" | "evacuating" | "inaccessible";
 }
@@ -75,18 +80,17 @@ export interface TacticalAlert {
   title: string;
   message: string;
   severity: AlertSeverity;
-  source: "IoT-Telemetry" | "D8-Hydro-Model" | "DOT-Transit" | "EOC-Dispatch";
+  source: "USGS-Streamgage" | "NOAA-NWS" | "City-SCADA" | "EOC-Dispatch";
   coordinates?: [number, number];
   acknowledged: boolean;
 }
 
 export interface GovCloudPosture {
-  environment: "AWS-GovCloud-US-East" | "AWS-GovCloud-US-West" | "Azure-Government";
-  compliance_tier: "FedRAMP High (JAB P-ATO)" | "DoD IL5 (CUI / Mission Critical)";
-  fips_140_level: 3;
-  encryption_at_rest: "AES-256-GCM (KMS HSM)";
-  audit_logging_status: "Active (Zero-Trust Immutable Stream)";
-  us_person_sovereignty: true;
+  environment: string;
+  compliance_tier: string;
+  encryption_at_rest: string;
+  audit_logging_status: string;
+  telemetry_integrity: string;
   last_compliance_sync: string;
 }
 
