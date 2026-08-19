@@ -17,8 +17,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const AI_MODEL = "google/gemini-2.5-flash";
-const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+// Support dynamic model configuration via AI_MODEL secret/env with fallback to latest Gemini Vision
+const AI_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-2.5-pro";
+const AI_URL = Deno.env.get("AI_GATEWAY_URL") ?? "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 interface Body {
   name?: string;
