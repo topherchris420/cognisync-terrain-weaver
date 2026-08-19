@@ -1,11 +1,12 @@
 import { Link, NavLink } from "react-router-dom";
-import { Layers, Map as MapIcon, LineChart, Github } from "lucide-react";
+import { Layers, Map as MapIcon, LineChart, Github, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 import { SITE } from "@/lib/site";
 
 const links = [
   { to: "/", label: "Map", icon: MapIcon, end: true },
+  { to: "/tactical", label: "Tactical COP", icon: Radio },
   { to: "/dashboard", label: "Dashboard", icon: LineChart },
 ];
 
@@ -14,6 +15,7 @@ const links = [
 // these against the lazy() imports in App.tsx — same module, same chunk.
 const PREFETCH: Record<string, () => void> = {
   "/": () => void import("@/pages/Analyze"),
+  "/tactical": () => void import("@/pages/Tactical"),
   "/dashboard": () => void import("@/pages/Dashboard"),
 };
 
