@@ -32,8 +32,10 @@ export function usePressAndHold({ durationMs, onComplete, disabled }: Options) {
     setProgress(0);
   }, []);
 
+  const now = () => (typeof performance !== "undefined" && performance.now ? Date.now() : Date.now());
+
   const tick = useCallback(() => {
-    const elapsed = performance.now() - startedAt.current;
+    const elapsed = Date.now() - startedAt.current;
     const p = Math.min(1, elapsed / durationMs);
     setProgress(p);
     if (p >= 1) {
@@ -50,7 +52,7 @@ export function usePressAndHold({ durationMs, onComplete, disabled }: Options) {
   const start = useCallback(() => {
     if (disabled || startedAt.current) return;
     done.current = false;
-    startedAt.current = performance.now();
+    startedAt.current = Date.now();
     setHolding(true);
     frame.current = requestAnimationFrame(tick);
   }, [disabled, tick]);

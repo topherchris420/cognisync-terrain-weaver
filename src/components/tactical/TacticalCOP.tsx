@@ -24,6 +24,9 @@ import { TacticalMapView, type TacticalMapViewHandle } from "./TacticalMapView";
 import { useTacticalStream } from "@/lib/tactical/stream";
 import type { IoTSensor, SupplyNode, TransitCorridor, TacticalCOPState } from "@/lib/tactical/types";
 import type { FlowPath, RiskZone } from "@/lib/simulation-types";
+import { TacticalHUD } from "./TacticalHUD";
+import { CommandPalette } from "./CommandPalette";
+import { DetectionOverlay } from "./DetectionOverlay";
 
 interface TacticalCOPProps {
   initialCenter?: [number, number]; // [lng, lat]
@@ -140,6 +143,13 @@ export function TacticalCOP({
             onSelectSensor={handleSelectSensor}
             onSelectNode={handleSelectNode}
             onSelectCorridor={handleSelectCorridor}
+          />
+
+          {/* Target Detection Overlay */}
+          <DetectionOverlay
+            sensors={state.sensors}
+            riskZones={riskZones}
+            flowPaths={flowPaths}
           />
 
           {/* Floating Layer Controls (Top Left of Map) */}

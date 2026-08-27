@@ -22,6 +22,13 @@ Object.defineProperty(window, "matchMedia", {
 window.HTMLCanvasElement.prototype.getContext =
   vi.fn() as unknown as typeof window.HTMLCanvasElement.prototype.getContext;
 
+if (typeof window.URL.createObjectURL !== "function") {
+  window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+}
+if (typeof window.URL.revokeObjectURL !== "function") {
+  window.URL.revokeObjectURL = vi.fn();
+}
+
 // jsdom ships no ResizeObserver; Radix primitives (Slider, Select) construct one.
 class ResizeObserverStub {
   observe() {}
