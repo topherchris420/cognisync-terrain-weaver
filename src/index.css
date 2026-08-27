@@ -124,6 +124,88 @@
     box-shadow: var(--shadow-glow);
   }
 
+  /* --------------------------------------------------- Ground-station HUD --
+     Hairline glass modules, square corners, mono micro-labels. */
+
+  .hud-panel {
+    background: hsl(240 26% 5% / 0.82);
+    border: 1px solid hsl(var(--border));
+    backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .hud-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(240 20% 9% / 0.7);
+    padding: 0.3rem 0.55rem;
+  }
+
+  .hud-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    line-height: 1;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .hud-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: hsl(var(--foreground));
+  }
+
+  /* Corner ticks — the frame markers of a targeting frame. */
+  .hud-ticks::before,
+  .hud-ticks::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: hsl(var(--primary) / 0.7);
+    pointer-events: none;
+  }
+  .hud-ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .hud-ticks::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+  }
+
+  .signal-dot {
+    width: 5px;
+    height: 5px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.8);
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+
+  .reticle {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.35) 1px, transparent 1px);
+    background-size: 100% 50%, 50% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.25;
+  }
+
+
   /* Analysis "scanning" sweep — a soft primary band that tracks down the tile
      being classified, giving the wait a sense of active work. */
   .scanline {
