@@ -37,43 +37,61 @@ export function DetectionOverlay({
   // Derive target items from sensors, risk zones, and flow paths
   const targets: DetectionTarget[] = [];
 
-  sensors.forEach((s) => {
+  (sensors ?? []).forEach((s) => {
+    const depth = s?.stage_height_m ?? s?.reading ?? (s as unknown as Record<string, number>)?.current_depth_m ?? 0;
     targets.push({
       id: s.id,
-      label: s.name,
+      label: s.name || "Sensor",
       category: "SENSOR",
-      coordinates: s.coordinates,
+      coordinates: s.coordinates || [0, 0],
       metricLabel: "Water Depth",
-      metricValue: `${s.current_depth_m.toFixed(2)}m`,
+      metricValue: `${Number(depth).toFixed(2)}m`,
       status: s.status === "critical" ? "CRITICAL" : s.status === "warning" ? "ALERT" : "NORMAL",
     });
   });
 
-  riskZones.forEach((rz, i) => {
-    if (rz.coordinates.length > 0) {
+  (riskZones ?? []).forEach((rz, i) => {
+    const rzObj = rz as unknown as Record<string, unknown>;
+    const coords: [number, number][] =
+      (rzObj?.polygon as [number, number][]) || (rzObj?.coordinates as [number, number][]) || [];
+    if (coords.length > 0) {
+      const riskScore =
+        typeof rzObj?.risk_score === "number"
+          ? rzObj.risk_score
+          : rz?.level === "severe"
+          ? 0.9
+          : rz?.level === "high"
+          ? 0.7
+          : rz?.level === "moderate"
+          ? 0.4
+          : 0.2;
       targets.push({
-        id: rz.id || `rz-${i}`,
+        id: (rzObj?.id as string) || `rz-${i}`,
         label: `Inundation Zone #${i + 1}`,
         category: "RISK_ZONE",
-        coordinates: rz.coordinates[0],
+        coordinates: coords[0] || [0, 0],
         metricLabel: "Inundation Risk",
-        metricValue: `${(rz.risk_score * 100).toFixed(0)}%`,
-        status: rz.risk_score > 0.7 ? "CRITICAL" : "ALERT",
+        metricValue: `${(riskScore * 100).toFixed(0)}%`,
+        status: riskScore > 0.7 ? "CRITICAL" : "ALERT",
       });
     }
   });
 
-  flowPaths.slice(0, 3).forEach((fp, i) => {
-    if (fp.coordinates.length > 0) {
-      const mid = fp.coordinates[Math.floor(fp.coordinates.length / 2)];
+  (flowPaths ?? []).slice(0, 3).forEach((fp, i) => {
+    const fpObj = fp as unknown as Record<string, unknown>;
+    const coords: [number, number][] =
+      (fpObj?.points as [number, number][]) || (fpObj?.coordinates as [number, number][]) || [];
+    if (coords.length > 0) {
+      const mid = coords[Math.floor(coords.length / 2)] || coords[0] || [0, 0];
+      const volume = (fpObj?.volume_m3 as number) ?? (fpObj?.flow_volume_m3 as number) ?? 0;
       targets.push({
-        id: fp.id || `fp-${i}`,
+        id: (fpObj?.id as string) || `fp-${i}`,
         label: `Hydro Flow Vector #${i + 1}`,
         category: "FLOW_CHANNEL",
         coordinates: mid,
         metricLabel: "Discharge Accumulation",
-        metricValue: `${fp.flow_volume_m3.toFixed(1)} m³`,
-        status: fp.flow_volume_m3 > 200 ? "CRITICAL" : "NORMAL",
+        metricValue: `${Number(volume).toFixed(1)} m³`,
+        status: volume > 200 ? "CRITICAL" : "NORMAL",
       });
     }
   });
@@ -110,7 +128,7 @@ export function DetectionOverlay({
             <div className="flex justify-between">
               <span>Coordinates:</span>
               <span className="text-foreground">
-                [{selectedTarget.coordinates[1].toFixed(4)}°, {selectedTarget.coordinates[0].toFixed(4)}°]
+                [{(selectedTarget.coordinates[1] ?? 0).toFixed(4)}°, {(selectedTarget.coordinates[0] ?? 0).toFixed(4)}°]
               </span>
             </div>
             <div className="flex justify-between">
