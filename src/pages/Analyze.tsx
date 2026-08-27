@@ -950,7 +950,7 @@ export default function Analyze() {
                           <div className="flex justify-between text-xs text-muted-foreground mb-1">
                             <span>Peak Stormwater Retention</span>
                             <span className="font-mono font-semibold text-foreground">
-                              {catalystFuture.future.impact.retentionDeltaPct.toFixed(1)}% gain
+                              {Math.round(catalystFuture.future.impact.addedRetentionM3).toLocaleString()} m³/yr
                             </span>
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
