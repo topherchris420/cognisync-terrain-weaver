@@ -80,7 +80,7 @@ export function TacticalHUD({
           <div className="w-24 h-24 rounded-full border border-dashed animate-spin-slow" style={{ borderColor: opticConfig.accentColor }} />
           <Crosshair className="absolute w-8 h-8" style={{ color: opticConfig.accentColor }} />
           <div className="absolute top-14 text-[10px] tracking-widest whitespace-nowrap font-bold" style={{ color: opticConfig.accentColor }}>
-            TGT [{lat.toFixed(5)}°, {lng.toFixed(5)}°]
+            TGT [{(lat ?? 0).toFixed(5)}°, {(lng ?? 0).toFixed(5)}°]
           </div>
         </div>
       </div>
@@ -157,21 +157,21 @@ export function TacticalHUD({
         <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Compass className="h-3.5 w-3.5 text-primary" />
-            <span>LAT: <strong className="text-foreground">{lat.toFixed(5)}°</strong></span>
-            <span>LNG: <strong className="text-foreground">{lng.toFixed(5)}°</strong></span>
+            <span>LAT: <strong className="text-foreground">{(lat ?? 0).toFixed(5)}°</strong></span>
+            <span>LNG: <strong className="text-foreground">{(lng ?? 0).toFixed(5)}°</strong></span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-primary" />
-            <span>ZOOM: <strong className="text-foreground">{zoom.toFixed(1)}</strong></span>
-            <span>BEARING: <strong className="text-foreground">{bearing.toFixed(0)}°</strong></span>
-            <span>PITCH: <strong className="text-foreground">{pitch.toFixed(0)}°</strong></span>
+            <span>ZOOM: <strong className="text-foreground">{(zoom ?? 0).toFixed(1)}</strong></span>
+            <span>BEARING: <strong className="text-foreground">{(bearing ?? 0).toFixed(0)}°</strong></span>
+            <span>PITCH: <strong className="text-foreground">{(pitch ?? 0).toFixed(0)}°</strong></span>
           </div>
 
           <div className="hidden lg:flex items-center gap-3 border-l border-border pl-3">
-            <span>AREA: <strong className="text-foreground">{surfaceAreaKm2.toFixed(2)} km²</strong></span>
-            <span>RUNOFF C: <strong className="text-foreground">{compositeRunoffC.toFixed(2)}</strong></span>
-            <span>ABSORPTION: <strong className="text-emerald-400">{absorptionScore.toFixed(1)}/100</strong></span>
+            <span>AREA: <strong className="text-foreground">{(surfaceAreaKm2 ?? 0).toFixed(2)} km²</strong></span>
+            <span>RUNOFF C: <strong className="text-foreground">{(compositeRunoffC ?? 0).toFixed(2)}</strong></span>
+            <span>ABSORPTION: <strong className="text-emerald-400">{(absorptionScore ?? 0).toFixed(1)}/100</strong></span>
           </div>
         </div>
 

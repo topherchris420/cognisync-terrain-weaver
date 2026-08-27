@@ -144,7 +144,8 @@ export function SupplyChainMatrix({
       <div className="space-y-2 overflow-y-auto max-h-[220px] pr-1 scrollbar-thin">
         {nodes.map((node) => {
           const isSelected = node.id === selectedNodeId;
-          const isLowSupply = node.days_of_supply < 2.0;
+          const daysOfSupply = node.days_of_supply ?? 0;
+          const isLowSupply = daysOfSupply < 2.0;
 
           return (
             <div
@@ -167,7 +168,7 @@ export function SupplyChainMatrix({
                       {node.name}
                     </h4>
                     <p className="text-[10px] text-muted-foreground font-mono mt-0.5 uppercase">
-                      Type: {node.type.replace("_", " ")}
+                      Type: {node.type ? node.type.replace("_", " ") : ""}
                     </p>
                   </div>
                 </div>
@@ -181,7 +182,7 @@ export function SupplyChainMatrix({
                       : "border-border text-muted-foreground bg-muted/20"
                   )}
                 >
-                  {node.days_of_supply.toFixed(1)} DOS
+                  {daysOfSupply.toFixed(1)} DOS
                 </Badge>
               </div>
 
