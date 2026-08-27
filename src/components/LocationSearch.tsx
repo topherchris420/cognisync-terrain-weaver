@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, MapPin, Loader2 } from "lucide-react";
+import { Search, MapPin, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { searchLocations, PRESETS, type GeocodeResult } from "@/lib/geocode";
 import { cn } from "@/lib/utils";
@@ -129,13 +129,28 @@ export function LocationSearch({ onSelect }: Props) {
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder="Search any city or address…"
-          className="pl-9"
+          className="pl-9 pr-8"
           role="combobox"
           aria-expanded={showDropdown}
           aria-controls="location-search-listbox"
           aria-autocomplete="list"
           aria-activedescendant={activeIndex >= 0 ? `location-option-${activeIndex}` : undefined}
         />
+        {query !== "" && !loading && (
+          <button
+            type="button"
+            aria-label="Clear location search"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setQuery("");
+              setResults([]);
+              setActiveIndex(-1);
+            }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         {loading && (
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         )}

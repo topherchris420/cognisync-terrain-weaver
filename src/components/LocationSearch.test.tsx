@@ -226,6 +226,35 @@ describe("LocationSearch", () => {
     expect(input).not.toHaveAttribute("aria-activedescendant");
   });
 
+  it("renders clear button when query is entered and clears input on click", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { display_name: "Berlin, Germany", lat: "52.52", lon: "13.405" },
+      ],
+    } as Response);
+
+    render(<LocationSearch onSelect={vi.fn()} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+
+    expect(screen.queryByRole("button", { name: /clear location search/i })).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "berlin" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    const clearBtn = screen.getByRole("button", { name: /clear location search/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    fireEvent.click(clearBtn);
+
+    expect(input).toHaveValue("");
+    expect(screen.getByText("Manhattan, NY")).toBeInTheDocument();
+  });
+
   it("clears the highlight when new results arrive", async () => {
     vi.useFakeTimers();
     vi.mocked(fetch).mockResolvedValue({
