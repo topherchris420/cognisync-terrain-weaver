@@ -22,20 +22,32 @@ const PREFETCH: Record<string, () => void> = {
 
 export function AppNav() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-xl">
       {/* Keyboard users get a shortcut past the nav; invisible until focused. */}
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:bg-primary focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-primary-foreground"
       >
         Skip to content
       </a>
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <Logo size="md" />
-        </Link>
+      <div className="flex h-11 items-center justify-between pl-3 pr-3">
+        <div className="flex items-center gap-4 min-w-0">
+          <Link to="/" className="flex items-center gap-2 group shrink-0">
+            <Logo size="sm" variant="mark" />
+            <span className="hud-value text-[11px] font-semibold uppercase tracking-[0.28em] text-foreground">
+              Mannahatta
+            </span>
+          </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
+          <span className="hidden md:block h-5 w-px bg-border" />
+
+          <div className="hidden md:flex items-center gap-2">
+            <span className="signal-dot" aria-hidden />
+            <span className="hud-label">Live · Urban Resilience Intelligence</span>
+          </div>
+        </div>
+
+        <nav className="hidden md:flex items-center gap-0 border-x border-border">
           {links.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -45,14 +57,14 @@ export function AppNav() {
               onFocus={PREFETCH[to]}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  "relative flex items-center gap-1.5 border-r border-border px-4 py-3 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors last:border-r-0",
                   isActive
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-primary/10 text-primary after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )
               }
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               {label}
             </NavLink>
           ))}
@@ -64,16 +76,16 @@ export function AppNav() {
             href={SITE.repoUrl}
             target="_blank"
             rel="noreferrer"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex h-7 w-7 items-center justify-center border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
             aria-label="Open source repository"
           >
-            <Github className="h-4 w-4" />
+            <Github className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>
 
       {/* Mobile nav */}
-      <nav className="md:hidden border-t border-border/60 flex">
+      <nav className="md:hidden border-t border-border flex">
         {links.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -81,7 +93,7 @@ export function AppNav() {
             end={end}
             className={({ isActive }) =>
               cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 border-r border-border py-2 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors last:border-r-0",
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground"
@@ -96,3 +108,4 @@ export function AppNav() {
     </header>
   );
 }
+
