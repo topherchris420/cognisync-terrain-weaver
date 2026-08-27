@@ -3,6 +3,7 @@ import { Layers, Map as MapIcon, LineChart, Github, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 import { SITE } from "@/lib/site";
+import { NavOpticsControls } from "./tactical/NavOpticsControls";
 
 const links = [
   { to: "/", label: "Map", icon: MapIcon, end: true },
@@ -58,6 +59,7 @@ export function AppNav() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <NavOpticsControls />
           <a
             href={SITE.repoUrl}
             target="_blank"

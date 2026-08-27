@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { SensorOpticsProvider } from "@/lib/sensor-optics-context";
 // Route-level code splitting: Analyze pulls in MapLibre GL (~800 kB) and
 // Dashboard pulls in the feed UI — neither should weigh down the landing page.
 const Analyze = lazy(() => import("./pages/Analyze"));
@@ -35,20 +36,22 @@ const App = () => (
             theme and renders white toasts over the dark UI on light-mode
             machines (no ThemeProvider is mounted to say otherwise). */}
         <Sonner theme="dark" />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <ScrollToTop />
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<Analyze />} />
-              <Route path="/analyze" element={<Navigate to="/" replace />} />
-              <Route path="/tactical" element={<Tactical />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+        <SensorOpticsProvider>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <ScrollToTop />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Analyze />} />
+                <Route path="/analyze" element={<Navigate to="/" replace />} />
+                <Route path="/tactical" element={<Tactical />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </SensorOpticsProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </ErrorBoundary>

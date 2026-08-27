@@ -65,6 +65,9 @@ import {
 import { boundsToSimBBox } from "@/lib/simulation";
 import { generatePDFReport } from "@/lib/pdf-export";
 import { toast } from "sonner";
+import { TacticalHUD } from "@/components/tactical/TacticalHUD";
+import { CommandPalette } from "@/components/tactical/CommandPalette";
+import { DetectionOverlay } from "@/components/tactical/DetectionOverlay";
 
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
 import type { SimulationRequestV2 } from "@/lib/simulation-types";
@@ -521,7 +524,29 @@ export default function Analyze() {
               baseSimResult={simResult}
             />
           )}
+
+          {/* Target Detection Overlay */}
+          <DetectionOverlay
+            riskZones={simResult?.risk_zones ?? []}
+            flowPaths={simResult?.flow_paths ?? []}
+          />
         </div>
+
+        {/* Tactical Military HUD & Spatial Command Palette */}
+        <TacticalHUD
+          lat={view.lat}
+          lng={view.lng}
+          zoom={view.zoom}
+          surfaceAreaKm2={currentAreaKm2}
+          absorptionScore={result ? Number(result.absorption_score) : 58.4}
+          locationName={locationLabel || name}
+        />
+
+        <CommandPalette
+          onSelectCity={(city) => goTo(city)}
+          onRunSimulation={() => runSimulation(false)}
+          onExportPdf={handleExportPDF}
+        />
 
         {/* 3. Top Floating Location Toolbar & Presets Bar */}
         <div className="absolute top-4 left-4 right-4 md:left-6 md:right-auto z-30 flex flex-col md:flex-row items-stretch md:items-center gap-2 max-w-2xl">
