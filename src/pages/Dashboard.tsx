@@ -324,58 +324,60 @@ export default function Dashboard() {
 
         {/* Controls */}
         {rows && rows.length > 0 && (
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[220px]">
+          <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1 min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by site name or location…"
-                className="pl-9"
+                className="pl-9 w-full"
                 aria-label="Search analyses"
               />
             </div>
-            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="w-[190px]" aria-label="Sort analyses">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="score-desc">Highest score</SelectItem>
-                <SelectItem value="score-asc">Lowest score</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant={compareMode ? "default" : "outline"}
-              size="sm"
-              className="gap-2"
-              onClick={toggleCompareMode}
-              aria-pressed={compareMode}
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-              Compare
-            </Button>
-            <div className="flex items-center gap-1.5" role="group" aria-label="Export the feed">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+                <SelectTrigger className="w-full sm:w-[170px]" aria-label="Sort analyses">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest first</SelectItem>
+                  <SelectItem value="score-desc">Highest score</SelectItem>
+                  <SelectItem value="score-asc">Lowest score</SelectItem>
+                </SelectContent>
+              </Select>
               <Button
-                variant="outline"
+                variant={compareMode ? "default" : "outline"}
                 size="sm"
-                className="gap-2"
-                onClick={() => exportFeed("geojson", visible)}
-                title="Export the visible sites as GeoJSON (QGIS / ArcGIS)"
+                className="gap-2 flex-1 sm:flex-initial"
+                onClick={toggleCompareMode}
+                aria-pressed={compareMode}
               >
-                <FileJson className="h-4 w-4" />
-                GeoJSON
+                <ArrowLeftRight className="h-4 w-4" />
+                {compareMode ? "Comparing" : "Compare"}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => exportFeed("csv", visible)}
-                title="Export the visible sites as CSV"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                CSV
-              </Button>
+              <div className="flex items-center gap-1.5 w-full sm:w-auto" role="group" aria-label="Export the feed">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 flex-1 sm:flex-none"
+                  onClick={() => exportFeed("geojson", visible)}
+                  title="Export the visible sites as GeoJSON (QGIS / ArcGIS)"
+                >
+                  <FileJson className="h-4 w-4" />
+                  GeoJSON
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 flex-1 sm:flex-none"
+                  onClick={() => exportFeed("csv", visible)}
+                  title="Export the visible sites as CSV"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  CSV
+                </Button>
+              </div>
             </div>
           </div>
         )}
