@@ -3,10 +3,10 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // src/lib/mcp/index.ts
-import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.26.1";
 
 // src/lib/mcp/tools/list-scans.ts
-import { defineTool } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z } from "npm:zod@^4";
 
 // src/lib/mcp/supabase.ts
@@ -92,7 +92,7 @@ var list_scans_default = defineTool({
 });
 
 // src/lib/mcp/tools/get-scan.ts
-import { defineTool as defineTool2, ToolError } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool2, ToolError } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z2 } from "npm:zod@^4";
 var get_scan_default = defineTool2({
   name: "get_scan",
@@ -112,7 +112,7 @@ var get_scan_default = defineTool2({
 });
 
 // src/lib/mcp/tools/find-scans-near.ts
-import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z3 } from "npm:zod@^4";
 var EARTH_KM_PER_DEG = 111.32;
 var find_scans_near_default = defineTool3({
@@ -147,40 +147,9 @@ var find_scans_near_default = defineTool3({
 });
 
 // src/lib/mcp/tools/score-land-cover.ts
-import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z4 } from "npm:zod@^4";
-
-// src/lib/absorption.ts
-var ABSORPTION_WEIGHTS = {
-  vegetation: 0.8,
-  soil: 0.7,
-  buildings: 0.1,
-  pavement: 0.12
-};
-var ABSORBING = [
-  "vegetation",
-  "soil",
-  "buildings",
-  "pavement"
-];
-function computeAbsorptionScore(cover) {
-  const land = ABSORBING.reduce((sum, k) => sum + (Number(cover[k]) || 0), 0);
-  if (land <= 0) return 0;
-  const absorbed = ABSORBING.reduce(
-    (sum, k) => sum + (Number(cover[k]) || 0) * ABSORPTION_WEIGHTS[k],
-    0
-  );
-  return Math.round(absorbed / land * 100 * 10) / 10;
-}
-var RISK_BANDS = { moderate: 35, low: 55 };
-function classifyFloodRisk(score) {
-  if (score >= RISK_BANDS.low) return "low";
-  if (score >= RISK_BANDS.moderate) return "moderate";
-  if (score >= 0) return "high";
-  return "unknown";
-}
-
-// src/lib/mcp/tools/score-land-cover.ts
+import { classifyFloodRisk, computeAbsorptionScore } from "npm:@/lib/absorption";
 var score_land_cover_default = defineTool4({
   name: "score_land_cover",
   title: "Score a land-cover mix",
@@ -209,8 +178,9 @@ var score_land_cover_default = defineTool4({
 });
 
 // src/lib/mcp/tools/create-analysis.ts
-import { defineTool as defineTool5, ToolError as ToolError2 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool5, ToolError as ToolError2 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z5 } from "npm:zod@^4";
+import { classifyFloodRisk as classifyFloodRisk2, computeAbsorptionScore as computeAbsorptionScore2 } from "npm:@/lib/absorption";
 var recommendation = z5.object({
   title: z5.string().min(1),
   description: z5.string().min(1),
@@ -245,8 +215,8 @@ var create_analysis_default = defineTool5({
       water: input.water,
       soil: input.soil
     };
-    const absorption_score = computeAbsorptionScore(land_cover);
-    const flood_risk = classifyFloodRisk(absorption_score);
+    const absorption_score = computeAbsorptionScore2(land_cover);
+    const flood_risk = classifyFloodRisk2(absorption_score);
     const { data, error } = await supabaseForUser(ctx).from("analyses").insert({
       user_id: ctx.getUserId(),
       name: input.name,
@@ -275,8 +245,9 @@ var create_analysis_default = defineTool5({
 });
 
 // src/lib/mcp/tools/update-analysis.ts
-import { defineTool as defineTool6, ToolError as ToolError3 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool6, ToolError as ToolError3 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z6 } from "npm:zod@^4";
+import { classifyFloodRisk as classifyFloodRisk3, computeAbsorptionScore as computeAbsorptionScore3 } from "npm:@/lib/absorption";
 var recommendation2 = z6.object({
   title: z6.string().min(1),
   description: z6.string().min(1),
@@ -322,10 +293,10 @@ var update_analysis_default = defineTool6({
     }
     if (given === 5) {
       const land_cover = cover;
-      const score = computeAbsorptionScore(land_cover);
+      const score = computeAbsorptionScore3(land_cover);
       patch.land_cover = land_cover;
       patch.absorption_score = score;
-      patch.flood_risk = classifyFloodRisk(score);
+      patch.flood_risk = classifyFloodRisk3(score);
     }
     if (Object.keys(patch).length === 0) throw new ToolError3("Nothing to update.");
     const { data, error } = await supabaseForUser(ctx).from("analyses").update(patch).eq("id", input.id).select().maybeSingle();
@@ -339,7 +310,7 @@ var update_analysis_default = defineTool6({
 });
 
 // src/lib/mcp/tools/delete-analysis.ts
-import { defineTool as defineTool7, ToolError as ToolError4 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool7, ToolError as ToolError4 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z7 } from "npm:zod@^4";
 var delete_analysis_default = defineTool7({
   name: "delete_analysis",
@@ -360,7 +331,7 @@ var delete_analysis_default = defineTool7({
 });
 
 // src/lib/mcp/tools/list-my-scans.ts
-import { defineTool as defineTool8, ToolError as ToolError5 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { defineTool as defineTool8, ToolError as ToolError5 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z8 } from "npm:zod@^4";
 var list_my_scans_default = defineTool8({
   name: "list_my_scans",
@@ -403,5 +374,5 @@ var mcp_default = defineMcp({
 });
 
 // lovable-mcp-supabase-entry.ts
-import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.26.3/stacks/supabase";
+import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.26.1/stacks/supabase";
 Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));
