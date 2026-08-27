@@ -413,12 +413,22 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
     useEffect(() => {
       const draw = drawRef.current;
       if (!draw) return;
+      const getCanvasStyle = () =>
+        typeof map?.getCanvas === "function" ? map.getCanvas().style : null;
+
+      const style = getCanvasStyle();
       if (activeIntervention && activeIntervention !== "wetland") {
         draw.changeMode("draw_polygon");
+        if (style) style.cursor = "crosshair";
       } else {
         draw.changeMode("simple_select");
+        if (style) style.cursor = "";
       }
-    }, [activeIntervention]);
+      return () => {
+        const s = getCanvasStyle();
+        if (s) s.cursor = "";
+      };
+    }, [activeIntervention, map]);
 
     useEffect(() => {
       if (!map) return;

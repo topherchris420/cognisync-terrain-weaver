@@ -169,6 +169,27 @@ export default function Analyze() {
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "simulation" | "mitigation" | "compare" | "export">("overview");
 
+  // When an intervention tool becomes active, auto-collapse drawer for clear map view
+  useEffect(() => {
+    if (activeIntervention) {
+      setDrawerOpen(false);
+    }
+  }, [activeIntervention]);
+
+  // Global escape key handler to cancel drawing or close open modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (activeIntervention) {
+          setActiveIntervention(null);
+          toast.info("Drawing cancelled");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeIntervention]);
+
   const determinism: DeterminismReport | null = useMemo(
     () => (nowSeal && possibleSeal ? checkStormDeterminism(nowSeal, possibleSeal) : null),
     [nowSeal, possibleSeal]
@@ -443,6 +464,47 @@ export default function Analyze() {
               onScenarioChange={(s) => setScenario(s)}
               activeIntervention={activeIntervention}
             />
+          )}
+
+          {/* Floating On-Map Drawing Mode Action Banner */}
+          {workflow.state === "REDESIGN" && activeIntervention && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
+              <div className="panel rounded-xl border border-accent/60 bg-card/95 p-4 shadow-2xl backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent border border-accent/40">
+                    <Paintbrush className="h-5 w-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-accent">
+                      Drawing Mode Active
+                    </h3>
+                    <p className="text-xs text-foreground font-medium">
+                      Click points on map to sketch area. Double-click or press <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono border">Esc</kbd> when finished.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActiveIntervention(null)}
+                    className="h-8 text-xs flex-1 sm:flex-none"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setActiveIntervention(null);
+                      setDrawerOpen(true);
+                    }}
+                    className="h-8 text-xs flex-1 sm:flex-none gap-1 bg-accent text-accent-foreground hover:bg-accent/90"
+                  >
+                    Done Drawing
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Split-Screen Comparative Mode */}

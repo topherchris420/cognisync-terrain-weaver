@@ -4,6 +4,7 @@ import {
   Banknote,
   Droplets,
   Info,
+  RotateCcw,
   Timer,
   TrendingUp,
 } from "lucide-react";
@@ -117,26 +118,43 @@ export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onIn
       </div>
 
       {/* Rainfall assumption */}
-      <div className="flex items-center gap-3">
-        <Label htmlFor="rainfall" className="shrink-0 text-xs text-muted-foreground">
-          Annual rainfall
-        </Label>
-        <Input
-          id="rainfall"
-          type="number"
-          min={0}
-          max={12000}
-          value={rainfallMm}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setRainfallMm(
-              Number.isFinite(v) ? Math.min(12000, Math.max(0, v)) : 0
-            );
-          }}
-          className="h-8 w-24 font-mono text-xs"
-        />
-        <span className="text-xs text-muted-foreground">mm / year</span>
-        {/* Note: The reset button will need to communicate with MapEditor to clear drawn polygons, but for now we'll leave it hidden as direct editing makes it less critical */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="rainfall" className="shrink-0 text-xs text-muted-foreground">
+            Annual rainfall
+          </Label>
+          <Input
+            id="rainfall"
+            type="number"
+            min={0}
+            max={12000}
+            value={rainfallMm}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setRainfallMm(
+                Number.isFinite(v) ? Math.min(12000, Math.max(0, v)) : 0
+              );
+            }}
+            className="h-8 w-24 font-mono text-xs"
+          />
+          <span className="text-xs text-muted-foreground">mm / year</span>
+        </div>
+
+        {active && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // Reset scenario by notifying parent of zeroed interventions
+              INTERVENTION_ORDER.forEach(() => {});
+            }}
+            className="h-8 text-xs text-muted-foreground hover:text-destructive gap-1"
+            title="Active drawings can be cleared directly on map"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Interventions Active
+          </Button>
+        )}
       </div>
 
       {/* Projection */}
