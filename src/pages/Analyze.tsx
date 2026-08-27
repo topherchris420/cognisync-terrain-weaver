@@ -948,9 +948,9 @@ export default function Analyze() {
 
                         <div className="rounded-lg border border-border bg-background/50 p-3">
                           <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span>Peak Stormwater Retention</span>
+                            <span>Added Retention</span>
                             <span className="font-mono font-semibold text-foreground">
-                              {catalystFuture.future.impact.retentionDeltaPct.toFixed(1)}% gain
+                              {Math.round(catalystFuture.future.impact.addedRetentionM3).toLocaleString()} m³/yr
                             </span>
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">

@@ -40,6 +40,8 @@ describe("Tactical Routing & Hazard Cross-Referencing", () => {
       ],
       inundation_risk_score: 0,
       intersecting_flow_volume_m3: 0,
+      inundation_depth_m: 0,
+      flow_velocity_mps: 0,
     };
 
     const flowPaths: FlowPath[] = [
@@ -69,6 +71,8 @@ describe("Tactical Routing & Hazard Cross-Referencing", () => {
       coordinates: [[-74.0, 40.71]],
       inundation_risk_score: 0,
       intersecting_flow_volume_m3: 0,
+      inundation_depth_m: 0,
+      flow_velocity_mps: 0,
     };
 
     const riskZones: RiskZone[] = [

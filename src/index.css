@@ -5,65 +5,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Mannahatta — Urban Resilience Intelligence
-   Earthy scientific mission-console. All colors HSL semantic tokens. */
+/* Mannahatta — Tactical OSINT ground station.
+   Near-black glass, hairline rules, one signal cyan. HSL tokens only. */
 
 @layer base {
   :root {
-    --background: 155 18% 7%;
-    --foreground: 60 15% 92%;
+    --background: 240 24% 3%;
+    --foreground: 220 12% 92%;
 
-    --card: 158 16% 10%;
-    --card-foreground: 60 15% 94%;
+    --card: 240 26% 6%;
+    --card-foreground: 220 12% 94%;
 
-    --popover: 158 18% 9%;
-    --popover-foreground: 60 15% 94%;
+    --popover: 240 26% 5%;
+    --popover-foreground: 220 12% 94%;
 
-    --primary: 158 55% 45%;
-    --primary-foreground: 155 30% 6%;
+    --primary: 190 100% 50%;
+    --primary-foreground: 240 40% 5%;
 
-    --secondary: 155 10% 15%;
-    --secondary-foreground: 60 15% 92%;
+    --secondary: 240 12% 12%;
+    --secondary-foreground: 220 12% 92%;
 
-    --muted: 155 10% 14%;
-    --muted-foreground: 60 8% 65%;
+    --muted: 240 12% 11%;
+    --muted-foreground: 235 8% 58%;
 
-    --accent: 190 75% 55%;
-    --accent-foreground: 200 40% 8%;
+    --accent: 190 100% 50%;
+    --accent-foreground: 240 40% 5%;
 
-    --destructive: 15 75% 55%;
-    --destructive-foreground: 60 15% 96%;
+    --destructive: 4 85% 58%;
+    --destructive-foreground: 220 12% 96%;
 
-    --warning: 38 90% 55%;
+    --warning: 38 95% 55%;
     --warning-foreground: 30 40% 8%;
 
-    --border: 155 12% 18%;
-    --input: 155 12% 14%;
-    --ring: 158 55% 45%;
+    --border: 240 10% 16%;
+    --input: 240 12% 11%;
+    --ring: 190 100% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.125rem;
 
-    --surface-pavement: 30 4% 55%;
-    --surface-building: 20 12% 42%;
-    --surface-vegetation: 130 45% 45%;
-    --surface-water: 200 75% 55%;
-    --surface-soil: 30 40% 45%;
+    --surface-pavement: 235 6% 55%;
+    --surface-building: 20 12% 46%;
+    --surface-vegetation: 145 55% 45%;
+    --surface-water: 190 100% 50%;
+    --surface-soil: 30 40% 48%;
 
-    --gradient-hero: radial-gradient(circle at 20% 20%, hsl(158 55% 45% / 0.22), transparent 55%),
-                     radial-gradient(circle at 80% 30%, hsl(190 75% 55% / 0.14), transparent 55%),
-                     radial-gradient(circle at 50% 90%, hsl(15 75% 55% / 0.08), transparent 60%);
-    --gradient-panel: linear-gradient(180deg, hsl(158 16% 11%), hsl(158 16% 9%));
-    --shadow-glow: 0 0 40px -8px hsl(158 55% 45% / 0.35);
-    --shadow-panel: 0 8px 32px -12px hsl(155 30% 3% / 0.6);
+    --gradient-hero: radial-gradient(circle at 20% 20%, hsl(190 100% 50% / 0.16), transparent 55%),
+                     radial-gradient(circle at 80% 30%, hsl(190 100% 50% / 0.08), transparent 55%),
+                     radial-gradient(circle at 50% 90%, hsl(4 85% 58% / 0.06), transparent 60%);
+    --gradient-panel: linear-gradient(180deg, hsl(240 26% 7% / 0.94), hsl(240 26% 4% / 0.94));
+    --shadow-glow: 0 0 32px -10px hsl(190 100% 50% / 0.45);
+    --shadow-panel: 0 18px 46px -22px hsl(240 60% 2% / 0.95);
 
-    --sidebar-background: 158 18% 8%;
-    --sidebar-foreground: 60 15% 92%;
-    --sidebar-primary: 158 55% 45%;
-    --sidebar-primary-foreground: 155 30% 6%;
-    --sidebar-accent: 158 15% 12%;
-    --sidebar-accent-foreground: 60 15% 92%;
-    --sidebar-border: 155 12% 16%;
-    --sidebar-ring: 158 55% 45%;
+    --sidebar-background: 240 26% 5%;
+    --sidebar-foreground: 220 12% 92%;
+    --sidebar-primary: 190 100% 50%;
+    --sidebar-primary-foreground: 240 40% 5%;
+    --sidebar-accent: 240 14% 10%;
+    --sidebar-accent-foreground: 220 12% 92%;
+    --sidebar-border: 240 10% 15%;
+    --sidebar-ring: 190 100% 50%;
 
     /* Catalyst — hidden layer. One restrained gold, used nowhere else. */
     --catalyst-gold: 41 58% 62%;
@@ -71,6 +71,7 @@
     --catalyst-ink: 40 30% 8%;
   }
 }
+
 
 @layer base {
   * {
@@ -122,6 +123,88 @@
   .glow-primary {
     box-shadow: var(--shadow-glow);
   }
+
+  /* --------------------------------------------------- Ground-station HUD --
+     Hairline glass modules, square corners, mono micro-labels. */
+
+  .hud-panel {
+    background: hsl(240 26% 5% / 0.82);
+    border: 1px solid hsl(var(--border));
+    backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .hud-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(240 20% 9% / 0.7);
+    padding: 0.3rem 0.55rem;
+  }
+
+  .hud-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    line-height: 1;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .hud-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: hsl(var(--foreground));
+  }
+
+  /* Corner ticks — the frame markers of a targeting frame. */
+  .hud-ticks::before,
+  .hud-ticks::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: hsl(var(--primary) / 0.7);
+    pointer-events: none;
+  }
+  .hud-ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .hud-ticks::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+  }
+
+  .signal-dot {
+    width: 5px;
+    height: 5px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.8);
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+
+  .reticle {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.35) 1px, transparent 1px);
+    background-size: 100% 50%, 50% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.25;
+  }
+
 
   /* Analysis "scanning" sweep — a soft primary band that tracks down the tile
      being classified, giving the wait a sense of active work. */
