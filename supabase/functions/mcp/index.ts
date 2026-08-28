@@ -157,19 +157,14 @@ var ABSORPTION_WEIGHTS = {
   buildings: 0.1,
   pavement: 0.12
 };
-var ABSORBING = [
-  "vegetation",
-  "soil",
-  "buildings",
-  "pavement"
-];
 function computeAbsorptionScore(cover) {
-  const land = ABSORBING.reduce((sum, k) => sum + (Number(cover[k]) || 0), 0);
+  const veg = Number(cover.vegetation) || 0;
+  const soil = Number(cover.soil) || 0;
+  const bldg = Number(cover.buildings) || 0;
+  const pave = Number(cover.pavement) || 0;
+  const land = veg + soil + bldg + pave;
   if (land <= 0) return 0;
-  const absorbed = ABSORBING.reduce(
-    (sum, k) => sum + (Number(cover[k]) || 0) * ABSORPTION_WEIGHTS[k],
-    0
-  );
+  const absorbed = veg * ABSORPTION_WEIGHTS.vegetation + soil * ABSORPTION_WEIGHTS.soil + bldg * ABSORPTION_WEIGHTS.buildings + pave * ABSORPTION_WEIGHTS.pavement;
   return Math.round(absorbed / land * 100 * 10) / 10;
 }
 var RISK_BANDS = { moderate: 35, low: 55 };
