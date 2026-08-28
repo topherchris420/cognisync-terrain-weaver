@@ -348,6 +348,20 @@
   }
 }
 
+  .hud-corner { position: absolute; width: 3rem; height: 3rem; opacity: 0.8; pointer-events: none; }
+  .hud-corner-tl { top: 1rem; left: 1rem; border-top: 2px solid; border-left: 2px solid; }
+  .hud-corner-tr { top: 1rem; right: 1rem; border-top: 2px solid; border-right: 2px solid; }
+  .hud-corner-bl { bottom: 1rem; left: 1rem; border-bottom: 2px solid; border-left: 2px solid; }
+  .hud-corner-br { bottom: 1rem; right: 1rem; border-bottom: 2px solid; border-right: 2px solid; }
+  .hud-freshness { color: hsl(var(--primary)); letter-spacing: 0.06em; }
+  .target-row { border: 1px solid transparent; transition: background 160ms ease, border-color 160ms ease; }
+  .target-row:hover, .target-row[aria-pressed="true"] { background: hsl(var(--primary) / 0.1); border-color: hsl(var(--primary) / 0.35); }
+  .target-frame { transform: translate(-50%, -50%); min-width: 5rem; padding: 0.35rem 0.5rem; border: 1px solid hsl(var(--primary) / 0.7); background: hsl(var(--background) / 0.78); color: hsl(var(--primary)); text-align: left; display: flex; flex-direction: column; gap: 0.15rem; font-size: 9px; letter-spacing: 0.08em; animation: target-pulse 2.8s ease-in-out infinite; }
+  .target-frame strong { color: hsl(var(--foreground)); font-size: 10px; }
+  .target-frame.alert { border-color: hsl(var(--warning)); color: hsl(var(--warning)); }
+  .target-frame.critical { border-color: hsl(var(--destructive)); color: hsl(var(--destructive)); animation-duration: 1.2s; }
+  @keyframes target-pulse { 0%, 100% { box-shadow: 0 0 0 hsl(var(--primary) / 0); } 50% { box-shadow: 0 0 18px hsl(var(--primary) / 0.18); } }
+
 /* Honour users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   html {
