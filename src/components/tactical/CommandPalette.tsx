@@ -42,6 +42,8 @@ export function CommandPalette({
     hudOpen,
     setHudOpen,
     soundEnabled,
+    detectionOpen,
+    setDetectionOpen,
   } = useSensorOptics();
 
   const [query, setQuery] = useState("");
@@ -222,6 +224,20 @@ export function CommandPalette({
                 <span>{hudOpen ? "Close GEOINT HUD Overlay" : "Open GEOINT HUD Overlay"}</span>
               </div>
               <Badge variant="secondary" className="text-[10px] font-mono">Hotkey [H]</Badge>
+            </button>
+
+            <button
+              onClick={() => {
+                setDetectionOpen((v) => !v);
+                setCommandPaletteOpen(false);
+              }}
+              className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-muted/60 flex items-center justify-between text-foreground transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+                <span>{detectionOpen ? "Hide" : "Show"} resilience target roster</span>
+              </div>
+              <Badge variant="secondary" className="text-[10px] font-mono">Targets [T]</Badge>
             </button>
 
             {onRunSimulation && (

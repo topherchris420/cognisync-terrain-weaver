@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { useWeatherAlerts } from "@/hooks/useWeatherAlerts";
 import {
   Radio,
   Navigation,
@@ -27,6 +28,7 @@ import type { FlowPath, RiskZone } from "@/lib/simulation-types";
 import { TacticalHUD } from "./TacticalHUD";
 import { CommandPalette } from "./CommandPalette";
 import { DetectionOverlay } from "./DetectionOverlay";
+import { WeatherAlertPanel } from "./WeatherAlertPanel";
 
 interface TacticalCOPProps {
   initialCenter?: [number, number]; // [lng, lat]
@@ -68,6 +70,7 @@ export function TacticalCOP({
     flowPaths,
     riskZones,
   });
+  const weather = useWeatherAlerts(initialCenter[1], initialCenter[0]);
 
   const handleSelectSensor = useCallback((sensor: IoTSensor) => {
     setSelectedSensor(sensor);
@@ -155,6 +158,16 @@ export function TacticalCOP({
           {/* Floating Layer Controls (Top Left of Map) */}
           <div className="absolute top-3 left-3 z-10">
             <TacticalLayerControls layers={layers} onChange={setLayers} />
+          </div>
+
+          {/* Live public weather intelligence */}
+          <div className="absolute top-3 right-3 z-10">
+            <WeatherAlertPanel
+              alerts={weather.alerts}
+              status={weather.status}
+              updatedAt={weather.updatedAt}
+              onRefresh={() => void weather.refresh()}
+            />
           </div>
 
           {/* Floating Incident Alert Feed (Bottom of Map) */}
