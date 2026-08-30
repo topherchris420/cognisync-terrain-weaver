@@ -3,6 +3,7 @@
 [![status](https://img.shields.io/badge/status-v0.3-brightgreen)](https://github.com/topherchris420/cognisync-terrain-weaver)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue)](https://www.typescriptlang.org/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-orange)](https://github.com/topherchris420/cognisync-terrain-weaver/pulls)
 
 **Point it at any city block. Get a quantitative climate-resilience report back in seconds.**

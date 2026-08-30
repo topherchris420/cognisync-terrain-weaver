@@ -6,8 +6,11 @@ import {
   csvEscape,
   parseBBox,
   recordAreaM2,
+  validateBoundingBox,
+  validateCoordinates,
   type BBox,
 } from "./geo";
+import { GeoError, InvalidBoundingBoxError, InvalidCoordinateError } from "./errors";
 import type { AnalysisRecord } from "./types";
 
 const record = (partial: Partial<AnalysisRecord>): AnalysisRecord => ({
@@ -136,6 +139,26 @@ describe("analysesToCSV", () => {
       record({ name: 'Pier 40, the "big" one' }),
     ]);
     expect(csv).toContain('"Pier 40, the ""big"" one"');
+  });
+});
+
+describe("coordinate and bbox validation", () => {
+  it("validates correct coordinates", () => {
+    expect(() => validateCoordinates(40.7128, -74.006)).not.toThrow();
+  });
+
+  it("throws InvalidCoordinateError for bad coordinates", () => {
+    expect(() => validateCoordinates(95, -74.006)).toThrow(InvalidCoordinateError);
+    expect(() => validateCoordinates(40.7128, -200)).toThrow(InvalidCoordinateError);
+    expect(() => validateCoordinates(NaN, -74)).toThrow(GeoError);
+  });
+
+  it("validates correct bounding boxes", () => {
+    expect(() => validateBoundingBox([[-74, 40.7], [-73.9, 40.8]])).not.toThrow();
+  });
+
+  it("throws InvalidBoundingBoxError for bad bounding boxes", () => {
+    expect(() => validateBoundingBox([[-74, 40.8], [-73.9, 40.7]])).toThrow(InvalidBoundingBoxError);
   });
 });
 
