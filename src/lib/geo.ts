@@ -1,6 +1,7 @@
 import type { AnalysisRecord } from "./types";
 import { classifyFloodRisk } from "./absorption";
 import { SITE } from "./site";
+import { InvalidBoundingBoxError, InvalidCoordinateError } from "./errors";
 
 /**
  * GIS interoperability toolkit.
@@ -21,6 +22,27 @@ function isLng(v: unknown): v is number {
 }
 function isLat(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 90;
+}
+
+/**
+ * Validates latitude and longitude coordinates.
+ * Throws InvalidCoordinateError if coordinates are out of valid bounds.
+ */
+export function validateCoordinates(lat: number, lng: number): void {
+  if (!isLat(lat) || !isLng(lng)) {
+    throw new InvalidCoordinateError(lat, lng);
+  }
+}
+
+/**
+ * Validates a BBox tuple.
+ * Throws InvalidBoundingBoxError if bounds are invalid.
+ */
+export function validateBoundingBox(bbox: BBox): void {
+  const [[w, s], [e, n]] = bbox;
+  if (!isLng(w) || !isLat(s) || !isLng(e) || !isLat(n) || s >= n) {
+    throw new InvalidBoundingBoxError();
+  }
 }
 
 /**
