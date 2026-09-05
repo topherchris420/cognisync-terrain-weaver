@@ -119,7 +119,9 @@ export function evaluateEligibility(
       type === "green_roofs" ? "buildings" : "pavement";
     const candidates = polygonFeatures(context, requiredClass);
     const sourceIds = new Set(
-      candidates.map((candidate) => candidate.properties.sourceId)
+      candidates
+        .map((candidate) => candidate.properties?.sourceId)
+        .filter((id): id is string => typeof id === "string")
     );
     const merged = mergePolygons(candidates);
     if (!merged) {
@@ -169,7 +171,9 @@ export function evaluateEligibility(
 
   const buildings = polygonFeatures(context, "buildings");
   const sourceIds = new Set(
-    buildings.map((candidate) => candidate.properties.sourceId)
+    buildings
+      .map((candidate) => candidate.properties?.sourceId)
+      .filter((id): id is string => typeof id === "string")
   );
   const mergedBuildings = mergePolygons(buildings);
   if (buildings.length > 0 && !mergedBuildings) {

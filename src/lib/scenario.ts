@@ -26,8 +26,8 @@ export type InterventionKey =
 export interface InterventionDef {
   key: InterventionKey;
   label: string;
-  /** Land-cover class the intervention converts. */
-  source: LandCoverKey;
+  /** Land-cover class the intervention converts (land only — never water). */
+  source: Exclude<LandCoverKey, "water">;
   /** Effective absorption weight of the converted surface. */
   targetWeight: number;
   /** Planning-level installed cost, USD per m². */

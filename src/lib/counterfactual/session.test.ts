@@ -214,7 +214,7 @@ describe("counterfactual session reducer", () => {
       requestId: "new-place",
     });
 
-    expect(next.possibleSurface.interventions).toEqual([]);
+    expect(next.possibleSurface!.interventions).toEqual([]);
     expect(next.nowSimulation).toBeNull();
     expect(next.possibleSimulation).toBeNull();
     expect(next.compareOpen).toBe(false);
@@ -466,8 +466,8 @@ describe("counterfactual session reducer", () => {
     });
 
     expect(state.storm).toBe(configuredStorm);
-    expect(state.nowSurface.surfaceHash).toBe("surface:configured:now");
-    expect(state.possibleSurface.surfaceHash).toBe(
+    expect(state.nowSurface!.surfaceHash).toBe("surface:configured:now");
+    expect(state.possibleSurface!.surfaceHash).toBe(
       "surface:configured:possible"
     );
 
@@ -503,7 +503,7 @@ describe("counterfactual session reducer", () => {
     });
     state = counterfactualReducer(state, {
       type: "NOW_SIMULATION_SUCCEEDED",
-      result: makeSimulation(storm.hash, state.nowSurface.surfaceHash),
+      result: makeSimulation(storm.hash, state.nowSurface!.surfaceHash),
     });
     state = counterfactualReducer(state, {
       type: "POSSIBLE_SIMULATION_STARTED",

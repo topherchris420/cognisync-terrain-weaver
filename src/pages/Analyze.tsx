@@ -78,6 +78,7 @@ import {
   type StormSeal,
   type DeterminismReport,
 } from "@/lib/storm-identity";
+import { StormTelemetryReadout } from "@/components/studio/StormTelemetryReadout";
 
 const STORM_RAINFALL_MM = 50;
 const STORM_RESOLUTION = "low" as const;
@@ -573,7 +574,15 @@ export default function Analyze() {
         </div>
 
         {/* 4. Live Bottom-Right GPS Status Readout */}
-        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+        <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+          {nowSeal && (
+            <StormTelemetryReadout
+              seal={nowSeal}
+              rerunSeal={possibleSeal}
+              report={determinism}
+            />
+          )}
+          <div className="flex items-center gap-2">
           <button
             onClick={copyShareLink}
             title="Copy coordinate link"
@@ -584,6 +593,7 @@ export default function Analyze() {
           </button>
           <div className="rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 font-mono text-xs text-muted-foreground shadow-md">
             {view.lat.toFixed(4)}°N, {view.lng.toFixed(4)}°W · z{view.zoom.toFixed(1)}
+          </div>
           </div>
         </div>
 

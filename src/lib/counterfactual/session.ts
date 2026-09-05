@@ -106,13 +106,15 @@ function clonePossibleSurface(surface: RealitySurface): RealitySurface {
 
 function getEditPhase(
   activeTool: InterventionType | null,
-  possibleSurface: RealitySurface
+  possibleSurface: RealitySurface | null
 ): AnalyzePhase {
   if (activeTool) {
     return "edit";
   }
 
-  return possibleSurface.interventions.length === 0 ? "edit-prompt" : "edit";
+  return (possibleSurface?.interventions.length ?? 0) === 0
+    ? "edit-prompt"
+    : "edit";
 }
 
 function matchesSurface(

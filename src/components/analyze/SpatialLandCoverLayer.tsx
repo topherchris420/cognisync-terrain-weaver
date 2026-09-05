@@ -125,12 +125,22 @@ export function SpatialLandCoverLayer({
       const feature = event.features?.[0];
       if (feature) onInspect(inspectionFromFeature(feature));
     };
-    map.on("click", POLYGON_LAYER_ID, handleClick);
-    map.on("click", TREE_LAYER_ID, handleClick);
+    const onLayerClick = map.on.bind(map) as unknown as (
+      type: string,
+      layer: string,
+      listener: typeof handleClick
+    ) => void;
+    const offLayerClick = map.off.bind(map) as unknown as (
+      type: string,
+      layer: string,
+      listener: typeof handleClick
+    ) => void;
+    onLayerClick("click", POLYGON_LAYER_ID, handleClick);
+    onLayerClick("click", TREE_LAYER_ID, handleClick);
 
     return () => {
-      map.off("click", POLYGON_LAYER_ID, handleClick);
-      map.off("click", TREE_LAYER_ID, handleClick);
+      offLayerClick("click", POLYGON_LAYER_ID, handleClick);
+      offLayerClick("click", TREE_LAYER_ID, handleClick);
       for (const layerId of [TREE_LAYER_ID, POLYGON_LAYER_ID]) {
         if (map.getLayer(layerId)) map.removeLayer(layerId);
       }
