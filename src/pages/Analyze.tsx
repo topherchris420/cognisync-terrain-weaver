@@ -593,6 +593,7 @@ export default function Analyze() {
           <div className="rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 font-mono text-xs text-muted-foreground shadow-md">
             {view.lat.toFixed(4)}°N, {view.lng.toFixed(4)}°W · z{view.zoom.toFixed(1)}
           </div>
+          </div>
         </div>
 
         {/* 5. Analysis Execution Floating Card (When no result is yet computed) */}
