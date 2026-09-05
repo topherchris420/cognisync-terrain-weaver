@@ -573,7 +573,15 @@ export default function Analyze() {
         </div>
 
         {/* 4. Live Bottom-Right GPS Status Readout */}
-        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+        <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+          {nowSeal && (
+            <StormTelemetryReadout
+              seal={nowSeal}
+              rerunSeal={possibleSeal}
+              report={determinism}
+            />
+          )}
+          <div className="flex items-center gap-2">
           <button
             onClick={copyShareLink}
             title="Copy coordinate link"
