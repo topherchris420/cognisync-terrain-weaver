@@ -32,7 +32,8 @@ export function usePressAndHold({ durationMs, onComplete, disabled }: Options) {
     setProgress(0);
   }, []);
 
-  const now = () => (typeof performance !== "undefined" && performance.now ? Date.now() : Date.now());
+  const now = () =>
+    typeof performance !== "undefined" ? performance.now() : Date.now();
 
   const tick = useCallback(() => {
     const elapsed = Date.now() - startedAt.current;
