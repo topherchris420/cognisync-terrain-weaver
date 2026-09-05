@@ -78,6 +78,7 @@ import {
   type StormSeal,
   type DeterminismReport,
 } from "@/lib/storm-identity";
+import { StormTelemetryReadout } from "@/components/studio/StormTelemetryReadout";
 
 const STORM_RAINFALL_MM = 50;
 const STORM_RESOLUTION = "low" as const;
