@@ -146,7 +146,7 @@ export default function Analyze() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = useMemo(
     () => viewFromParams(searchParams) ?? DEFAULT_VIEW,
-    []
+    [searchParams]
   );
 
   const [name, setName] = useState("Lower Manhattan Watershed");
@@ -219,7 +219,7 @@ export default function Analyze() {
     const bounds = mapRef.current?.getBounds();
     if (bounds) return bboxAreaKm2(bounds);
     return 0.85;
-  }, [result, view]);
+  }, [result]);
 
   const onViewChange = useCallback(
     (v: { lat: number; lng: number; zoom: number }) => {
