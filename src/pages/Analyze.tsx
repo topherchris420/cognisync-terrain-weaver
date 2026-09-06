@@ -68,6 +68,7 @@ import { toast } from "sonner";
 import { TacticalHUD } from "@/components/tactical/TacticalHUD";
 import { CommandPalette } from "@/components/tactical/CommandPalette";
 import { DetectionOverlay } from "@/components/tactical/DetectionOverlay";
+import { AnalysisLaunchPanel } from "@/components/analyze/AnalysisLaunchPanel";
 
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
 import type { SimulationRequestV2 } from "@/lib/simulation-types";
@@ -179,6 +180,21 @@ export default function Analyze() {
       setDrawerOpen(false);
     }
   }, [activeIntervention]);
+
+  // The launch panel advertises this accelerator. Keep it unavailable while
+  // typing and route through runAnalysis so every normal guard still applies.
+  useEffect(() => {
+    const handleLaunchShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping = target?.matches("input, textarea, select, [contenteditable='true']");
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !isTyping) {
+        event.preventDefault();
+        void runAnalysis();
+      }
+    };
+    window.addEventListener("keydown", handleLaunchShortcut);
+    return () => window.removeEventListener("keydown", handleLaunchShortcut);
+  });
 
   // Global escape key handler to cancel drawing or close open modals
   useEffect(() => {
@@ -599,35 +615,13 @@ export default function Analyze() {
 
         {/* 5. Analysis Execution Floating Card (When no result is yet computed) */}
         {!result && workflow.state !== "ANALYZING" && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-full max-w-md px-4">
-            <div className="panel rounded-xl border border-border p-5 shadow-2xl backdrop-blur-md">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary border border-primary/30">
-                    <Layers className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold">{locationLabel || "Target Region"}</h2>
-                    <p className="text-xs text-muted-foreground">Area: {currentAreaKm2.toFixed(2)} km²</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                  Ready to Scan
-                </span>
-              </div>
-
-              <Button
-                onClick={runAnalysis}
-                disabled={!mapReady}
-                className="w-full rounded-lg h-11 text-sm font-medium"
-              >
-                {!mapReady ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Initializing satellite imagery…</>
-                ) : (
-                  <><Droplets className="mr-2 h-4 w-4 text-accent" /> Scan Surface Permeability</>
-                )}
-              </Button>
-            </div>
+          <div className="absolute bottom-5 left-1/2 z-20 w-full max-w-[520px] -translate-x-1/2 px-4 sm:bottom-7">
+            <AnalysisLaunchPanel
+              location={locationLabel || name}
+              areaKm2={currentAreaKm2}
+              mapReady={mapReady}
+              onAnalyze={runAnalysis}
+            />
           </div>
         )}
 
