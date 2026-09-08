@@ -229,6 +229,10 @@ export default function Analyze() {
     [result]
   );
 
+  /** Real 1609 cover for the analyzed site, or an explicit "not surveyed" state. */
+  const welikia1609 = useWelikia1609(analyzedBBox);
+
+
   const currentAreaKm2 = useMemo(() => {
     if (result) {
       const parsed = parseBBox(result.bbox);
