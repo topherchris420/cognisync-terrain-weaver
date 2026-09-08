@@ -37,7 +37,7 @@ const OUT_PATH = "public/data/welikia-1609-blocks.json";
  * not describe the thing.
  */
 const CLASS_RULES = [
-  ["water", /deepwater|tidal river|confined river|stream|\bpond\b|aquatic bed|eelgrass|vernal pool|subtidal|oxbow/i],
+  ["water", /deepwater|tidal river|confined river|tidal creek|stream|\bspring\b|\bpond\b|aquatic bed|eelgrass|vernal pool|subtidal|oxbow/i],
   ["soil", /beach|mudflat|dune|outcrop|cliff|bluff|talus|cave|shell midden|lenape path|lenape living|lenape house|intertidal shore|rocky intertidal/i],
   ["vegetation", /forest|woodland|swamp|marsh|\bfen\b|\bbog\b|meadow|grassland|shrub|heath|barrens|field|swale|panne|scrub|thicket/i],
 ];
