@@ -10,6 +10,8 @@ import { FlowLayer } from "@/components/FlowLayer";
 import { RiskHeatmap } from "@/components/RiskHeatmap";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { BaselineComparison } from "@/components/BaselineComparison";
+import { Historical1609Panel } from "@/components/historical/Historical1609Panel";
+import { useWelikia1609 } from "@/hooks/useWelikia1609";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
@@ -756,6 +758,12 @@ export default function Analyze() {
 
                   {/* Pre-development Baseline Comparison */}
                   <BaselineComparison score={Number(result.absorption_score)} />
+
+                  {/* Observed 1609 land cover for this ground, where surveyed */}
+                  <Historical1609Panel
+                    state={welikia1609}
+                    presentScore={Number(result.absorption_score)}
+                  />
 
                   {/* Prioritized Climate Adaptation Recommendations */}
                   <div className="space-y-3">
