@@ -631,7 +631,7 @@ export default function Analyze() {
           <aside className="atlas-intro" aria-label="Start a resilience study">
             <div>
               <span className="atlas-eyebrow text-primary">Fieldwork for a changing planet</span>
-              <h1>A better future<br />starts with<br /><em>the ground.</em></h1>
+              <h1>A better future <br />starts with <br /><em>the ground.</em></h1>
               <p className="atlas-intro-copy">See how your city absorbs rain.<br />Explore the changes that could help it absorb more.</p>
             </div>
             <div className="atlas-search">
