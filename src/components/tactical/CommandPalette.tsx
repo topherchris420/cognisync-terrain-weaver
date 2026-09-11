@@ -186,7 +186,7 @@ export function CommandPalette({
                 handleExecute(query);
               }
             }}
-            placeholder="Type command or speak (e.g., 'Switch to NVG', 'Fly to Copenhagen', 'Run 50mm storm')..."
+            placeholder="Type command or speak (e.g., 'Switch to NVG', 'Fly to Copenhagen', 'Run 50 mm storm')..."
             className="h-9 font-mono text-xs bg-transparent border-none focus-visible:ring-0 shadow-none px-0"
             autoFocus
           />
@@ -250,7 +250,7 @@ export function CommandPalette({
               >
                 <div className="flex items-center gap-2">
                   <CloudLightning className="h-3.5 w-3.5 text-amber-400" />
-                  <span>Execute 50mm Design Storm Hydrograph Simulation</span>
+                  <span>Execute 50 mm Design Storm Hydrograph Simulation</span>
                 </div>
                 <Badge variant="secondary" className="text-[10px] font-mono">Simulate</Badge>
               </button>

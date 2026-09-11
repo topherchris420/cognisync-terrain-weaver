@@ -85,7 +85,7 @@ export function SimulationPanel({
       {/* Rainfall Slider */}
       <div className="space-y-3">
         <Label htmlFor="rainfall" className="text-sm">
-          Rainfall: <span className="font-mono">{rainfall[0]}mm</span>
+          Rainfall: <span className="font-mono">{rainfall[0]} mm</span>
         </Label>
         <Slider
           id="rainfall"
@@ -97,8 +97,8 @@ export function SimulationPanel({
           className="py-2"
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>10mm (light)</span>
-          <span>200mm (extreme)</span>
+          <span>10 mm (light)</span>
+          <span>200 mm (extreme)</span>
         </div>
       </div>
 

@@ -459,7 +459,7 @@ export default function Analyze() {
         toast.success("Counterfactual simulation complete.");
       } else {
         workflow.advance("STORM_COMPLETE");
-        toast.success("50mm Design Storm modeled.");
+        toast.success("50 mm Design Storm modeled.");
       }
     } catch (e) {
       console.error(e);
@@ -689,7 +689,7 @@ export default function Analyze() {
             <div className="panel rounded-full border border-primary/40 bg-card/95 px-6 py-3 shadow-2xl backdrop-blur-md flex items-center gap-3">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-sm font-medium text-foreground">
-                {workflow.state === "STORM" ? "Simulating 50mm / 60-minute design storm…" : "Simulating mitigated watershed response…"}
+                {workflow.state === "STORM" ? "Simulating 50 mm / 60-minute design storm…" : "Simulating mitigated watershed response…"}
               </span>
             </div>
           </div>
@@ -832,7 +832,7 @@ export default function Analyze() {
                     }}
                     className="w-full rounded-lg h-11 text-sm font-medium gap-2"
                   >
-                    <Droplets className="h-4 w-4" /> {isExample ? "Explore rainfall estimate" : "Run 50mm Storm Simulation"}
+                    <Droplets className="h-4 w-4" /> {isExample ? "Explore rainfall estimate" : "Run 50 mm Storm Simulation"}
                   </Button>
                 </div>
               )}

@@ -65,7 +65,7 @@ export function StormTelemetryReadout({ seal, rerunSeal, report, className }: Pr
         <div className="flex justify-between gap-2">
           <dt className="text-muted-foreground uppercase tracking-wider">Force</dt>
           <dd className="text-foreground">
-            {seal.storm.rainfallDepthMm}mm/{seal.storm.durationMinutes}m
+            {seal.storm.rainfallDepthMm} mm / {seal.storm.durationMinutes} min
           </dd>
         </div>
         <div className="flex justify-between gap-2">

@@ -122,7 +122,7 @@ export function TacticalCOP({
               <SelectContent className="font-mono text-xs">
                 <SelectItem value="normal">Baseline Calm</SelectItem>
                 <SelectItem value="tropical_storm">Tropical Storm</SelectItem>
-                <SelectItem value="cloudburst_50mm">50mm Cloudburst</SelectItem>
+                <SelectItem value="cloudburst_50mm">50 mm Cloudburst</SelectItem>
                 <SelectItem value="cat_4_hurricane">Severe Storm Surge</SelectItem>
               </SelectContent>
             </Select>

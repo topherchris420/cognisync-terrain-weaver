@@ -56,7 +56,7 @@ export function StormSealReadout({ seal, rerunSeal, report, className }: Props) 
         <div className="flex justify-between gap-4">
           <dt className="text-muted-foreground">Forcing</dt>
           <dd className="text-foreground">
-            {seal.storm.rainfallDepthMm}mm / {seal.storm.durationMinutes}min ·{" "}
+            {seal.storm.rainfallDepthMm} mm / {seal.storm.durationMinutes} min ·{" "}
             {seal.storm.distribution} · {seal.storm.resolution}
           </dd>
         </div>
