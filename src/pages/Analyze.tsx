@@ -48,6 +48,7 @@ import {
   Waves,
   ShieldCheck,
   Compass,
+  Leaf,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useWorkflow } from "@/hooks/useWorkflow";
