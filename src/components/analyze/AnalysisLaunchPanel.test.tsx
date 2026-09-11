@@ -27,4 +27,12 @@ describe("AnalysisLaunchPanel", () => {
 
     expect(screen.getByRole("button", { name: /acquiring satellite feed/i })).toBeDisabled();
   });
+
+  it("lets visitors open an explicitly labeled example while imagery is unavailable", () => {
+    const onExample = vi.fn();
+    render(<AnalysisLaunchPanel location="Manhattan" areaKm2={0} mapReady={false} onAnalyze={vi.fn()} onExample={onExample} />);
+    fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    expect(onExample).toHaveBeenCalledOnce();
+    expect(screen.getByText(/illustrative data/i)).toBeInTheDocument();
+  });
 });

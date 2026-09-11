@@ -8,6 +8,14 @@ function renderWithOptics(ui: React.ReactNode) {
 }
 
 describe("TacticalHUD", () => {
+  it("does not invent resilience metrics before an analysis exists", () => {
+    renderWithOptics(<TacticalHUD />);
+    fireEvent.keyDown(window, { key: "h" });
+    expect(screen.getByText("NOT ANALYZED")).toBeInTheDocument();
+    expect(screen.queryByText(/58.4\/100/)).not.toBeInTheDocument();
+    expect(screen.queryByText("0.42")).not.toBeInTheDocument();
+    expect(screen.queryByText("ANALYSIS READY")).not.toBeInTheDocument();
+  });
   it("does not render when HUD is closed", () => {
     renderWithOptics(
       <TacticalHUD lat={40.758} lng={-73.985} zoom={15} />

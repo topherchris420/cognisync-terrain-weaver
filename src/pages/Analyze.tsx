@@ -70,6 +70,9 @@ import { toast } from "sonner";
 import { TacticalHUD } from "@/components/tactical/TacticalHUD";
 import { CommandPalette } from "@/components/tactical/CommandPalette";
 import { DetectionOverlay } from "@/components/tactical/DetectionOverlay";
+import { ExampleStorm } from "@/components/analyze/ExampleStorm";
+import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
+import "@/styles/atlas.css";
 import { AnalysisLaunchPanel } from "@/components/analyze/AnalysisLaunchPanel";
 
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
@@ -86,7 +89,7 @@ import { StormTelemetryReadout } from "@/components/studio/StormTelemetryReadout
 const STORM_RAINFALL_MM = 50;
 const STORM_RESOLUTION = "low" as const;
 
-const DEFAULT_VIEW = { lat: 40.758, lng: -73.985, zoom: 15 };
+const DEFAULT_VIEW = { lat: 40.7075, lng: -74.009, zoom: 15 };
 
 export function buildStormDefinition(
   rainfallDepthMm: number,
@@ -153,12 +156,15 @@ export default function Analyze() {
   );
 
   const [name, setName] = useState("Lower Manhattan Watershed");
-  const [locationLabel, setLocationLabel] = useState("Manhattan, NY");
+  const [viewportArea, setViewportArea] = useState(0);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [locationLabel, setLocationLabel] = useState(viewFromParams(searchParams) ? "Shared map view" : "Lower Manhattan, NY");
   const [view, setView] = useState(initialView);
   const [mapReady, setMapReady] = useState(false);
   const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
   
   const [result, setResult] = useState<AnalysisRecord | null>(null);
+  const isExample = result?.status === "example";
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
   const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
@@ -233,19 +239,38 @@ export default function Analyze() {
   const welikia1609 = useWelikia1609(analyzedBBox);
 
 
-  const currentAreaKm2 = useMemo(() => {
-    if (result) {
-      const parsed = parseBBox(result.bbox);
-      if (parsed) return bboxAreaKm2(parsed);
-    }
-    const bounds = mapRef.current?.getBounds();
-    if (bounds) return bboxAreaKm2(bounds);
-    return 0.85;
-  }, [result]);
+  const currentAreaKm2 = analyzedBBox ? bboxAreaKm2(analyzedBBox) : viewportArea;
+
+  // Keep the report's extent visible even when the camera moves elsewhere.
+  useEffect(() => {
+    if (!mapInstance || !result || !analyzedBBox) return;
+    const id = "atlas-analysis-footprint";
+    mapInstance.addSource(id, { type: "geojson", data: analysesToGeoJSON([result]) });
+    mapInstance.addLayer({
+      id,
+      type: "line",
+      source: id,
+      paint: { "line-color": "#bdd394", "line-width": 2, "line-dasharray": [3, 2] },
+    });
+    return () => {
+      if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
+      if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+    };
+  }, [mapInstance, result, analyzedBBox]);
+
+  // Resizing the dock changes the actual captured footprint as well as the canvas.
+  useEffect(() => {
+    if (!mapInstance) return;
+    const observer = new ResizeObserver(() => mapInstance.resize());
+    observer.observe(mapInstance.getContainer());
+    return () => observer.disconnect();
+  }, [mapInstance]);
 
   const onViewChange = useCallback(
     (v: { lat: number; lng: number; zoom: number }) => {
       setView(v);
+      const bounds = mapRef.current?.getBounds();
+      if (bounds) setViewportArea(bboxAreaKm2(bounds));
       setSearchParams(
         {
           lat: v.lat.toFixed(5),
@@ -278,8 +303,11 @@ export default function Analyze() {
   };
 
   const resetScan = () => {
+    setAnalysisError(null);
     setResult(null);
     setCapturedTile(null);
+    setScenarioExport(null);
+    setActiveTab("overview");
     setSimResult(null);
     setFutureSimResult(null);
     setCatalystFuture(null);
@@ -290,8 +318,20 @@ export default function Analyze() {
     workflow.reset();
   };
 
+  const openExample = () => {
+    resetScan();
+    setResult(EXAMPLE_ANALYSIS);
+    setName(EXAMPLE_ANALYSIS.name);
+    setLocationLabel(EXAMPLE_ANALYSIS.location_label!);
+    mapRef.current?.fitBounds(parseBBox(EXAMPLE_ANALYSIS.bbox)!);
+    setDrawerOpen(true);
+    workflow.advance("ANALYZED");
+  };
+
   const runAnalysis = async () => {
-    if (workflow.state === "ANALYZING" || !mapReady) return;
+    if (["ANALYZING", "STORM", "RERUN_STORM"].includes(workflow.state) || !mapReady) return;
+    setAnalysisError(null);
+    resetScan();
     workflow.advance("ANALYZING");
     setDrawerOpen(true);
     setActiveTab("overview");
@@ -299,7 +339,7 @@ export default function Analyze() {
     try {
       const imageDataUrl = await mapRef.current?.captureImage();
       if (!imageDataUrl) {
-        toast.error("Couldn't capture map imagery. Try zooming or panning.");
+        setAnalysisError("Couldn’t capture imagery. Pan or zoom the map, then try again.");
         workflow.advance("SEARCH");
         return;
       }
@@ -308,7 +348,7 @@ export default function Analyze() {
 
       const { data, error } = await supabase.functions.invoke("analyze-terrain", {
         body: {
-          name: name.trim() || "Analyzed Site",
+          name: isExample ? "Lower Manhattan Watershed" : name.trim() || "Analyzed Site",
           location_label: locationLabel.trim() || null,
           center_lat: view.lat,
           center_lng: view.lng,
@@ -320,7 +360,7 @@ export default function Analyze() {
 
       if (error) {
         console.error("analyze-terrain failed:", error);
-        toast.error("Analysis service temporarily unavailable.");
+        setAnalysisError("The analysis service is unavailable. Try again, or explore the example below.");
         workflow.advance("SEARCH");
         return;
       }
@@ -331,12 +371,22 @@ export default function Analyze() {
       toast.success("Surface permeability analysis complete.");
     } catch (e) {
       console.error(e);
-      toast.error("Unexpected error during analysis.");
+      setAnalysisError("The scan could not finish. Try again, or explore the example below.");
       workflow.advance("SEARCH");
     }
   };
 
   const runSimulation = async (isRerun = false) => {
+    if (isExample) {
+      if (isRerun && result && analyzedBBox) {
+        setCatalystFuture({ scenario, future: projectFuture(result.land_cover, scenario, bboxAreaKm2(analyzedBBox) * 1e6) });
+        setActiveTab("compare");
+      } else {
+        setActiveTab("simulation");
+      }
+      setDrawerOpen(true);
+      return;
+    }
     if (!mapReady || workflow.state === "STORM" || workflow.state === "RERUN_STORM") return;
     
     workflow.advance(isRerun ? "RERUN_STORM" : "STORM");
@@ -454,20 +504,22 @@ export default function Analyze() {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground">
+    <div className="atlas-app flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
       {/* 1. Permanent Professional Workstation Topbar */}
       <AppNav />
 
       {/* 2. Main GIS Viewport Area */}
-      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+      <main id="main" className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", (!result || drawerOpen) && "atlas-workspace--docked")}>
         {/* Full-bleed Map Canvas */}
-        <div className="absolute inset-0 w-full h-full">
+        <div className="atlas-map absolute inset-0 h-full">
           <MapView
             ref={mapRef}
             initialCenter={[initialView.lng, initialView.lat]}
             initialZoom={initialView.zoom}
             onReady={() => {
               setMapReady(true);
+              const bounds = mapRef.current?.getBounds();
+              if (bounds) setViewportArea(bboxAreaKm2(bounds));
               setMapInstance(mapRef.current?.getMap() ?? null);
             }}
             onViewChange={onViewChange}
@@ -561,7 +613,7 @@ export default function Analyze() {
           lng={view.lng}
           zoom={view.zoom}
           surfaceAreaKm2={currentAreaKm2}
-          absorptionScore={result ? Number(result.absorption_score) : 58.4}
+          absorptionScore={result ? Number(result.absorption_score) : undefined}
           locationName={locationLabel || name}
         />
 
@@ -571,32 +623,35 @@ export default function Analyze() {
           onExportPdf={handleExportPDF}
         />
 
-        {/* 3. Top Floating Location Toolbar & Presets Bar */}
-        <div className="absolute top-4 left-4 right-4 md:left-6 md:right-auto z-30 flex flex-col md:flex-row items-stretch md:items-center gap-2 max-w-2xl">
-          <div className="w-full md:w-80 shadow-lg rounded-lg bg-card/95 backdrop-blur-md border border-border">
-            <LocationSearch onSelect={goTo} />
-          </div>
-
-          {/* Quick Watershed Jump Bookmarks */}
-          <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto p-1 rounded-lg bg-card/90 backdrop-blur-md border border-border shadow-md">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 flex items-center gap-1">
-              <Compass className="h-3 w-3" /> Bookmarks:
-            </span>
-            {PRESETS.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => goTo(p)}
-                className="px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors whitespace-nowrap"
-              >
-                {p.label.split(",")[0]}
-              </button>
-            ))}
-          </div>
+        <div className="atlas-map-heading">
+          <span className="atlas-eyebrow">Resilience atlas / study area</span>
+          <p>{result ? result.location_label : locationLabel || "Custom map view"}</p>
         </div>
+        {!result && workflow.state !== "ANALYZING" && (
+          <aside className="atlas-intro" aria-label="Start a resilience study">
+            <div>
+              <span className="atlas-eyebrow text-primary">Fieldwork for a changing planet</span>
+              <h1>A better future<br />starts with<br /><em>the ground.</em></h1>
+              <p className="atlas-intro-copy">See how your city absorbs rain.<br />Explore the changes that could help it absorb more.</p>
+            </div>
+            <div className="atlas-search">
+              <label htmlFor="location-search" className="atlas-eyebrow">01 / Find your place</label>
+              <LocationSearch onSelect={goTo} />
+              <div className="atlas-presets">
+                {PRESETS.slice(0, 3).map((preset) => <button key={preset.label} type="button" onClick={() => goTo(preset)}>{preset.label.split(",")[0]} <ArrowRight size={11} aria-hidden="true" /></button>)}
+              </div>
+            </div>
+            <div className="atlas-intro-action">
+              <span className="atlas-eyebrow">02 / Read the landscape</span>
+              {analysisError && <p role="alert" className="my-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-xs leading-relaxed">{analysisError}</p>}
+              <AnalysisLaunchPanel location={locationLabel || name} areaKm2={currentAreaKm2} mapReady={mapReady} onAnalyze={runAnalysis} onExample={openExample} />
+            </div>
+            <div className="atlas-process"><span>Land cover</span><ArrowRight size={12} /><span>Rainfall</span><ArrowRight size={12} /><span>Possibilities</span></div>
+          </aside>
+        )}
 
         {/* 4. Live Bottom-Right GPS Status Readout */}
-        <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+        <div className="atlas-map-status absolute bottom-9 right-4 z-20 flex flex-col items-end gap-2">
           {nowSeal && (
             <StormTelemetryReadout
               seal={nowSeal}
@@ -614,22 +669,10 @@ export default function Analyze() {
             <span className="hidden sm:inline">Share</span>
           </button>
           <div className="rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 font-mono text-xs text-muted-foreground shadow-md">
-            {view.lat.toFixed(4)}°N, {view.lng.toFixed(4)}°W · z{view.zoom.toFixed(1)}
+            {Math.abs(view.lat).toFixed(4)}°{view.lat >= 0 ? "N" : "S"}, {Math.abs(view.lng).toFixed(4)}°{view.lng >= 0 ? "E" : "W"} · z{view.zoom.toFixed(1)}
           </div>
           </div>
         </div>
-
-        {/* 5. Analysis Execution Floating Card (When no result is yet computed) */}
-        {!result && workflow.state !== "ANALYZING" && (
-          <div className="absolute bottom-5 left-1/2 z-20 w-full max-w-[520px] -translate-x-1/2 px-4 sm:bottom-7">
-            <AnalysisLaunchPanel
-              location={locationLabel || name}
-              areaKm2={currentAreaKm2}
-              mapReady={mapReady}
-              onAnalyze={runAnalysis}
-            />
-          </div>
-        )}
 
         {/* 6. Active Scanning Progress Modal */}
         {workflow.state === "ANALYZING" && (
@@ -646,7 +689,7 @@ export default function Analyze() {
             <div className="panel rounded-full border border-primary/40 bg-card/95 px-6 py-3 shadow-2xl backdrop-blur-md flex items-center gap-3">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-sm font-medium text-foreground">
-                {workflow.state === "STORM" ? "Simulating 50mm / 2-hr design storm hydrograph…" : "Simulating mitigated watershed response…"}
+                {workflow.state === "STORM" ? "Simulating 50mm / 60-minute design storm…" : "Simulating mitigated watershed response…"}
               </span>
             </div>
           </div>
@@ -656,8 +699,9 @@ export default function Analyze() {
         {result && (
           <aside
             aria-label="Urban Resilience Workbench"
+            hidden={!drawerOpen}
             className={cn(
-              "absolute top-0 bottom-0 left-0 z-30 w-full sm:w-[460px] md:w-[480px] border-r border-border bg-card/95 backdrop-blur-xl shadow-2xl flex flex-col transition-transform duration-300 ease-in-out",
+              "atlas-results absolute top-0 bottom-0 left-0 z-30 border-r border-border bg-card flex flex-col",
               drawerOpen ? "translate-x-0" : "-translate-x-full"
             )}
           >
@@ -672,7 +716,7 @@ export default function Analyze() {
                     {result.location_label || result.name}
                   </h2>
                   <p className="text-[11px] font-mono text-muted-foreground truncate">
-                    {bboxAreaKm2(parseBBox(result.bbox)!).toFixed(2)} km² · {Math.round(bboxAreaKm2(parseBBox(result.bbox)!) * 100)} ha
+                    {currentAreaKm2.toFixed(2)} km² · {Math.round(currentAreaKm2 * 100)} ha
                   </p>
                 </div>
               </div>
@@ -682,6 +726,7 @@ export default function Analyze() {
                   variant="ghost"
                   size="sm"
                   onClick={resetScan}
+                  disabled={["ANALYZING", "STORM", "RERUN_STORM"].includes(workflow.state)}
                   className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
                   title="Reset and clear analysis"
                 >
@@ -700,6 +745,7 @@ export default function Analyze() {
               </div>
             </div>
 
+            {isExample && <div className="atlas-example-notice"><strong>Illustrative example</strong><span>Explore the tools with sample data. Not a site assessment.</span></div>}
             {/* Workbench Navigation Tabs */}
             <div className="border-b border-border bg-card px-2 shrink-0">
               <Tabs
@@ -747,6 +793,7 @@ export default function Analyze() {
               {/* TAB 1: OVERVIEW & LAND COVER */}
               {activeTab === "overview" && (
                 <div className="space-y-6">
+                  {isExample && <p className="text-xs leading-relaxed text-muted-foreground">{result.ai_notes}</p>}
                   {/* Absorption Score Gauge */}
                   <div className="panel rounded-xl border border-border p-4">
                     <AbsorptionScoreGauge score={Number(result.absorption_score)} />
@@ -785,13 +832,14 @@ export default function Analyze() {
                     }}
                     className="w-full rounded-lg h-11 text-sm font-medium gap-2"
                   >
-                    <Droplets className="h-4 w-4" /> Run 50mm Storm Simulation
+                    <Droplets className="h-4 w-4" /> {isExample ? "Explore rainfall estimate" : "Run 50mm Storm Simulation"}
                   </Button>
                 </div>
               )}
 
               {/* TAB 2: STORMWATER RUNOFF SIMULATION */}
-              {activeTab === "simulation" && (
+              {activeTab === "simulation" && isExample && analyzedBBox && <ExampleStorm cover={result.land_cover} bbox={analyzedBBox} />}
+              {activeTab === "simulation" && !isExample && (
                 <div className="space-y-6">
                   <div className="panel rounded-xl border border-border p-4 space-y-4">
                     <div>
@@ -924,7 +972,7 @@ export default function Analyze() {
                       onClick={() => runSimulation(true)}
                       className="w-full rounded-lg h-11 text-sm font-medium gap-2"
                     >
-                      <Play className="h-4 w-4" /> Rerun Storm on Mitigated Surface
+                      <Play className="h-4 w-4" /> {isExample ? "Compare planning estimates" : "Rerun Storm on Mitigated Surface"}
                     </Button>
                   </div>
                 </div>
@@ -939,7 +987,7 @@ export default function Analyze() {
                         Baseline vs. Mitigated Comparison
                       </h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Side-by-side verification of water absorption gains under identical storm conditions.
+                        {isExample ? "Planning estimates from illustrative land cover and your drawn interventions. No routed storm comparison." : "Side-by-side verification of water absorption gains under identical storm conditions."}
                       </p>
                     </div>
 
@@ -978,10 +1026,10 @@ export default function Analyze() {
                         </div>
 
                         <Button
-                          onClick={() => workflow.advance("COMPARE")}
+                          onClick={() => isExample ? setActiveTab("mitigation") : workflow.advance("COMPARE")}
                           className="w-full rounded-lg h-10 text-xs font-medium gap-2"
                         >
-                          <Compass className="h-4 w-4" /> Open Split-Screen Comparison
+                          <Compass className="h-4 w-4" /> {isExample ? "Keep exploring interventions" : "Open Split-Screen Comparison"}
                         </Button>
                       </div>
                     ) : (
@@ -1060,7 +1108,7 @@ export default function Analyze() {
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
-      </div>
+      </main>
     </div>
   );
 }
