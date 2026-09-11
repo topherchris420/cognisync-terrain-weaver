@@ -527,6 +527,27 @@ export default function Analyze() {
             onViewChange={onViewChange}
           />
 
+          {/* Welikia 1609 historical reconstruction, raster + clickable blocks */}
+          {show1609 && <Welikia1609Layer map={mapInstance} />}
+
+          {/* Historical layer toggle */}
+          <div className="absolute left-4 top-4 z-30">
+            <button
+              type="button"
+              onClick={() => setShow1609((v) => !v)}
+              aria-pressed={show1609}
+              className={cn(
+                "panel flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-medium uppercase tracking-widest backdrop-blur-md transition-colors",
+                show1609
+                  ? "border-primary/60 bg-primary/15 text-primary"
+                  : "border-border bg-card/85 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Leaf className="h-3.5 w-3.5" />
+              1609 Layer
+            </button>
+          </div>
+
           {/* Hydrologic Inundation and Flow Vector Layers */}
           {simResult && showRiskHeatmap && (
             <RiskHeatmap map={mapInstance} riskZones={simResult.risk_zones ?? []} />
