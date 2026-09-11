@@ -12,6 +12,7 @@ import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { BaselineComparison } from "@/components/BaselineComparison";
 import { Historical1609Panel } from "@/components/historical/Historical1609Panel";
 import { useWelikia1609 } from "@/hooks/useWelikia1609";
+import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
