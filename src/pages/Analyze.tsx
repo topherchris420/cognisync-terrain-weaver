@@ -178,6 +178,7 @@ export default function Analyze() {
   // Layer visibility toggles
   const [showFlowVectors, setShowFlowVectors] = useState(true);
   const [showRiskHeatmap, setShowRiskHeatmap] = useState(true);
+  const [show1609, setShow1609] = useState(false);
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
