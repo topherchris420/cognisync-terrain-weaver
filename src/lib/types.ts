@@ -41,26 +41,26 @@ export const LAND_COVER_META: Record<
   vegetation: {
     label: "Vegetation",
     token: "hsl(var(--surface-vegetation))",
-    hint: "Absorbs rainfall, cools surface temperature",
+    hint: "Absorbs rainfall and cools surface temperature.",
   },
   soil: {
     label: "Bare soil",
     token: "hsl(var(--surface-soil))",
-    hint: "Permeable, moderate absorption",
+    hint: "Permeable surface with moderate absorption capability.",
   },
   water: {
     label: "Water",
     token: "hsl(var(--surface-water))",
-    hint: "Existing hydrological capacity",
+    hint: "Existing hydrological retention capacity.",
   },
   buildings: {
     label: "Buildings",
     token: "hsl(var(--surface-building))",
-    hint: "Impervious, runoff generator",
+    hint: "Impervious structure generating surface runoff.",
   },
   pavement: {
     label: "Pavement",
     token: "hsl(var(--surface-pavement))",
-    hint: "Impervious, heat-island driver",
+    hint: "Impervious surface driving urban heat island effect.",
   },
 };

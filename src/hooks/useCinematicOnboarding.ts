@@ -29,7 +29,7 @@ export function useCinematicOnboarding() {
   const subtitle = {
     IDLE: "",
     FLYING_IN: "This is Mannahatta. A spatial counterfactual engine.",
-    SIMULATING_CURRENT: "Simulating a 50mm design storm on current terrain...",
+    SIMULATING_CURRENT: "Simulating a 50 mm design storm on current terrain...",
     REDESIGNING: "Catalyst: Optimizing the ground to reduce risk under $500k...",
     COMPARING_REALITIES: "Comparing realities. The future responds to the ground.",
     FINISHED: ""
