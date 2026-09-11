@@ -12,6 +12,7 @@ import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { BaselineComparison } from "@/components/BaselineComparison";
 import { Historical1609Panel } from "@/components/historical/Historical1609Panel";
 import { useWelikia1609 } from "@/hooks/useWelikia1609";
+import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
@@ -47,6 +48,7 @@ import {
   Waves,
   ShieldCheck,
   Compass,
+  Leaf,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useWorkflow } from "@/hooks/useWorkflow";
@@ -177,6 +179,7 @@ export default function Analyze() {
   // Layer visibility toggles
   const [showFlowVectors, setShowFlowVectors] = useState(true);
   const [showRiskHeatmap, setShowRiskHeatmap] = useState(true);
+  const [show1609, setShow1609] = useState(false);
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -524,6 +527,27 @@ export default function Analyze() {
             }}
             onViewChange={onViewChange}
           />
+
+          {/* Welikia 1609 historical reconstruction, raster + clickable blocks */}
+          {show1609 && <Welikia1609Layer map={mapInstance} />}
+
+          {/* Historical layer toggle */}
+          <div className="absolute left-4 bottom-16 z-30">
+            <button
+              type="button"
+              onClick={() => setShow1609((v) => !v)}
+              aria-pressed={show1609}
+              className={cn(
+                "panel flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-medium uppercase tracking-widest backdrop-blur-md transition-colors",
+                show1609
+                  ? "border-primary/60 bg-primary/15 text-primary"
+                  : "border-border bg-card/85 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Leaf className="h-3.5 w-3.5" />
+              1609 Layer
+            </button>
+          </div>
 
           {/* Hydrologic Inundation and Flow Vector Layers */}
           {simResult && showRiskHeatmap && (
