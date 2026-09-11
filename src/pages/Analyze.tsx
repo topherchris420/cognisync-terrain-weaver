@@ -532,7 +532,7 @@ export default function Analyze() {
           {show1609 && <Welikia1609Layer map={mapInstance} />}
 
           {/* Historical layer toggle */}
-          <div className="absolute left-4 bottom-16 z-30">
+          <div className="absolute right-4 top-4 z-40">
             <button
               type="button"
               onClick={() => setShow1609((v) => !v)}
