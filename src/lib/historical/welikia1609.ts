@@ -230,3 +230,87 @@ export async function lookupWelikia1609(
   const payload = await loadWelikia1609(fetchImpl);
   return queryWelikia1609(payload, query);
 }
+
+/** Georeferenced 1609 map raster published by the Welikia map explorer. */
+export const WELIKIA_TILE_URL =
+  "https://d17l30qqe4mnqp.cloudfront.net/overlays/1609Sat/tiles_60k_new/{z}/{x}/{y}.png";
+
+export interface Welikia1609BlockProperties {
+  landCover: string;
+  community: string;
+  vegetation: number;
+  soil: number;
+  water: number;
+  absorptionScore: number;
+}
+
+export type Welikia1609FeatureCollection = GeoJSON.FeatureCollection<
+  GeoJSON.Polygon,
+  Welikia1609BlockProperties
+>;
+
+/**
+ * The reconstructed blocks overlapping a view, as clickable rectangles.
+ *
+ * Each block is drawn at its published bounding box — the compact index keeps
+ * the box rather than the full outline so the whole city fits in one small
+ * file. Clicking a block reports the community that dominated it.
+ */
+export function welikia1609FeaturesIn(
+  payload: WelikiaPayload,
+  query: Welikia1609Query,
+  limit = 4000
+): Welikia1609FeatureCollection {
+  const features: Welikia1609FeatureCollection["features"] = [];
+  for (const row of payload.blocks) {
+    if (features.length >= limit) break;
+    if (overlapArea(row, query) <= 0) continue;
+    const [west, south, east, north, vegetation, soil, water, community] = row;
+    const landCover: LandCover = {
+      vegetation,
+      soil,
+      water,
+      buildings: 0,
+      pavement: 0,
+    };
+    const dominant =
+      water >= vegetation && water >= soil
+        ? "water"
+        : vegetation >= soil
+          ? "vegetation"
+          : "soil";
+    features.push({
+      type: "Feature",
+      properties: {
+        landCover: dominant,
+        community: payload.communities[community] ?? "Unnamed community",
+        vegetation,
+        soil,
+        water,
+        absorptionScore: computeAbsorptionScore(landCover),
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [west, south],
+            [east, south],
+            [east, north],
+            [west, north],
+            [west, south],
+          ],
+        ],
+      },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+/** Convenience: load the index and cut the blocks for a view. */
+export async function loadWelikia1609Features(
+  query: Welikia1609Query,
+  fetchImpl: typeof fetch = fetch
+): Promise<Welikia1609FeatureCollection> {
+  const payload = await loadWelikia1609(fetchImpl);
+  return welikia1609FeaturesIn(payload, query);
+}
