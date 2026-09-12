@@ -39,6 +39,7 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
 
     const install = () => {
       if (removed) return;
+      if (!map.isStyleLoaded()) return;
       if (!map.getSource(RASTER_SOURCE)) {
         map.addSource(RASTER_SOURCE, {
           type: "raster",
@@ -153,8 +154,8 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
       listener: (e: never) => void
     ) => void;
 
-    if (map.isStyleLoaded()) install();
-    else map.once("load", install);
+    install();
+    map.on("styledata", install);
 
     on("click", BLOCK_FILL, handleClick as unknown as (e: never) => void);
     on("mouseenter", BLOCK_FILL, onEnter as unknown as (e: never) => void);
@@ -163,6 +164,7 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
 
     return () => {
       removed = true;
+      map.off("styledata", install);
       popupRef.current?.remove();
       off("click", BLOCK_FILL, handleClick as unknown as (e: never) => void);
       off("mouseenter", BLOCK_FILL, onEnter as unknown as (e: never) => void);

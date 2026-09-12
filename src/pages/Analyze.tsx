@@ -12,7 +12,10 @@ import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { BaselineComparison } from "@/components/BaselineComparison";
 import { Historical1609Panel } from "@/components/historical/Historical1609Panel";
 import { useWelikia1609 } from "@/hooks/useWelikia1609";
-import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
+import { EraRasterLayer } from "@/components/historical/EraRasterLayer";
+import { EraTimeline } from "@/components/historical/EraTimeline";
+import { EraCompare } from "@/components/historical/EraCompare";
+import { DEFAULT_ERA_ID, getEra } from "@/lib/historical/eras";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
@@ -179,7 +182,8 @@ export default function Analyze() {
   // Layer visibility toggles
   const [showFlowVectors, setShowFlowVectors] = useState(true);
   const [showRiskHeatmap, setShowRiskHeatmap] = useState(true);
-  const [show1609, setShow1609] = useState(false);
+  const [eraId, setEraId] = useState<string>(DEFAULT_ERA_ID);
+  const [compareEras, setCompareEras] = useState(false);
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -528,26 +532,27 @@ export default function Analyze() {
             onViewChange={onViewChange}
           />
 
-          {/* Welikia 1609 historical reconstruction, raster + clickable blocks */}
-          {show1609 && <Welikia1609Layer map={mapInstance} />}
+          {/* Era layer for the selected point on the timeline */}
+          {eraId !== "today" && (
+            <EraRasterLayer map={mapInstance} era={getEra(eraId)} />
+          )}
 
-          {/* Historical layer toggle */}
-          <div className="absolute right-4 top-4 z-40">
-            <button
-              type="button"
-              onClick={() => setShow1609((v) => !v)}
-              aria-pressed={show1609}
-              className={cn(
-                "panel flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-medium uppercase tracking-widest backdrop-blur-md transition-colors",
-                show1609
-                  ? "border-primary/60 bg-primary/15 text-primary"
-                  : "border-border bg-card/85 text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Leaf className="h-3.5 w-3.5" />
-              1609 Layer
-            </button>
+          {/* Historical timeline: 1609 → today → projected future */}
+          <div className="absolute left-1/2 top-3 z-40 -translate-x-1/2">
+            <EraTimeline
+              eraId={eraId}
+              onChange={setEraId}
+              onCompare={() => setCompareEras(true)}
+              center={{ lat: view.lat, lng: view.lng }}
+            />
           </div>
+
+          <EraCompare
+            open={compareEras}
+            onClose={() => setCompareEras(false)}
+            center={{ lat: view.lat, lng: view.lng }}
+            zoom={view.zoom}
+          />
 
           {/* Hydrologic Inundation and Flow Vector Layers */}
           {simResult && showRiskHeatmap && (
