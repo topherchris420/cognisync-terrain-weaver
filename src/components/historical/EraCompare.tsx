@@ -36,10 +36,16 @@ export function EraCompare({
 }: Props) {
   const [eraIds, setEraIds] = useState<string[]>(initialEraIds);
   const maps = useRef<(MLMap | null)[]>([null, null, null]);
+  const [mapList, setMapList] = useState<(MLMap | null)[]>([null, null, null]);
   const syncing = useRef(false);
 
   const register = useCallback((index: number, map: MLMap) => {
     maps.current[index] = map;
+    setMapList((prev) => {
+      const next = [...prev];
+      next[index] = map;
+      return next;
+    });
 
     const onMove = () => {
       if (syncing.current) return;
@@ -63,6 +69,7 @@ export function EraCompare({
   useEffect(() => {
     if (open) return;
     maps.current = [null, null, null];
+    setMapList([null, null, null]);
   }, [open]);
 
   if (!open) return null;
@@ -97,7 +104,7 @@ export function EraCompare({
                 initialZoom={zoom}
                 onReady={({ map }) => register(index, map)}
               />
-              <EraRasterLayer map={maps.current[index]} era={era} />
+              <EraRasterLayer map={mapList[index]} era={era} />
 
               <div className="panel pointer-events-auto absolute left-2 top-2 z-20 max-w-[15rem] rounded-lg border border-border bg-card/90 p-2 backdrop-blur-md">
                 <div className="flex items-center gap-2">
