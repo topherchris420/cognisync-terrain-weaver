@@ -12,7 +12,10 @@ import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { BaselineComparison } from "@/components/BaselineComparison";
 import { Historical1609Panel } from "@/components/historical/Historical1609Panel";
 import { useWelikia1609 } from "@/hooks/useWelikia1609";
-import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
+import { EraRasterLayer } from "@/components/historical/EraRasterLayer";
+import { EraTimeline } from "@/components/historical/EraTimeline";
+import { EraCompare } from "@/components/historical/EraCompare";
+import { DEFAULT_ERA_ID, getEra } from "@/lib/historical/eras";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
@@ -179,7 +182,8 @@ export default function Analyze() {
   // Layer visibility toggles
   const [showFlowVectors, setShowFlowVectors] = useState(true);
   const [showRiskHeatmap, setShowRiskHeatmap] = useState(true);
-  const [show1609, setShow1609] = useState(false);
+  const [eraId, setEraId] = useState<string>(DEFAULT_ERA_ID);
+  const [compareEras, setCompareEras] = useState(false);
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
