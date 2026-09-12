@@ -27,6 +27,7 @@ export function EraRasterLayer({ map, era }: Props) {
 
     const install = () => {
       if (removed) return;
+      if (!map.isStyleLoaded()) return;
       if (!map.getSource(sourceId)) {
         map.addSource(sourceId, {
           type: "raster",

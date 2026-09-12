@@ -39,6 +39,7 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
 
     const install = () => {
       if (removed) return;
+      if (!map.isStyleLoaded()) return;
       if (!map.getSource(RASTER_SOURCE)) {
         map.addSource(RASTER_SOURCE, {
           type: "raster",
