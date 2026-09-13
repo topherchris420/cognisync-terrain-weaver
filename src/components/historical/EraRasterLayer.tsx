@@ -47,6 +47,7 @@ export function EraRasterLayer({ map, era }: Props) {
       }
     };
 
+    console.log("[EraRasterLayer] effect", era.id, "styleLoaded", map.isStyleLoaded());
     install();
     map.on("styledata", install);
 
