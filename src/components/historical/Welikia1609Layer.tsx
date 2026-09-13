@@ -156,6 +156,8 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
 
     install();
     map.on("styledata", install);
+    map.on("load", install);
+    map.on("idle", install);
 
     on("click", BLOCK_FILL, handleClick as unknown as (e: never) => void);
     on("mouseenter", BLOCK_FILL, onEnter as unknown as (e: never) => void);
@@ -165,6 +167,8 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
     return () => {
       removed = true;
       map.off("styledata", install);
+      map.off("load", install);
+      map.off("idle", install);
       popupRef.current?.remove();
       off("click", BLOCK_FILL, handleClick as unknown as (e: never) => void);
       off("mouseenter", BLOCK_FILL, onEnter as unknown as (e: never) => void);
