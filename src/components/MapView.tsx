@@ -298,8 +298,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   // Built unconditionally, not inside useImperativeHandle: React skips the
   // imperative-handle factory when no ref is passed, and panes that only use
   // onReady (the era comparison view) would then never receive the map.
-  const handle = useMemo<MapViewHandle>(
-    () => ({
+  const handle: MapViewHandle = useMemo(() => {
+    const value: MapViewHandle = {
+
       async captureImage() {
         const map = mapRef.current;
         if (!map) return null;
