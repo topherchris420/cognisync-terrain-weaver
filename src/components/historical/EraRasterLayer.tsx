@@ -49,10 +49,14 @@ export function EraRasterLayer({ map, era }: Props) {
 
     install();
     map.on("styledata", install);
+    map.on("load", install);
+    map.on("idle", install);
 
     return () => {
       removed = true;
       map.off("styledata", install);
+      map.off("load", install);
+      map.off("idle", install);
       if (map.getLayer(layerId)) map.removeLayer(layerId);
       if (map.getSource(sourceId)) map.removeSource(sourceId);
     };

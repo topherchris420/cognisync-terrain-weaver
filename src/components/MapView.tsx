@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import maplibregl, { Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Button } from "@/components/ui/button";
@@ -295,10 +295,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     setAttempt((a) => a + 1);
   };
 
-  useImperativeHandle(
-    ref,
-    () => {
-      const handle: MapViewHandle = {
+  // Built unconditionally, not inside useImperativeHandle: React skips the
+  // imperative-handle factory when no ref is passed, and panes that only use
+  // onReady (the era comparison view) would then never receive the map.
+  const handle: MapViewHandle = useMemo(() => {
+    const value: MapViewHandle = {
+
       async captureImage() {
         const map = mapRef.current;
         if (!map) return null;
@@ -369,12 +371,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       getMap() {
         return mapRef.current;
       },
-      };
-      readyHandleRef.current = handle;
-      return handle;
-    },
-    []
-  );
+    };
+    return value;
+  }, []);
+
+  readyHandleRef.current = handle;
+
+  useImperativeHandle(ref, () => handle, [handle]);
+
 
   return (
     <div className="relative h-full w-full">
