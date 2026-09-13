@@ -371,9 +371,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       getMap() {
         return mapRef.current;
       },
-    }),
-    []
-  );
+    };
+    return value;
+  }, []);
+
   readyHandleRef.current = handle;
 
   useImperativeHandle(ref, () => handle, [handle]);
