@@ -40,6 +40,7 @@ export function EraCompare({
   const syncing = useRef(false);
 
   const register = useCallback((index: number, map: MLMap) => {
+    console.log("[EraCompare] register pane", index);
     maps.current[index] = map;
     setMapList((prev) => {
       const next = [...prev];
