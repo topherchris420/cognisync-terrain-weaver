@@ -213,7 +213,11 @@ export const ERAS: MapEra[] = [
 export const DEFAULT_ERA_ID = "today";
 
 export function getEra(id: string): MapEra {
-  return ERAS.find((era) => era.id === id) ?? ERAS[ERAS.length - 2];
+  return (
+    ERAS.find((era) => era.id === id) ??
+    ERAS.find((era) => era.id === DEFAULT_ERA_ID) ??
+    ERAS[0]
+  );
 }
 
 /** True when the era's layer actually has data where the map is looking. */
