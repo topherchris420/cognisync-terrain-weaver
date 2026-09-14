@@ -21,7 +21,7 @@ export interface MapEra {
   /** One line describing what the eye is actually looking at. */
   caption: string;
   /** `live` uses the map's own satellite imagery, no overlay. */
-  kind: "reconstruction" | "raster" | "live" | "projection";
+  kind: "reconstruction" | "raster" | "live" | "projection" | "floodplain";
   /** XYZ template, or ArcGIS `{z}/{y}/{x}` for the NOAA service. */
   tiles?: string;
   maxzoom?: number;
