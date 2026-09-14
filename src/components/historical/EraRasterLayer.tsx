@@ -66,5 +66,8 @@ export function EraRasterLayer({ map, era }: Props) {
   if (era.kind === "reconstruction") {
     return <Welikia1609Layer map={map} opacity={opacity} />;
   }
+  if (era.kind === "floodplain") {
+    return <FloodplainLayer map={map} scenarioId={era.id} opacity={opacity} />;
+  }
   return null;
 }
