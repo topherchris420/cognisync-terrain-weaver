@@ -153,6 +153,46 @@ export const ERAS: MapEra[] = [
     coverage: "global",
   },
   {
+    id: "fp-2050",
+    year: 2050,
+    label: "2050s",
+    caption:
+      "The city's mapped 100-year floodplain for the 2050s under projected sea level rise.",
+    kind: "floodplain",
+    attribution: "Future Floodplain 2050s — NYC Open Data",
+    agency: "NYC Mayor's Office of Climate & Environmental Justice",
+    provenance: "projection",
+    coverage: "nyc",
+    opacity: 0.45,
+  },
+  {
+    id: "fp-2080",
+    year: 2080,
+    label: "2080s",
+    caption:
+      "The city's mapped 100-year floodplain for the 2080s under projected sea level rise.",
+    kind: "floodplain",
+    attribution:
+      "Sea Level Rise Maps (2080s 100-year Floodplain) — NYC Open Data",
+    agency: "NYC Mayor's Office of Climate & Environmental Justice",
+    provenance: "projection",
+    coverage: "nyc",
+    opacity: 0.45,
+  },
+  {
+    id: "fp-2100",
+    year: 2100,
+    label: "2100",
+    caption:
+      "The city's mapped 100-year floodplain for 2100 under projected sea level rise.",
+    kind: "floodplain",
+    attribution: "Sea Level Rise Maps (2100 100-year Floodplain) — NYC Open Data",
+    agency: "NYC Mayor's Office of Climate & Environmental Justice",
+    provenance: "projection",
+    coverage: "nyc",
+    opacity: 0.45,
+  },
+  {
     id: "slr-3ft",
     year: 2100,
     label: "+3 ft",
