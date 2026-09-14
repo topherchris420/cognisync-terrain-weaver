@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { Map as MLMap } from "maplibre-gl";
 import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
+import { FloodplainLayer } from "@/components/historical/FloodplainLayer";
 import type { MapEra } from "@/lib/historical/eras";
 
 interface Props {
@@ -64,6 +65,9 @@ export function EraRasterLayer({ map, era }: Props) {
 
   if (era.kind === "reconstruction") {
     return <Welikia1609Layer map={map} opacity={opacity} />;
+  }
+  if (era.kind === "floodplain") {
+    return <FloodplainLayer map={map} scenarioId={era.id} opacity={opacity} />;
   }
   return null;
 }
