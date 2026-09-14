@@ -538,7 +538,7 @@ export default function Analyze() {
           )}
 
           {/* Historical timeline: 1609 → today → projected future */}
-          <div className="absolute left-1/2 top-3 z-40 -translate-x-1/2">
+          <div className="absolute right-4 top-3 z-30 max-w-[calc(100vw-2rem)]">
             <EraTimeline
               eraId={eraId}
               onChange={setEraId}
