@@ -140,7 +140,7 @@ export function EraCompare({
                 <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
                   {covered
                     ? era.caption
-                    : `${era.label} covers New York City only — nothing is drawn here.`}
+                    : `New York City (${era.label}) covers the city only — nothing is drawn here.`}
                 </p>
               </div>
             </div>

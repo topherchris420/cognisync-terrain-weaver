@@ -109,7 +109,7 @@ export function EraTimeline({ eraId, onChange, onCompare, center, className }: P
         <p className="text-[11px] leading-snug text-muted-foreground">
           {covered
             ? `${active.caption} ${active.agency}.`
-            : `${active.label} is published for New York City only, so there is nothing to draw here. Move the map to the city to see it.`}
+            : `New York City (${active.label}) is published only for the city, so there is nothing to draw here. Move the map to the city to see it.`}
         </p>
       </div>
     </div>
