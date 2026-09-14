@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { Map as MLMap } from "maplibre-gl";
 import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
+import { FloodplainLayer } from "@/components/historical/FloodplainLayer";
 import type { MapEra } from "@/lib/historical/eras";
 
 interface Props {
