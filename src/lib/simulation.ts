@@ -88,6 +88,41 @@ export function getFlowColor(intensity: number): string {
   return `rgba(59, 130, 246, ${opacity})`; // Blue-500
 }
 
+/**
+ * Smooths flow path coordinates using Chaikin's corner-cutting algorithm.
+ * Converts discrete grid step lines into natural, curved hydrodynamic channels.
+ */
+export function smoothFlowPoints(
+  points: [number, number][],
+  iterations = 2
+): [number, number][] {
+  if (points.length <= 2) return points;
+
+  let current = points;
+  for (let it = 0; it < iterations; it++) {
+    const smoothed: [number, number][] = [current[0]];
+    for (let i = 0; i < current.length - 1; i++) {
+      const p0 = current[i];
+      const p1 = current[i + 1];
+
+      // Chaikin corner cutting ratios (0.75 / 0.25)
+      const q: [number, number] = [
+        0.75 * p0[0] + 0.25 * p1[0],
+        0.75 * p0[1] + 0.25 * p1[1],
+      ];
+      const r: [number, number] = [
+        0.25 * p0[0] + 0.75 * p1[0],
+        0.25 * p0[1] + 0.75 * p1[1],
+      ];
+
+      smoothed.push(q, r);
+    }
+    smoothed.push(current[current.length - 1]);
+    current = smoothed;
+  }
+  return current;
+}
+
 export type SimulationTransport = (
   request: SimulationRequestV2
 ) => Promise<unknown>;

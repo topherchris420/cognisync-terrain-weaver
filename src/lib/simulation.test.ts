@@ -6,6 +6,7 @@ import {
   runoffCoefficient,
   estimateRunoffVolumeM3,
   getFlowColor,
+  smoothFlowPoints,
   runPairedRealitySimulation,
   runRealitySimulation,
 } from "./simulation";
@@ -130,6 +131,28 @@ describe("getFlowColor", () => {
 describe("MAX_SIMULATION_AREA_KM2", () => {
   it("is a positive, practical cap", () => {
     expect(MAX_SIMULATION_AREA_KM2).toBeGreaterThan(1);
+  });
+});
+
+describe("smoothFlowPoints", () => {
+  it("returns original points when point count is <= 2", () => {
+    const single: [number, number][] = [[0, 0]];
+    const pair: [number, number][] = [[0, 0], [1, 1]];
+    expect(smoothFlowPoints(single)).toEqual(single);
+    expect(smoothFlowPoints(pair)).toEqual(pair);
+  });
+
+  it("subdivides and cuts corners for points >= 3 to generate smooth curve points", () => {
+    const squarePath: [number, number][] = [
+      [0, 0],
+      [0, 10],
+      [10, 10],
+    ];
+    const smoothed = smoothFlowPoints(squarePath, 1);
+    // 3 points cut into 1 start, 2 for first segment, 2 for second segment, 1 end = 6 points
+    expect(smoothed.length).toBe(6);
+    expect(smoothed[0]).toEqual([0, 0]);
+    expect(smoothed[smoothed.length - 1]).toEqual([10, 10]);
   });
 });
 
