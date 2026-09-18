@@ -62,14 +62,18 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
   const addToMap = useCallback(() => {
     if (!map) return;
 
-    // Check if layers already exist
-    if (map.getLayer(RISK_LAYER_ID)) return;
+    if (!map.isStyleLoaded()) return;
 
-    // Add GeoJSON source
-    map.addSource(RISK_SOURCE_ID, {
-      type: "geojson",
-      data: riskZonesToGeoJSON(riskZones),
-    });
+    // StrictMode and rapid state changes can invoke this more than once.
+    // Reuse an existing source instead of attempting to register it again.
+    if (map.getLayer(RISK_LAYER_ID) || map.getLayer(RISK_OUTLINE_LAYER_ID)) return;
+
+    if (!map.getSource(RISK_SOURCE_ID)) {
+      map.addSource(RISK_SOURCE_ID, {
+        type: "geojson",
+        data: riskZonesToGeoJSON(riskZones),
+      });
+    }
 
     // Add fill layer with color based on risk level
     map.addLayer({

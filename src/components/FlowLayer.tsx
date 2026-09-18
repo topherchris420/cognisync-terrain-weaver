@@ -56,14 +56,18 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
   const addToMap = useCallback(() => {
     if (!map) return;
 
-    // Check if layers already exist
-    if (map.isStyleLoaded() && map.getLayer(FLOW_LAYER_ID)) return;
+    if (!map.isStyleLoaded()) return;
 
-    // Add GeoJSON source
-    map.addSource(FLOW_SOURCE_ID, {
-      type: "geojson",
-      data: flowPathsToGeoJSON(flowPaths),
-    });
+    // StrictMode and rapid state changes can invoke this more than once.
+    // Reuse an existing source instead of attempting to register it again.
+    if (map.getLayer(FLOW_GLOW_LAYER_ID) || map.getLayer(FLOW_LAYER_ID) || map.getLayer(FLOW_ANIMATION_LAYER_ID)) return;
+
+    if (!map.getSource(FLOW_SOURCE_ID)) {
+      map.addSource(FLOW_SOURCE_ID, {
+        type: "geojson",
+        data: flowPathsToGeoJSON(flowPaths),
+      });
+    }
 
     // Add glowing blur layer underneath
     map.addLayer({
@@ -170,96 +174,18 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     (paths: FlowPath[]) => {
       if (!map) return;
 
-      const source = map.isStyleLoaded() && map.getSource(FLOW_SOURCE_ID) as GeoJSONSource;
+      if (!map.isStyleLoaded()) return;
+
+      let source = map.getSource(FLOW_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!source) {
+        addToMap();
+        source = map.getSource(FLOW_SOURCE_ID) as GeoJSONSource | undefined;
+      }
       if (source) {
         source.setData(flowPathsToGeoJSON(paths));
-      } else {
-        // Source doesn't exist yet, add it
-        map.addSource(FLOW_SOURCE_ID, {
-          type: "geojson",
-          data: flowPathsToGeoJSON(paths),
-        });
-
-        // Add layers if they don't exist
-        if (!map.isStyleLoaded() && map.getLayer(FLOW_GLOW_LAYER_ID)) {
-          map.addLayer({
-            id: FLOW_GLOW_LAYER_ID,
-            type: "line",
-            source: FLOW_SOURCE_ID,
-            layout: {
-              "line-join": "round",
-              "line-cap": "round",
-            },
-            paint: {
-              "line-color": "#60a5fa",
-              "line-width": 8,
-              "line-blur": 6,
-              "line-opacity": [
-                "interpolate",
-                ["linear"],
-                ["get", "volume_m3"],
-                0,
-                0.1,
-                1000,
-                0.6,
-              ],
-            },
-          });
-        }
-
-        if (!map.isStyleLoaded() && map.getLayer(FLOW_LAYER_ID)) {
-          map.addLayer({
-            id: FLOW_LAYER_ID,
-            type: "line",
-            source: FLOW_SOURCE_ID,
-            layout: {
-              "line-join": "round",
-              "line-cap": "round",
-            },
-            paint: {
-              "line-color": "#3b82f6",
-              "line-width": 2,
-              "line-opacity": [
-                "interpolate",
-                ["linear"],
-                ["get", "volume_m3"],
-                0,
-                0.3,
-                1000,
-                1,
-              ],
-            },
-          });
-        }
-
-        if (!map.isStyleLoaded() && map.getLayer(FLOW_ANIMATION_LAYER_ID)) {
-          map.addLayer({
-            id: FLOW_ANIMATION_LAYER_ID,
-            type: "line",
-            source: FLOW_SOURCE_ID,
-            layout: {
-              "line-join": "round",
-              "line-cap": "round",
-            },
-            paint: {
-              "line-color": "#3b82f6",
-              "line-width": 3,
-              "line-dasharray": [2, 4],
-              "line-opacity": [
-                "interpolate",
-                ["linear"],
-                ["get", "volume_m3"],
-                0,
-                0.3,
-                1000,
-                1,
-              ],
-            },
-          });
-        }
       }
     },
-    [map]
+    [map, addToMap]
   );
 
   // Compute dynamic physical velocity step based on flow paths
