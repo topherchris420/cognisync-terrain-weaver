@@ -1,21 +1,22 @@
 /* Resilience atlas: scoped so operational/tactical views retain their own theme. */
 .atlas-app {
-  --background: 150 16% 8%;
-  --foreground: 55 18% 91%;
-  --card: 150 13% 10%;
-  --card-foreground: 55 18% 91%;
-  --muted: 150 10% 15%;
-  --muted-foreground: 130 7% 65%;
-  --border: 145 10% 23%;
-  --input: 150 10% 15%;
-  --primary: 83 42% 70%;
-  --primary-foreground: 150 25% 10%;
-  --ring: 83 42% 70%;
-  --accent: 83 42% 70%;
-  --accent-foreground: 150 25% 10%;
-  --gradient-panel: linear-gradient(180deg, hsl(150 12% 12%), hsl(150 12% 10%));
-  --dock-width: 380px;
+  --background: 168 18% 7%;
+  --foreground: 56 20% 93%;
+  --card: 168 16% 10%;
+  --card-foreground: 56 20% 93%;
+  --muted: 168 13% 15%;
+  --muted-foreground: 158 9% 66%;
+  --border: 164 13% 25%;
+  --input: 168 13% 15%;
+  --primary: 78 55% 72%;
+  --primary-foreground: 168 30% 9%;
+  --ring: 78 55% 72%;
+  --accent: 78 55% 72%;
+  --accent-foreground: 168 30% 9%;
+  --gradient-panel: linear-gradient(180deg, hsl(168 15% 13%), hsl(168 16% 9%));
+  --dock-width: 392px;
   color-scheme: dark;
+  background: hsl(var(--background));
 }
 .atlas-app header > div { height: 62px; padding-inline: 24px; gap: 24px; }
 .atlas-app header .hud-value { font-family: 'Lora', Georgia, serif; font-size: 22px; font-weight: 400; letter-spacing: -.6px; text-transform: none; }
@@ -98,6 +99,74 @@
   .atlas-map-status { display: none; }
   .atlas-results { top: 22%; border-top: 1px solid hsl(var(--border)); border-radius: 14px 14px 0 0; }
   .atlas-process { display: none; }
+}
+/* Instrument-panel finish: calibrated grain, scanlines, and quiet depth. */
+.atlas-app .atlas-workspace::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  background-image:
+    linear-gradient(hsl(78 55% 72% / .035) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(78 55% 72% / .035) 1px, transparent 1px),
+    radial-gradient(circle at 70% 30%, hsl(78 55% 72% / .08), transparent 34%),
+    radial-gradient(circle at 30% 90%, hsl(184 55% 34% / .1), transparent 40%);
+  background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
+  mix-blend-mode: screen;
+  opacity: .48;
+}
+.atlas-app .atlas-workspace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, hsl(168 22% 4% / .12) 68%, hsl(168 22% 4% / .38) 100%);
+  box-shadow: inset 0 0 140px hsl(168 35% 3% / .6);
+}
+.atlas-intro {
+  background:
+    linear-gradient(135deg, hsl(var(--background) / .98), hsl(168 22% 10% / .96)),
+    repeating-linear-gradient(0deg, transparent 0 3px, hsl(0 0% 100% / .012) 3px 4px);
+  box-shadow: 16px 0 48px hsl(168 45% 2% / .24);
+}
+.atlas-intro::before {
+  content: "FIELD NODE 04  /  40.7075° N  74.0090° W";
+  display: block;
+  position: absolute;
+  top: 14px;
+  right: 24px;
+  font: 9px/1 'JetBrains Mono', monospace;
+  letter-spacing: .13em;
+  color: hsl(var(--muted-foreground) / .52);
+}
+.atlas-intro h1 {
+  text-wrap: balance;
+  text-shadow: 0 10px 40px hsl(168 35% 2% / .35);
+}
+.atlas-search input:focus {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / .55), 0 0 28px hsl(var(--primary) / .08);
+}
+.atlas-primary {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(70 47% 63%));
+  box-shadow: 0 10px 26px hsl(var(--primary) / .14), inset 0 1px 0 hsl(0 0% 100% / .28);
+}
+.atlas-map-heading {
+  border-color: hsl(var(--primary) / .28);
+  box-shadow: 0 14px 36px hsl(168 45% 2% / .28), inset 0 1px 0 hsl(0 0% 100% / .08);
+}
+.atlas-map-heading::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid hsl(var(--primary) / .1);
+  pointer-events: none;
+}
+.atlas-map-status > div,
+.atlas-results,
+.atlas-intro {
+  backdrop-filter: blur(18px) saturate(1.12);
 }
 @media (prefers-reduced-motion: reduce) {
   .atlas-app *, .atlas-app *::before, .atlas-app *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
