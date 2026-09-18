@@ -163,6 +163,55 @@ function siteAreaM2(value: unknown): number {
     : 0;
 }
 
+function safeHasStyle(map: MapLibreMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 function invalidCollection(
   features: InterventionFeature[]
 ): GeoJSON.FeatureCollection {
@@ -431,17 +480,17 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
     }, [activeIntervention, map]);
 
     useEffect(() => {
-      if (!map) return;
+      if (!map || !safeHasStyle(map)) return;
       if (!map.hasImage(INVALID_PATTERN_ID)) {
         map.addImage(INVALID_PATTERN_ID, hatchImage());
       }
-      if (!map.getSource(INVALID_SOURCE_ID)) {
+      if (!safeGetSource(map, INVALID_SOURCE_ID)) {
         map.addSource(INVALID_SOURCE_ID, {
           type: "geojson",
           data: invalidCollection(featuresRef.current),
         });
       }
-      if (!map.getLayer(INVALID_FILL_ID)) {
+      if (!safeGetLayer(map, INVALID_FILL_ID)) {
         map.addLayer({
           id: INVALID_FILL_ID,
           type: "fill",
@@ -452,7 +501,7 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           },
         });
       }
-      if (!map.getLayer(INVALID_OUTLINE_ID)) {
+      if (!safeGetLayer(map, INVALID_OUTLINE_ID)) {
         map.addLayer({
           id: INVALID_OUTLINE_ID,
           type: "line",
@@ -466,19 +515,22 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
       }
       return () => {
         for (const id of [INVALID_OUTLINE_ID, INVALID_FILL_ID]) {
-          if (map.getLayer(id)) map.removeLayer(id);
+          safeRemoveLayer(map, id);
         }
-        if (map.getSource(INVALID_SOURCE_ID)) {
-          map.removeSource(INVALID_SOURCE_ID);
-        }
-        if (map.hasImage(INVALID_PATTERN_ID)) {
-          map.removeImage(INVALID_PATTERN_ID);
+        safeRemoveSource(map, INVALID_SOURCE_ID);
+        try {
+          if (map.hasImage(INVALID_PATTERN_ID)) {
+            map.removeImage(INVALID_PATTERN_ID);
+          }
+        } catch {
+          // Ignore if image or map style was destroyed
         }
       };
     }, [map]);
 
     useEffect(() => {
-      const source = map?.getSource(INVALID_SOURCE_ID) as
+      if (!map || !safeHasStyle(map)) return;
+      const source = safeGetSource(map, INVALID_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
       source?.setData(invalidCollection(features));

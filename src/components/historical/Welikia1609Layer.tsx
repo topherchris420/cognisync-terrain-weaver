@@ -29,6 +29,55 @@ interface Welikia1609LayerProps {
  * Blocks are reloaded for the visible area as the map moves, so the whole city
  * index never has to be drawn at once.
  */
+function safeHasStyle(map: MLMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps) {
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [, setReady] = useState(false);
@@ -39,8 +88,8 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
 
     const install = () => {
       if (removed) return;
-      if (!map.isStyleLoaded()) return;
-      if (!map.getSource(RASTER_SOURCE)) {
+      if (!safeHasStyle(map) || !map.isStyleLoaded()) return;
+      if (!safeGetSource(map, RASTER_SOURCE)) {
         map.addSource(RASTER_SOURCE, {
           type: "raster",
           tiles: [WELIKIA_TILE_URL],
@@ -50,7 +99,7 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
             "1609 reconstruction © Welikia Project, Wildlife Conservation Society",
         });
       }
-      if (!map.getLayer(RASTER_LAYER)) {
+      if (!safeGetLayer(map, RASTER_LAYER)) {
         map.addLayer({
           id: RASTER_LAYER,
           type: "raster",
@@ -58,10 +107,10 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
           paint: { "raster-opacity": opacity },
         });
       }
-      if (!map.getSource(BLOCK_SOURCE)) {
+      if (!safeGetSource(map, BLOCK_SOURCE)) {
         map.addSource(BLOCK_SOURCE, { type: "geojson", data: EMPTY });
       }
-      if (!map.getLayer(BLOCK_FILL)) {
+      if (!safeGetLayer(map, BLOCK_FILL)) {
         map.addLayer({
           id: BLOCK_FILL,
           type: "fill",
@@ -80,7 +129,7 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
           },
         });
       }
-      if (!map.getLayer(BLOCK_LINE)) {
+      if (!safeGetLayer(map, BLOCK_LINE)) {
         map.addLayer({
           id: BLOCK_LINE,
           type: "line",
@@ -96,7 +145,7 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
     };
 
     const refresh = async () => {
-      if (removed) return;
+      if (removed || !safeHasStyle(map)) return;
       const b = map.getBounds();
       try {
         const data = await loadWelikia1609Features({
@@ -105,8 +154,8 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
           east: b.getEast(),
           north: b.getNorth(),
         });
-        if (removed) return;
-        const source = map.getSource(BLOCK_SOURCE) as GeoJSONSource | undefined;
+        if (removed || !safeHasStyle(map)) return;
+        const source = safeGetSource(map, BLOCK_SOURCE) as GeoJSONSource | undefined;
         source?.setData(data);
       } catch {
         // The panel already reports a failed index load; the map just stays bare.
@@ -175,17 +224,21 @@ export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps)
       off("mouseleave", BLOCK_FILL, onLeave as unknown as (e: never) => void);
       map.off("moveend", refresh);
       for (const id of [BLOCK_LINE, BLOCK_FILL, RASTER_LAYER]) {
-        if (map.getLayer(id)) map.removeLayer(id);
+        safeRemoveLayer(map, id);
       }
       for (const id of [BLOCK_SOURCE, RASTER_SOURCE]) {
-        if (map.getSource(id)) map.removeSource(id);
+        safeRemoveSource(map, id);
       }
     };
   }, [map, opacity]);
 
   useEffect(() => {
-    if (!map || !map.getLayer(RASTER_LAYER)) return;
-    map.setPaintProperty(RASTER_LAYER, "raster-opacity", opacity);
+    if (!map || !safeGetLayer(map, RASTER_LAYER)) return;
+    try {
+      map.setPaintProperty(RASTER_LAYER, "raster-opacity", opacity);
+    } catch {
+      // Ignore if map or style was destroyed
+    }
   }, [map, opacity]);
 
   return null;

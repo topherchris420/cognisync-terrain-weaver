@@ -18,6 +18,55 @@ const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: 
  * and refreshed as the map moves, so a whole borough can be inspected without
  * loading the entire city at once.
  */
+function safeHasStyle(map: MLMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
   const sourceId = `floodplain-${scenarioId}-src`;
   const fillId = `floodplain-${scenarioId}-fill`;
@@ -28,11 +77,11 @@ export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
     let removed = false;
 
     const install = () => {
-      if (removed || !map.isStyleLoaded()) return;
-      if (!map.getSource(sourceId)) {
+      if (removed || !safeHasStyle(map) || !map.isStyleLoaded()) return;
+      if (!safeGetSource(map, sourceId)) {
         map.addSource(sourceId, { type: "geojson", data: EMPTY });
       }
-      if (!map.getLayer(fillId)) {
+      if (!safeGetLayer(map, fillId)) {
         map.addLayer({
           id: fillId,
           type: "fill",
@@ -43,7 +92,7 @@ export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
           },
         });
       }
-      if (!map.getLayer(lineId)) {
+      if (!safeGetLayer(map, lineId)) {
         map.addLayer({
           id: lineId,
           type: "line",
@@ -58,7 +107,7 @@ export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
     };
 
     const refresh = async () => {
-      if (removed) return;
+      if (removed || !safeHasStyle(map)) return;
       const b = map.getBounds();
       try {
         const data = await loadFloodplain(scenarioId, {
@@ -67,8 +116,8 @@ export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
           east: b.getEast(),
           north: b.getNorth(),
         });
-        if (removed) return;
-        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+        if (removed || !safeHasStyle(map)) return;
+        const source = safeGetSource(map, sourceId) as GeoJSONSource | undefined;
         source?.setData(data);
       } catch {
         // The timeline caption already names the source; the map stays bare.
@@ -88,9 +137,9 @@ export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
       map.off("idle", install);
       map.off("moveend", refresh);
       for (const id of [lineId, fillId]) {
-        if (map.getLayer(id)) map.removeLayer(id);
+        safeRemoveLayer(map, id);
       }
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
+      safeRemoveSource(map, sourceId);
     };
   }, [map, scenarioId, sourceId, fillId, lineId, opacity]);
 

@@ -61,15 +61,64 @@ function inspectionFromFeature(
   };
 }
 
+function safeHasStyle(map: MapLibreMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MapLibreMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 export function SpatialLandCoverLayer({
   map,
   context,
   onInspect,
 }: SpatialLandCoverLayerProps) {
   useEffect(() => {
-    if (!map || !context) return;
+    if (!map || !context || !safeHasStyle(map)) return;
 
-    const existing = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+    const existing = safeGetSource(map, SOURCE_ID) as GeoJSONSource | undefined;
     if (existing) {
       existing.setData(context.featureCollection);
     } else {
@@ -79,7 +128,7 @@ export function SpatialLandCoverLayer({
       });
     }
 
-    if (!map.getLayer(POLYGON_LAYER_ID)) {
+    if (!safeGetLayer(map, POLYGON_LAYER_ID)) {
       map.addLayer({
         id: POLYGON_LAYER_ID,
         type: "fill",
@@ -102,7 +151,7 @@ export function SpatialLandCoverLayer({
         },
       });
     }
-    if (!map.getLayer(TREE_LAYER_ID)) {
+    if (!safeGetLayer(map, TREE_LAYER_ID)) {
       map.addLayer({
         id: TREE_LAYER_ID,
         type: "circle",
@@ -142,9 +191,9 @@ export function SpatialLandCoverLayer({
       offLayerClick("click", POLYGON_LAYER_ID, handleClick);
       offLayerClick("click", TREE_LAYER_ID, handleClick);
       for (const layerId of [TREE_LAYER_ID, POLYGON_LAYER_ID]) {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        safeRemoveLayer(map, layerId);
       }
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      safeRemoveSource(map, SOURCE_ID);
     };
   }, [context, map, onInspect]);
 
