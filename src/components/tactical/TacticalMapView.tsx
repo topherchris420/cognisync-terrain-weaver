@@ -171,7 +171,9 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
           if (!map.getStyle || map.getStyle()) {
             source = map.getSource(TACTICAL_CORRIDORS_SOURCE) as maplibregl.GeoJSONSource | undefined;
           }
-        } catch {}
+        } catch {
+          // Ignore if source or map style was destroyed
+        }
         if (!source) return;
 
         if (!layers.showCorridors) {

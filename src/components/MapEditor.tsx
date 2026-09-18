@@ -522,7 +522,9 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           if (map.hasImage(INVALID_PATTERN_ID)) {
             map.removeImage(INVALID_PATTERN_ID);
           }
-        } catch {}
+        } catch {
+          // Ignore if image or map style was destroyed
+        }
       };
     }, [map]);
 

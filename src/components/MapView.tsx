@@ -321,7 +321,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         if (hadLabels) {
           try {
             map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "none");
-          } catch {}
+          } catch {
+            // Ignore layer updates if map style was destroyed
+          }
         }
 
         const repaint = () =>
@@ -344,7 +346,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
                 map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "visible");
                 await repaint();
               }
-            } catch {}
+            } catch {
+              // Ignore layer updates if map style was destroyed
+            }
           }
         }
       },

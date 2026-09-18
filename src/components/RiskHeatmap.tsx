@@ -330,13 +330,17 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
     const handleMouseEnter = () => {
       try {
         map.getCanvas().style.cursor = "pointer";
-      } catch {}
+      } catch {
+        // Ignore cursor updates if canvas is unavailable
+      }
     };
 
     const handleMouseLeave = () => {
       try {
         map.getCanvas().style.cursor = "";
-      } catch {}
+      } catch {
+        // Ignore cursor updates if canvas is unavailable
+      }
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;

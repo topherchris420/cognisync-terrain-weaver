@@ -265,13 +265,17 @@ export default function Analyze() {
         source: id,
         paint: { "line-color": "#bdd394", "line-width": 2, "line-dasharray": [3, 2] },
       });
-    } catch {}
+    } catch {
+      // Ignore layer additions if style was destroyed
+    }
     return () => {
       if (!hasStyle()) return;
       try {
         if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
         if (mapInstance.getSource(id)) mapInstance.removeSource(id);
-      } catch {}
+      } catch {
+        // Ignore layer removals if style was destroyed
+      }
     };
   }, [mapInstance, result, analyzedBBox]);
 
