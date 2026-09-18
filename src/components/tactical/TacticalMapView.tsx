@@ -46,6 +46,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<MLMap | null>(null);
     const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
+    const [mapReady, setMapReady] = useState(false);
     const markersRef = useRef<Marker[]>([]);
     const flowLayerRef = useRef<FlowLayerHandle>(null);
     const riskHeatmapRef = useRef<RiskHeatmapHandle>(null);
@@ -143,6 +144,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
             ],
           },
         });
+        setMapReady(true);
       });
 
       mapRef.current = map;
@@ -152,6 +154,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
         map.remove();
         mapRef.current = null;
         setMapInstance(null);
+        setMapReady(false);
       };
       // Center and zoom are initial mount coordinates
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,7 +202,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
     // Update Custom Markers (Sensors, Supply Nodes, Convoys)
     useEffect(() => {
       const map = mapInstance;
-      if (!map) return;
+      if (!map || !mapReady) return;
 
       // Clear existing markers
       markersRef.current.forEach((m) => m.remove());
@@ -283,6 +286,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
       state.supply_nodes,
       state.convoys,
       mapInstance,
+      mapReady,
       layers.showSensors,
       layers.showSupply,
       onSelectSensor,
@@ -294,14 +298,14 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
         <div ref={mapContainerRef} className="w-full h-full" />
 
         {/* Overlay Flow Layers & Risk Heatmap from existing Engine */}
-        {layers.showFlows && (
+        {mapReady && layers.showFlows && (
           <FlowLayer
             ref={flowLayerRef}
             map={mapInstance}
             flowPaths={flowPaths}
           />
         )}
-        {layers.showRiskZones && (
+        {mapReady && layers.showRiskZones && (
           <RiskHeatmap
             ref={riskHeatmapRef}
             map={mapInstance}
