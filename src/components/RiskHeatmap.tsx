@@ -51,6 +51,55 @@ function riskZonesToGeoJSON(zones: RiskZone[]): FeatureCollection {
   };
 }
 
+function safeHasStyle(map: MLMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(function RiskHeatmap(
   { riskZones = [], map },
   ref
@@ -60,15 +109,15 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
   const popupRef = useRef<Popup | null>(null);
 
   const addToMap = useCallback(() => {
-    if (!map) return;
+    if (!map || !safeHasStyle(map)) return;
 
     if (!map.isStyleLoaded()) return;
 
     // StrictMode and rapid state changes can invoke this more than once.
     // Reuse an existing source instead of attempting to register it again.
-    if (map.getLayer(RISK_LAYER_ID) || map.getLayer(RISK_OUTLINE_LAYER_ID)) return;
+    if (safeGetLayer(map, RISK_LAYER_ID) || safeGetLayer(map, RISK_OUTLINE_LAYER_ID)) return;
 
-    if (!map.getSource(RISK_SOURCE_ID)) {
+    if (!safeGetSource(map, RISK_SOURCE_ID)) {
       map.addSource(RISK_SOURCE_ID, {
         type: "geojson",
         data: riskZonesToGeoJSON(riskZones),
@@ -136,8 +185,6 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
   }, [map, riskZones]);
 
   const removeFromMap = useCallback(() => {
-    if (!map) return;
-
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
@@ -148,22 +195,17 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
       popupRef.current = null;
     }
 
-    if (map.getLayer(RISK_OUTLINE_LAYER_ID)) {
-      map.removeLayer(RISK_OUTLINE_LAYER_ID);
-    }
-    if (map.getLayer(RISK_LAYER_ID)) {
-      map.removeLayer(RISK_LAYER_ID);
-    }
-    if (map.getSource(RISK_SOURCE_ID)) {
-      map.removeSource(RISK_SOURCE_ID);
-    }
+    if (!map) return;
+    safeRemoveLayer(map, RISK_OUTLINE_LAYER_ID);
+    safeRemoveLayer(map, RISK_LAYER_ID);
+    safeRemoveSource(map, RISK_SOURCE_ID);
   }, [map]);
 
   const updateZones = useCallback(
     (zones: RiskZone[]) => {
-      if (!map) return;
+      if (!map || !safeHasStyle(map)) return;
 
-      const source = map.getSource(RISK_SOURCE_ID) as GeoJSONSource;
+      const source = safeGetSource(map, RISK_SOURCE_ID) as GeoJSONSource | undefined;
       if (source) {
         source.setData(riskZonesToGeoJSON(zones));
       } else {
@@ -173,7 +215,7 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
           data: riskZonesToGeoJSON(zones),
         });
 
-        if (!map.getLayer(RISK_LAYER_ID)) {
+        if (!safeGetLayer(map, RISK_LAYER_ID)) {
           map.addLayer({
             id: RISK_LAYER_ID,
             type: "fill",
@@ -209,7 +251,7 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
           });
         }
 
-        if (!map.getLayer(RISK_OUTLINE_LAYER_ID)) {
+        if (!safeGetLayer(map, RISK_OUTLINE_LAYER_ID)) {
           map.addLayer({
             id: RISK_OUTLINE_LAYER_ID,
             type: "line",
@@ -240,33 +282,37 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
 
   // Pulsing animation loop for hazard zones
   useEffect(() => {
-    if (!map) return;
+    if (!map || !safeHasStyle(map)) return;
 
     const animatePulse = () => {
       pulsePhaseRef.current += 0.04;
       const pulseFactor = (Math.sin(pulsePhaseRef.current) + 1) / 2; // 0 to 1
       const severeOpacity = 0.5 + pulseFactor * 0.25;
 
-      if (map.getLayer(RISK_LAYER_ID)) {
-        map.setPaintProperty(RISK_LAYER_ID, "fill-opacity", [
-          "match",
-          ["get", "level"],
-          "low",
-          RISK_OPACITIES.low,
-          "moderate",
-          RISK_OPACITIES.moderate,
-          "high",
-          RISK_OPACITIES.high,
-          "severe",
-          severeOpacity,
-          0.4,
-        ]);
+      if (safeGetLayer(map, RISK_LAYER_ID)) {
+        try {
+          map.setPaintProperty(RISK_LAYER_ID, "fill-opacity", [
+            "match",
+            ["get", "level"],
+            "low",
+            RISK_OPACITIES.low,
+            "moderate",
+            RISK_OPACITIES.moderate,
+            "high",
+            RISK_OPACITIES.high,
+            "severe",
+            severeOpacity,
+            0.4,
+          ]);
+        } catch {
+          // Ignore if layer or map was destroyed
+        }
       }
 
       animFrameRef.current = requestAnimationFrame(animatePulse);
     };
 
-    if (riskZones.length > 0 && map.getLayer(RISK_LAYER_ID)) {
+    if (riskZones.length > 0 && safeGetLayer(map, RISK_LAYER_ID)) {
       animFrameRef.current = requestAnimationFrame(animatePulse);
     }
 
@@ -279,14 +325,18 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
 
   // Handle click popup inspection on risk zones
   useEffect(() => {
-    if (!map) return;
+    if (!map || !safeHasStyle(map)) return;
 
     const handleMouseEnter = () => {
-      map.getCanvas().style.cursor = "pointer";
+      try {
+        map.getCanvas().style.cursor = "pointer";
+      } catch {}
     };
 
     const handleMouseLeave = () => {
-      map.getCanvas().style.cursor = "";
+      try {
+        map.getCanvas().style.cursor = "";
+      } catch {}
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
@@ -328,14 +378,14 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
         .addTo(map);
     };
 
-    if (map.getLayer(RISK_LAYER_ID)) {
+    if (safeGetLayer(map, RISK_LAYER_ID)) {
       map.on("mouseenter", RISK_LAYER_ID, handleMouseEnter);
       map.on("mouseleave", RISK_LAYER_ID, handleMouseLeave);
       map.on("click", RISK_LAYER_ID, handleClick);
     }
 
     return () => {
-      if (map.getLayer(RISK_LAYER_ID)) {
+      if (safeGetLayer(map, RISK_LAYER_ID)) {
         map.off("mouseenter", RISK_LAYER_ID, handleMouseEnter);
         map.off("mouseleave", RISK_LAYER_ID, handleMouseLeave);
         map.off("click", RISK_LAYER_ID, handleClick);

@@ -46,6 +46,55 @@ function calculateOpacity(volume_m3: number): number {
   return minOpacity + (maxOpacity - minOpacity) * normalized;
 }
 
+function safeHasStyle(map: MLMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function FlowLayer(
   { flowPaths = [], map },
   ref
@@ -54,15 +103,15 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
   const dashOffsetRef = useRef(0);
 
   const addToMap = useCallback(() => {
-    if (!map) return;
+    if (!map || !safeHasStyle(map)) return;
 
     if (!map.isStyleLoaded()) return;
 
     // StrictMode and rapid state changes can invoke this more than once.
     // Reuse an existing source instead of attempting to register it again.
-    if (map.getLayer(FLOW_GLOW_LAYER_ID) || map.getLayer(FLOW_LAYER_ID) || map.getLayer(FLOW_ANIMATION_LAYER_ID)) return;
+    if (safeGetLayer(map, FLOW_GLOW_LAYER_ID) || safeGetLayer(map, FLOW_LAYER_ID) || safeGetLayer(map, FLOW_ANIMATION_LAYER_ID)) return;
 
-    if (!map.getSource(FLOW_SOURCE_ID)) {
+    if (!safeGetSource(map, FLOW_SOURCE_ID)) {
       map.addSource(FLOW_SOURCE_ID, {
         type: "geojson",
         data: flowPathsToGeoJSON(flowPaths),
@@ -145,41 +194,31 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
   }, [map, flowPaths]);
 
   const removeFromMap = useCallback(() => {
-    if (!map) return;
-
     // Stop animation
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
 
-    // Remove layers
-    if (map.isStyleLoaded() && map.getLayer(FLOW_ANIMATION_LAYER_ID)) {
-      map.removeLayer(FLOW_ANIMATION_LAYER_ID);
-    }
-    if (map.isStyleLoaded() && map.getLayer(FLOW_LAYER_ID)) {
-      map.removeLayer(FLOW_LAYER_ID);
-    }
-    if (map.isStyleLoaded() && map.getLayer(FLOW_GLOW_LAYER_ID)) {
-      map.removeLayer(FLOW_GLOW_LAYER_ID);
-    }
+    if (!map) return;
 
-    // Remove source
-    if (map.isStyleLoaded() && map.getSource(FLOW_SOURCE_ID)) {
-      map.removeSource(FLOW_SOURCE_ID);
-    }
+    // Remove layers & source
+    safeRemoveLayer(map, FLOW_ANIMATION_LAYER_ID);
+    safeRemoveLayer(map, FLOW_LAYER_ID);
+    safeRemoveLayer(map, FLOW_GLOW_LAYER_ID);
+    safeRemoveSource(map, FLOW_SOURCE_ID);
   }, [map]);
 
   const updatePaths = useCallback(
     (paths: FlowPath[]) => {
-      if (!map) return;
+      if (!map || !safeHasStyle(map)) return;
 
       if (!map.isStyleLoaded()) return;
 
-      let source = map.getSource(FLOW_SOURCE_ID) as GeoJSONSource | undefined;
+      let source = safeGetSource(map, FLOW_SOURCE_ID) as GeoJSONSource | undefined;
       if (!source) {
         addToMap();
-        source = map.getSource(FLOW_SOURCE_ID) as GeoJSONSource | undefined;
+        source = safeGetSource(map, FLOW_SOURCE_ID) as GeoJSONSource | undefined;
       }
       if (source) {
         source.setData(flowPathsToGeoJSON(paths));
@@ -201,14 +240,18 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
   const popupRef = useRef<Popup | null>(null);
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !safeHasStyle(map)) return;
 
     const handleMouseEnter = () => {
-      map.getCanvas().style.cursor = "pointer";
+      try {
+        map.getCanvas().style.cursor = "pointer";
+      } catch {}
     };
 
     const handleMouseLeave = () => {
-      map.getCanvas().style.cursor = "";
+      try {
+        map.getCanvas().style.cursor = "";
+      } catch {}
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
@@ -254,14 +297,14 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
         .addTo(map);
     };
 
-    if (map.isStyleLoaded() && map.getLayer(FLOW_LAYER_ID)) {
+    if (map.isStyleLoaded() && safeGetLayer(map, FLOW_LAYER_ID)) {
       map.on("mouseenter", FLOW_LAYER_ID, handleMouseEnter);
       map.on("mouseleave", FLOW_LAYER_ID, handleMouseLeave);
       map.on("click", FLOW_LAYER_ID, handleClick);
     }
 
     return () => {
-      if (map.isStyleLoaded() && map.getLayer(FLOW_LAYER_ID)) {
+      if (safeGetLayer(map, FLOW_LAYER_ID)) {
         map.off("mouseenter", FLOW_LAYER_ID, handleMouseEnter);
         map.off("mouseleave", FLOW_LAYER_ID, handleMouseLeave);
         map.off("click", FLOW_LAYER_ID, handleClick);
@@ -275,7 +318,7 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
 
   // Start animation loop
   useEffect(() => {
-    if (!map) return;
+    if (!map || !safeHasStyle(map)) return;
 
     const animate = () => {
       const step = calculateVelocityStep();
@@ -284,19 +327,23 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
         dashOffsetRef.current = 0;
       }
 
-      if (map.isStyleLoaded() && map.getLayer(FLOW_ANIMATION_LAYER_ID)) {
-        map.setPaintProperty(
-          FLOW_ANIMATION_LAYER_ID,
-          "line-dashoffset",
-          dashOffsetRef.current
-        );
+      if (map.isStyleLoaded() && safeGetLayer(map, FLOW_ANIMATION_LAYER_ID)) {
+        try {
+          map.setPaintProperty(
+            FLOW_ANIMATION_LAYER_ID,
+            "line-dashoffset",
+            dashOffsetRef.current
+          );
+        } catch {
+          // Ignore if layer or map was destroyed
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
     // Start animation once layers are added
-    if (map.isStyleLoaded() && map.getLayer(FLOW_ANIMATION_LAYER_ID)) {
+    if (map.isStyleLoaded() && safeGetLayer(map, FLOW_ANIMATION_LAYER_ID)) {
       animationFrameRef.current = requestAnimationFrame(animate);
     }
 

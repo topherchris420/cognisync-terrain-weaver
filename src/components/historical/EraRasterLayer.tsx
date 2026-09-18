@@ -16,6 +16,55 @@ interface Props {
  * blocks as well as imagery; every other era is a single tiled raster, so one
  * component covers all of them.
  */
+function safeHasStyle(map: MLMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
 export function EraRasterLayer({ map, era }: Props) {
   const sourceId = `era-${era.id}-src`;
   const layerId = `era-${era.id}-layer`;
@@ -28,8 +77,8 @@ export function EraRasterLayer({ map, era }: Props) {
 
     const install = () => {
       if (removed) return;
-      if (!map.isStyleLoaded()) return;
-      if (!map.getSource(sourceId)) {
+      if (!safeHasStyle(map) || !map.isStyleLoaded()) return;
+      if (!safeGetSource(map, sourceId)) {
         map.addSource(sourceId, {
           type: "raster",
           tiles: [tiles],
@@ -38,7 +87,7 @@ export function EraRasterLayer({ map, era }: Props) {
           attribution: era.attribution ?? era.agency,
         });
       }
-      if (!map.getLayer(layerId)) {
+      if (!safeGetLayer(map, layerId)) {
         map.addLayer({
           id: layerId,
           type: "raster",
@@ -58,8 +107,8 @@ export function EraRasterLayer({ map, era }: Props) {
       map.off("styledata", install);
       map.off("load", install);
       map.off("idle", install);
-      if (map.getLayer(layerId)) map.removeLayer(layerId);
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
+      safeRemoveLayer(map, layerId);
+      safeRemoveSource(map, sourceId);
     };
   }, [map, tiles, sourceId, layerId, opacity, era.maxzoom, era.attribution, era.agency]);
 

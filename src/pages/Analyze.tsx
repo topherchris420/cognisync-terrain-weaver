@@ -250,20 +250,28 @@ export default function Analyze() {
 
   // Keep the report's extent visible even when the camera moves elsewhere.
   useEffect(() => {
-    if (!mapInstance || !result || !analyzedBBox || !mapInstance.isStyleLoaded()) return;
+    if (!mapInstance || !result || !analyzedBBox) return;
+    const hasStyle = () => {
+      try { return Boolean(!mapInstance.getStyle || mapInstance.getStyle()); } catch { return false; }
+    };
+    if (!hasStyle() || !mapInstance.isStyleLoaded()) return;
     const id = "atlas-analysis-footprint";
-    if (mapInstance.getSource(id)) return;
-    mapInstance.addSource(id, { type: "geojson", data: analysesToGeoJSON([result]) });
-    mapInstance.addLayer({
-      id,
-      type: "line",
-      source: id,
-      paint: { "line-color": "#bdd394", "line-width": 2, "line-dasharray": [3, 2] },
-    });
+    try {
+      if (mapInstance.getSource(id)) return;
+      mapInstance.addSource(id, { type: "geojson", data: analysesToGeoJSON([result]) });
+      mapInstance.addLayer({
+        id,
+        type: "line",
+        source: id,
+        paint: { "line-color": "#bdd394", "line-width": 2, "line-dasharray": [3, 2] },
+      });
+    } catch {}
     return () => {
-      if (!mapInstance.isStyleLoaded()) return;
-      if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
-      if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+      if (!hasStyle()) return;
+      try {
+        if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
+        if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+      } catch {}
     };
   }, [mapInstance, result, analyzedBBox]);
 

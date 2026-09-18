@@ -309,9 +309,19 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         // model for land-cover classification, and burnt-in street names and
         // city labels are text the model would try to read as terrain. The
         // user sees labels; the classifier must not.
-        const hadLabels = Boolean(map.getLayer(LABELS_LAYER_ID));
+        let hadLabels = false;
+        try {
+          if (!map.getStyle || map.getStyle()) {
+            hadLabels = Boolean(map.getLayer(LABELS_LAYER_ID));
+          }
+        } catch {
+          hadLabels = false;
+        }
+
         if (hadLabels) {
-          map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "none");
+          try {
+            map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "none");
+          } catch {}
         }
 
         const repaint = () =>
@@ -329,8 +339,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           return null;
         } finally {
           if (hadLabels) {
-            map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "visible");
-            await repaint();
+            try {
+              if (!map.getStyle || map.getStyle()) {
+                map.setLayoutProperty(LABELS_LAYER_ID, "visibility", "visible");
+                await repaint();
+              }
+            } catch {}
           }
         }
       },
