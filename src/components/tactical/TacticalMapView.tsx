@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import maplibregl, { Map as MLMap, Marker, Popup } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { TacticalCOPState, IoTSensor, SupplyNode, ConvoyAsset, TransitCorridor } from "@/lib/tactical/types";
@@ -45,6 +45,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
   ) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<MLMap | null>(null);
+    const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
     const markersRef = useRef<Marker[]>([]);
     const flowLayerRef = useRef<FlowLayerHandle>(null);
     const riskHeatmapRef = useRef<RiskHeatmapHandle>(null);
@@ -145,10 +146,12 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
       });
 
       mapRef.current = map;
+      setMapInstance(map);
 
       return () => {
         map.remove();
         mapRef.current = null;
+        setMapInstance(null);
       };
       // Center and zoom are initial mount coordinates
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,7 +159,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
 
     // Update Transit Corridors on Map
     useEffect(() => {
-      const map = mapRef.current;
+      const map = mapInstance;
       if (!map) return;
 
       const updateData = () => {
@@ -191,11 +194,11 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
       } else {
         map.once("load", updateData);
       }
-    }, [state.corridors, layers.showCorridors]);
+    }, [mapInstance, state.corridors, layers.showCorridors]);
 
     // Update Custom Markers (Sensors, Supply Nodes, Convoys)
     useEffect(() => {
-      const map = mapRef.current;
+      const map = mapInstance;
       if (!map) return;
 
       // Clear existing markers
@@ -279,6 +282,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
       state.sensors,
       state.supply_nodes,
       state.convoys,
+      mapInstance,
       layers.showSensors,
       layers.showSupply,
       onSelectSensor,
@@ -293,14 +297,14 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
         {layers.showFlows && (
           <FlowLayer
             ref={flowLayerRef}
-            map={mapRef.current}
+            map={mapInstance}
             flowPaths={flowPaths}
           />
         )}
         {layers.showRiskZones && (
           <RiskHeatmap
             ref={riskHeatmapRef}
-            map={mapRef.current}
+            map={mapInstance}
             riskZones={riskZones}
           />
         )}
