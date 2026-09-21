@@ -274,6 +274,7 @@ export function routeWatershed(
             ? "high"
             : "moderate",
       affected_area_km2: cellAreaM2 / 1e6,
+      flood_depth_m: clamp(cell.value / Math.max(cellAreaM2, 1e-6), 0, 4),
     }));
 
   const impact_points: ImpactPoint[] = ranked.slice(0, MAX_IMPACT_POINTS).map((cell) => {

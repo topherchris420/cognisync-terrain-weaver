@@ -7,6 +7,8 @@ import { smoothFlowPoints } from "@/lib/simulation";
 interface FlowLayerProps {
   flowPaths?: FlowPath[];
   map?: MLMap | null;
+  /** Wider vectors when the map is pitched, so runoff stays readable on the mesh. */
+  relief?: boolean;
 }
 
 export interface FlowLayerHandle {
@@ -95,8 +97,20 @@ function safeRemoveSource(map: MLMap | null | undefined, id: string) {
   }
 }
 
+const RELIEF_WIDTH = {
+  glow: 12,
+  base: 3.5,
+  dash: 4.5,
+} as const;
+
+const FLAT_WIDTH = {
+  glow: 8,
+  base: 2,
+  dash: 3,
+} as const;
+
 export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function FlowLayer(
-  { flowPaths = [], map },
+  { flowPaths = [], map, relief = false },
   ref
 ) {
   const animationFrameRef = useRef<number | null>(null);
@@ -369,6 +383,24 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
       removeFromMap();
     }
   }, [flowPaths, map, addToMap, updatePaths, removeFromMap]);
+
+  useEffect(() => {
+    if (!map || !safeHasStyle(map)) return;
+    const widths = relief ? RELIEF_WIDTH : FLAT_WIDTH;
+    const paint: Array<[string, number]> = [
+      [FLOW_GLOW_LAYER_ID, widths.glow],
+      [FLOW_LAYER_ID, widths.base],
+      [FLOW_ANIMATION_LAYER_ID, widths.dash],
+    ];
+    for (const [layerId, width] of paint) {
+      if (!safeGetLayer(map, layerId)) continue;
+      try {
+        map.setPaintProperty(layerId, "line-width", width);
+      } catch {
+        // Layer may have been removed between the check and the write.
+      }
+    }
+  }, [map, relief, flowPaths]);
 
   useImperativeHandle(
     ref,

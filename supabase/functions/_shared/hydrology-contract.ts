@@ -96,6 +96,8 @@ export interface HydrologyRiskZone {
   polygon: [number, number][];
   level: "low" | "moderate" | "high" | "severe";
   affected_area_km2: number;
+  /** Standing water depth, meters, from accumulated volume over the cell. */
+  flood_depth_m?: number;
 }
 
 export interface HydrologyImpactPoint {

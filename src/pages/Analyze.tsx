@@ -7,6 +7,7 @@ import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LocationSearch } from "@/components/LocationSearch";
 import { AnalyzingState } from "@/components/AnalyzingState";
 import { FlowLayer } from "@/components/FlowLayer";
+import { FloodVolumeLayer } from "@/components/FloodVolumeLayer";
 import { RiskHeatmap } from "@/components/RiskHeatmap";
 import { LandCoverBreakdown } from "@/components/LandCoverBreakdown";
 import { BaselineComparison } from "@/components/BaselineComparison";
@@ -626,7 +627,17 @@ export default function Analyze() {
             <RiskHeatmap map={mapInstance} riskZones={simResult.risk_zones ?? []} />
           )}
           {simResult && showFlowVectors && (
-            <FlowLayer map={mapInstance} flowPaths={simResult.flow_paths ?? []} />
+            <FlowLayer
+              map={mapInstance}
+              flowPaths={simResult.flow_paths ?? []}
+              relief={terrainEnabled}
+            />
+          )}
+          {simResult && terrainEnabled && showRiskHeatmap && (
+            <FloodVolumeLayer
+              map={mapInstance}
+              riskZones={simResult.risk_zones ?? []}
+            />
           )}
 
           {/* Interactive Direct Map Editor for Mitigations */}
@@ -758,13 +769,29 @@ export default function Analyze() {
               report={determinism}
             />
           )}
+          {terrainEnabled && (
+            <p className="max-w-[18rem] rounded-md border border-border bg-card/90 px-3 py-1.5 text-right text-[10px] leading-snug text-muted-foreground shadow-md backdrop-blur-md">
+              {simResult
+                ? "Pitched relief and buildings. Flood columns follow modeled depth, scaled with the terrain."
+                : "Pitched relief and buildings. The vertical scale eases as you zoom into the block."}
+            </p>
+          )}
           <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setTerrainEnabled((value) => !value)}
-            title={terrainEnabled ? "Flatten to nadir" : "Tilt into 3D terrain"}
+            title={
+              terrainEnabled
+                ? "Return to a flat overhead view"
+                : "Pitch the map to show relief, buildings, and flood depth"
+            }
             aria-pressed={terrainEnabled}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-md"
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border bg-card/90 backdrop-blur-md px-3 py-1.5 text-xs hover:text-foreground hover:bg-muted transition-colors shadow-md",
+              terrainEnabled
+                ? "border-primary/50 text-foreground"
+                : "border-border text-muted-foreground"
+            )}
           >
             <Mountain className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{terrainEnabled ? "3D on" : "3D terrain"}</span>

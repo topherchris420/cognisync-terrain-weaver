@@ -150,6 +150,24 @@ describe("local D8 hydrology", () => {
     expect(possible.risk_zones.length).toBeGreaterThan(0);
   });
 
+  it("stores standing-water depth on each risk cell", () => {
+    const result = routeWatershed(input(cover({ pavement: 90, buildings: 10 })));
+    expect(result.risk_zones.length).toBeGreaterThan(0);
+    for (const zone of result.risk_zones) {
+      expect(zone.flood_depth_m).toBeGreaterThan(0);
+      expect(zone.flood_depth_m).toBeLessThanOrEqual(4);
+    }
+    const depthOf = (level: "moderate" | "high" | "severe") =>
+      result.risk_zones
+        .filter((zone) => zone.level === level)
+        .map((zone) => zone.flood_depth_m ?? 0);
+    const moderate = depthOf("moderate");
+    const severe = depthOf("severe");
+    if (moderate.length > 0 && severe.length > 0) {
+      expect(Math.min(...severe)).toBeGreaterThanOrEqual(Math.max(...moderate));
+    }
+  });
+
   it("is deterministic for a sealed storm and terrain", () => {
     const first = routeWatershed(input(cover({ buildings: 40, pavement: 30, vegetation: 30 })));
     const second = routeWatershed(input(cover({ buildings: 40, pavement: 30, vegetation: 30 })));

@@ -4,6 +4,26 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, SatelliteDish } from "lucide-react";
 import type { MapCameraState } from "@/lib/counterfactual/types";
+import {
+  BUILDINGS_LAYER_ID,
+  BUILDINGS_SOURCE_ID,
+  FLOOD_VOLUME_LAYER_ID,
+  HILLSHADE_EXAGGERATION_FLAT,
+  HILLSHADE_EXAGGERATION_RELIEF,
+  HILLSHADE_LAYER_ID,
+  TERRAIN_OVERLAY_SOURCE_IDS,
+  TERRARIUM_SOURCE_ID,
+  buildingsLayer,
+  buildingsSource,
+  flatMapLight,
+  flatMapSky,
+  hillshadeLayer,
+  terrainExaggerationForZoom,
+  terrainLight,
+  terrainPitchForZoom,
+  terrainSky,
+  terrariumSource,
+} from "@/lib/terrain-scene";
 
 export interface MapViewHandle {
   captureImage: () => Promise<string | null>;
@@ -35,48 +55,93 @@ export interface MapViewProps {
   terrainEnabled?: boolean;
 }
 
-const TERRARIUM_SOURCE = "terrarium";
-const HILLSHADE_LAYER = "hillshade";
+function overlaySourceId(event: unknown): string | undefined {
+  if (!event || typeof event !== "object" || !("sourceId" in event)) return undefined;
+  const sourceId = (event as { sourceId?: unknown }).sourceId;
+  return typeof sourceId === "string" ? sourceId : undefined;
+}
 
+function layerBefore(
+  map: MLMap,
+  candidates: string[]
+): string | undefined {
+  if (typeof map.getLayer !== "function") return undefined;
+  return candidates.find((id) => map.getLayer(id));
+}
+
+function setLayerVisibility(map: MLMap, id: string, visibility: "visible" | "none") {
+  if (typeof map.getLayer !== "function" || !map.getLayer(id)) return;
+  if (typeof map.setLayoutProperty !== "function") return;
+  map.setLayoutProperty(id, "visibility", visibility);
+}
+
+/**
+ * Hillshade stays on in the flat view. Pitched mode adds a zoom-scaled
+ * terrain mesh, building mass, and a sky so the storm has a ground to sit on.
+ */
 function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
   try {
     if (typeof map.getSource !== "function" || typeof map.addSource !== "function") {
       return;
     }
-    if (!map.getSource(TERRARIUM_SOURCE)) {
-      map.addSource(TERRARIUM_SOURCE, {
-        type: "raster-dem",
-        tiles: [
-          "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-        ],
-        tileSize: 256,
-        maxzoom: 15,
-        encoding: "terrarium",
-        attribution: "Elevation © Mapzen / AWS Terrain Tiles",
-      });
+    if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) return;
+
+    const zoom = typeof map.getZoom === "function" ? map.getZoom() : 15;
+    const exaggeration = terrainExaggerationForZoom(zoom);
+    const wasDimensional =
+      typeof map.getTerrain === "function" && Boolean(map.getTerrain());
+
+    if (!map.getSource(TERRARIUM_SOURCE_ID)) {
+      map.addSource(TERRARIUM_SOURCE_ID, terrariumSource());
     }
-    if (typeof map.getLayer === "function" && !map.getLayer(HILLSHADE_LAYER)) {
+    const hillshadeExaggeration = terrainEnabled
+      ? HILLSHADE_EXAGGERATION_RELIEF
+      : HILLSHADE_EXAGGERATION_FLAT;
+    if (typeof map.getLayer === "function" && !map.getLayer(HILLSHADE_LAYER_ID)) {
       map.addLayer(
-        {
-          id: HILLSHADE_LAYER,
-          type: "hillshade",
-          source: TERRARIUM_SOURCE,
-          paint: {
-            "hillshade-exaggeration": 0.85,
-            "hillshade-shadow-color": "#07110e",
-            "hillshade-highlight-color": "#f4f7ea",
-            "hillshade-illumination-direction": 315,
-            "hillshade-illumination-anchor": "map",
-          },
-        },
-        map.getLayer(LABELS_LAYER_ID) ? LABELS_LAYER_ID : undefined
+        hillshadeLayer(hillshadeExaggeration),
+        layerBefore(map, [LABELS_LAYER_ID])
+      );
+    } else if (typeof map.setPaintProperty === "function") {
+      map.setPaintProperty(
+        HILLSHADE_LAYER_ID,
+        "hillshade-exaggeration",
+        hillshadeExaggeration
       );
     }
+
+    if (!terrainEnabled) {
+      if (typeof map.setTerrain === "function") map.setTerrain(null);
+      setLayerVisibility(map, BUILDINGS_LAYER_ID, "none");
+      setLayerVisibility(map, FLOOD_VOLUME_LAYER_ID, "none");
+      if (wasDimensional) {
+        if (typeof map.setSky === "function") map.setSky(flatMapSky());
+        if (typeof map.setLight === "function") map.setLight(flatMapLight());
+      }
+      return;
+    }
+
     if (typeof map.setTerrain === "function") {
-      map.setTerrain(
-        terrainEnabled ? { source: TERRARIUM_SOURCE, exaggeration: 3.2 } : null
+      map.setTerrain({ source: TERRARIUM_SOURCE_ID, exaggeration });
+    }
+    if (!map.getSource(BUILDINGS_SOURCE_ID)) {
+      map.addSource(BUILDINGS_SOURCE_ID, buildingsSource());
+    }
+    if (typeof map.getLayer === "function" && !map.getLayer(BUILDINGS_LAYER_ID)) {
+      map.addLayer(
+        buildingsLayer(),
+        layerBefore(map, [
+          FLOOD_VOLUME_LAYER_ID,
+          "risk-zones-layer",
+          "flow-paths-glow-layer",
+          LABELS_LAYER_ID,
+        ])
       );
     }
+    setLayerVisibility(map, BUILDINGS_LAYER_ID, "visible");
+    setLayerVisibility(map, FLOOD_VOLUME_LAYER_ID, "visible");
+    if (typeof map.setSky === "function") map.setSky(terrainSky());
+    if (typeof map.setLight === "function") map.setLight(terrainLight());
   } catch (error) {
     console.warn("Terrain overlay unavailable", error);
   }
@@ -221,7 +286,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         pitch: viewRef.current.pitch,
         minZoom: 2,
         maxZoom: 19,
-        maxPitch: 75,
+        maxPitch: 80,
         // Required so we can read pixels off the canvas for AI analysis.
         canvasContextAttributes: { preserveDrawingBuffer: true },
         attributionControl: { compact: true },
@@ -293,6 +358,13 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
     map.on("error", (e) => {
       if (connected || disposed) return;
+      const sourceId = overlaySourceId(e);
+      if (
+        sourceId &&
+        (TERRAIN_OVERLAY_SOURCE_IDS as readonly string[]).includes(sourceId)
+      ) {
+        return;
+      }
       console.error("Map error before imagery connected:", e.error ?? e);
       tileErrors += 1;
       if (tileErrors >= MAX_TILE_ERRORS) nextProvider("tile errors");
@@ -334,8 +406,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     applyElevationOverlays(map, terrainEnabled);
     if (typeof map.easeTo !== "function") return;
     if (terrainEnabled) {
+      const zoom = map.getZoom?.() ?? 15;
       map.easeTo({
-        pitch: Math.max(map.getPitch?.() ?? 0, 68),
+        pitch: Math.max(map.getPitch?.() ?? 0, terrainPitchForZoom(zoom)),
         bearing: map.getBearing?.() || -24,
         duration: 1100,
         essential: true,
@@ -343,6 +416,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     } else if ((map.getPitch?.() ?? 0) > 1) {
       map.easeTo({ pitch: 0, duration: 700 });
     }
+  }, [terrainEnabled]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !terrainEnabled || typeof map.on !== "function") return;
+    const onZoomEnd = () => applyElevationOverlays(map, true);
+    map.on("zoomend", onZoomEnd);
+    return () => {
+      if (typeof map.off === "function") map.off("zoomend", onZoomEnd);
+    };
   }, [terrainEnabled]);
 
   useEffect(() => {
@@ -408,6 +491,22 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         if (hadTerrain && typeof map.setTerrain === "function") {
           map.setTerrain(null);
         }
+        const hiddenReliefLayers: string[] = [];
+        for (const layerId of [BUILDINGS_LAYER_ID, FLOOD_VOLUME_LAYER_ID]) {
+          if (typeof map.getLayer !== "function" || !map.getLayer(layerId)) continue;
+          let visibility: string | undefined;
+          try {
+            visibility =
+              typeof map.getLayoutProperty === "function"
+                ? map.getLayoutProperty(layerId, "visibility")
+                : undefined;
+          } catch {
+            visibility = undefined;
+          }
+          if (visibility === "none") continue;
+          setLayerVisibility(map, layerId, "none");
+          hiddenReliefLayers.push(layerId);
+        }
         if (
           (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&
           typeof map.jumpTo === "function"
@@ -431,7 +530,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           return null;
         } finally {
           if (hadTerrain && typeof map.setTerrain === "function") {
-            map.setTerrain({ source: TERRARIUM_SOURCE, exaggeration: 3.2 });
+            const zoom = typeof map.getZoom === "function" ? map.getZoom() : 15;
+            map.setTerrain({
+              source: TERRARIUM_SOURCE_ID,
+              exaggeration: terrainExaggerationForZoom(zoom),
+            });
+          }
+          for (const layerId of hiddenReliefLayers) {
+            setLayerVisibility(map, layerId, "visible");
           }
           if (
             (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&
