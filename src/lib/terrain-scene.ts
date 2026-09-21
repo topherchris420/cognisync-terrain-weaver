@@ -63,6 +63,7 @@ const DEPTH_BY_LEVEL: Record<RiskZone["level"], number> = {
 
 export const HILLSHADE_EXAGGERATION_FLAT = 0.85;
 export const HILLSHADE_EXAGGERATION_RELIEF = 0.4;
+export const DEFAULT_TERRAIN_EXAGGERATION = undefined;
 
 function lerpStops(
   stops: ReadonlyArray<readonly [number, number]>,
@@ -87,8 +88,17 @@ export function terrainExaggerationForZoom(zoom: number): number {
   return lerpStops(EXAGGERATION_STOPS, zoom);
 }
 
-export function terrainPitchForZoom(zoom: number): number {
-  return lerpStops(PITCH_STOPS, zoom);
+export function terrainPitchForZoom(
+  zoom: number,
+  exaggeration?: number
+): number {
+  const basePitch = lerpStops(PITCH_STOPS, zoom);
+  if (typeof exaggeration === "number" && Number.isFinite(exaggeration)) {
+    const baseExaggeration = terrainExaggerationForZoom(zoom);
+    const extra = (exaggeration - baseExaggeration) * (10 / 4.4);
+    return Math.min(80, Math.round(basePitch + extra));
+  }
+  return basePitch;
 }
 
 export function terrariumSource(): RasterDEMSourceSpecification {
