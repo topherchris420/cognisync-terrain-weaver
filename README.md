@@ -9,14 +9,14 @@
 
 # Mannahatta · Urban Resilience Intelligence
 
-[![status](https://img.shields.io/badge/status-v0.3-brightgreen.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver)
+[![status](https://img.shields.io/badge/status-v0.4-brightgreen.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](./LICENSE)
 [![CI](https://img.shields.io/badge/CI-Passing-success.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver/actions)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg?style=for-the-badge)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver/pulls)
 
-> **Point it at any city block. Get a quantitative climate-resilience diagnostic and hydrodynamic hydrograph back in seconds.**
+> **Point it at any city block. Get a quantitative climate-resilience diagnostic, a closed water-balance, and a D8 hydrograph back in seconds — in the browser.**
 
 **Mannahatta** is an open-source, full-stack geospatial intelligence platform. It turns satellite imagery and high-resolution SRTM elevation grids into real-time surface permeability ledgers, **Urban Absorption Scores**, cloudburst flood hydrographs, and actionable green-infrastructure adaptation roadmaps.
 
@@ -62,8 +62,9 @@ Modern cities have capped natural hydrology with impermeable gray infrastructure
 | 🧪 **5-Class Surface Permeability** | `analyze-terrain` | Computer-vision satellite breakdown into *Vegetation*, *Bare Soil*, *Water*, *Buildings*, and *Pavement* |
 | 🎯 **Urban Absorption Score (0–100)** | `absorption.ts` | Weighted surface permeability score with risk banding (*Resilient*, *Vulnerable*, *Critical*) |
 | 🌲 **1609 Ecological Baseline** | `baseline.ts` | Pre-development reference benchmark ($79.1 / 100$) derived from Lenapehoking historical ecology |
-| 🌊 **50 mm Cloudburst Simulation** | `run-simulation` | D8 hydrodynamic flow accumulation over SRTM elevation DEM grids ($m^3$ infiltration vs runoff) |
+| 🌊 **50 mm Cloudburst Simulation** | `src/lib/hydrology` | Client-side D8 flow accumulation over Mapzen Terrarium DEM (SRTM-derived), with land-cover retention and intervention modifiers |
 | 🌀 **Animated WebGL Flow Vectors** | `FlowLayer.tsx` | Particle flow direction paths and flood risk inundation heatmaps with toggleable layers |
+| ⛰ **3D Terrain** | `MapView.tsx` | MapLibre raster-DEM + hillshade from Terrarium tiles; analysis captures flatten to nadir so vision classification stays honest |
 | 🛠 **Mitigation Scenario Studio** | `ScenarioStudio.tsx` | Interactive polygon drawing for bioswales, green roofs, permeable pavement, and tree canopy |
 | 🪞 **Counterfactual Comparison** | `CompareRealities.tsx` | Synchronized dual-map split-screen visual slider comparing baseline vs mitigated states |
 | 📁 **GIS Dossier & Vector Export** | `pdf-export.ts` | One-click export of executive vector PDF dossiers, RFC 7946 GeoJSON layers, and tabular CSV datasets |
@@ -147,7 +148,9 @@ Using Mannahatta's surface absorption formula, pre-development Manhattan scores 
 
 ## 🌊 Hydrological Storm Engine
 
-When a user triggers a storm simulation, the hydro-engine models surface runoff under a **50 mm / 120 min design cloudburst event**:
+Storm routing now runs **in the browser**. The same sealed storm and the same terrain are applied to NOW (classified land cover) and POSSIBLE (drawn green infrastructure). The live OpenTopography edge function is no longer required for a closed water-balance.
+
+When a user triggers a storm, the engine models a **50 mm / 60 min** uniform design cloudburst:
 
 ```
                        D8 Steepest Downhill Direction Matrix
@@ -157,13 +160,11 @@ When a user triggers a storm simulation, the hydro-engine models surface runoff 
                                  [ +1, -1 ]  [ +1,  0 ]  [ +1, +1 ]
 ```
 
-1. **Elevation Grid Ingestion**: Retrieves real SRTM 30 m elevation data from OpenTopography (with fallback to synthetic topographic slope).
-2. **D8 Hydrodynamic Routing**: Calculates downhill gradient vectors across all grid cells to establish stream channel convergence.
-3. **Volumetric Hydrograph**:
-   - $\text{Total Precipitation Volume } (m^3) = \text{Area } (m^2) \times 0.050\text{ m}$
-   - $\text{Runoff Volume } (m^3) = \text{Area } (m^2) \times 0.050\text{ m} \times C_{\text{composite}}$
-   - $\text{Infiltration Volume } (m^3) = \text{Total Volume} - \text{Runoff Volume}$
-4. **WebGL Particle Rendering**: Displays real-time flow paths with velocity vectors scaled by accumulated discharge ($m^3/\text{s}$).
+1. **Elevation**: Mapzen Terrarium tiles (SRTM-derived, CORS-open) sampled onto the study grid. If tiles are unreachable, a deterministic slope surface is used and labelled *illustrative*.
+2. **Land-cover retention**: Each cell starts at `1 − C`, where `C` is the composite Rational Method runoff coefficient of the classified mix. Drawn interventions add a retention delta only on overlaying cells.
+3. **D8 routing**: Steepest-downhill accumulation, flow paths, inundation zones, and impact points.
+4. **Closed water-balance**: rainfall = infiltrated + stored + runoff, plus an SCS-style triangular hydrograph scaled so ∫Q dt equals runoff volume.
+5. **Paired identities**: NOW and POSSIBLE share one storm hash and one elevation hash. Compare is refused until those identities match.
 
 ---
 
@@ -207,11 +208,11 @@ The engine calculates financial and ecological ROI:
 ### Edge Functions & Serverless Backend
 - **Runtime**: Deno, TypeScript
 - **Database & Auth**: Supabase Postgres + PostGIS, `@supabase/supabase-js`
-- **Vision AI**: Google Gemini Vision API (`analyze-terrain`)
-- **Topography API**: OpenTopography SRTM GL1 API (`run-simulation`)
+- **Vision AI**: Google Gemini Vision API (`analyze-terrain`) for live land-cover classification
+- **Terrain**: Mapzen Terrarium DEM tiles in the client; OpenTopography remains available on the edge function for legacy callers
 
 ### Verification & Testing
-- **Test Runner**: Vitest, `@testing-library/react`, `jsdom` (50+ test suites, 290+ tests)
+- **Test Runner**: Vitest, `@testing-library/react`, `jsdom`
 - **Linting & Types**: ESLint 9, TypeScript `tsc --noEmit`
 
 ---
@@ -236,7 +237,7 @@ npm install
 npm run dev
 ```
 
-Navigate to `http://localhost:8080` in your web browser.
+Navigate to `http://localhost:43147` in your web browser.
 
 ### CLI Command Matrix
 
@@ -304,10 +305,14 @@ mannahatta/
   - CAPEX financial modeling & annual runoff reduction estimates
   - GeoJSON, CSV, and PDF dossier exports
 - 🟢 **v0.3 — Hydrodynamic Storm Engine** *(Released)*
-  - 50 mm cloudburst simulation over SRTM elevation DEM grids
+  - 50 mm cloudburst simulation over elevation DEM grids
   - D8 flow routing with animated WebGL particle flow vectors
   - Split-screen counterfactual reality comparison slider
-- 🟡 **v0.4 — Sensor Telemetry & SWMM Integration** *(In Progress)*
+- 🟢 **v0.4 — Local-first hydrology & 3D terrain** *(Released)*
+  - Browser D8 engine with land-cover retention and intervention modifiers
+  - Closed water-balance, SCS hydrograph, Terrarium DEM, 3D hillshade
+  - NOW and POSSIBLE are distinct routed surfaces under one sealed storm
+- 🟡 **v0.5 — Sensor Telemetry & SWMM Integration** *(In Progress)*
   - Live IoT rain gauge and soil moisture sensor telemetry over MQTT
   - EPA SWMM (Storm Water Management Model) engine sync
 - 🔵 **v1.0 — City Digital Twins & Open API** *(Planned)*

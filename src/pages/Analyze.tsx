@@ -22,8 +22,8 @@ import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
 import type { FutureState } from "@/lib/catalyst";
 import type { Scenario, InterventionKey, ScenarioExport } from "@/lib/scenario";
-import { EMPTY_SCENARIO } from "@/lib/scenario";
-import { MapEditor } from "@/components/MapEditor";
+import { EMPTY_SCENARIO, hasActiveInterventions } from "@/lib/scenario";
+import { MapEditor, type MapEditorHandle } from "@/components/MapEditor";
 import { riskLabel } from "@/lib/absorption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +51,7 @@ import {
   Waves,
   ShieldCheck,
   Compass,
-  Leaf,
+  Mountain,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useWorkflow } from "@/hooks/useWorkflow";
@@ -90,9 +90,33 @@ import {
   type DeterminismReport,
 } from "@/lib/storm-identity";
 import { StormTelemetryReadout } from "@/components/studio/StormTelemetryReadout";
+import { StormHydrograph } from "@/components/studio/StormHydrograph";
+import { WaterBalanceMeter } from "@/components/studio/WaterBalanceMeter";
+import { buildRealitySurface } from "@/lib/counterfactual/modifiers";
+import {
+  LOCAL_GRID,
+  runLocalStorm,
+} from "@/lib/hydrology";
+import type { InterventionFeature } from "@/lib/counterfactual/types";
 
 const STORM_RAINFALL_MM = 50;
-const STORM_RESOLUTION = "low" as const;
+const STORM_RESOLUTION = "medium" as const;
+
+const SURFACE_PROVENANCE = [
+  {
+    sourceId: "mannahatta-land-cover",
+    title: "Classified satellite land cover",
+    agency: "Mannahatta",
+    url: "https://github.com/topherchris420/cognisync-terrain-weaver",
+    accessedAt: "2026-09-21T00:00:00.000Z",
+    confidence: "medium" as const,
+    status: "derived" as const,
+    caveats: [
+      "Unmodified cells use the composite Rational Method runoff coefficient for the classified mix.",
+      "Drawn interventions raise retention only on overlaying grid cells.",
+    ],
+  },
+];
 
 const DEFAULT_VIEW = { lat: 40.7075, lng: -74.009, zoom: 15 };
 
@@ -154,6 +178,7 @@ function viewFromParams(params: URLSearchParams) {
 export default function Analyze() {
   usePageTitle("Analyze");
   const mapRef = useRef<MapViewHandle>(null);
+  const editorRef = useRef<MapEditorHandle>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = useMemo(
     () => viewFromParams(searchParams) ?? DEFAULT_VIEW,
@@ -172,6 +197,11 @@ export default function Analyze() {
   const isExample = result?.status === "example";
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
   const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
+  const [interventionFeatures, setInterventionFeatures] = useState<InterventionFeature[]>([]);
+  const [terrainEnabled, setTerrainEnabled] = useState(false);
+  const [stormRainfallMm, setStormRainfallMm] = useState(STORM_RAINFALL_MM);
+  const [stormResolution, setStormResolution] = useState<"low" | "medium" | "high">(STORM_RESOLUTION);
+  const [simWarnings, setSimWarnings] = useState<string[]>([]);
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(null);
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
@@ -335,6 +365,8 @@ export default function Analyze() {
     setNowSeal(null);
     setPossibleSeal(null);
     setActiveIntervention(null);
+    setInterventionFeatures([]);
+    setSimWarnings([]);
     setScenario(EMPTY_SCENARIO);
     workflow.reset();
   };
@@ -398,93 +430,113 @@ export default function Analyze() {
   };
 
   const runSimulation = async (isRerun = false) => {
-    if (isExample) {
-      if (isRerun && result && analyzedBBox) {
-        setCatalystFuture({ scenario, future: projectFuture(result.land_cover, scenario, bboxAreaKm2(analyzedBBox) * 1e6) });
-        setActiveTab("compare");
-      } else {
-        setActiveTab("simulation");
-      }
-      setDrawerOpen(true);
-      return;
-    }
-    if (!mapReady || workflow.state === "STORM" || workflow.state === "RERUN_STORM") return;
-    
-    workflow.advance(isRerun ? "RERUN_STORM" : "STORM");
+    if (!result) return;
+    if (workflow.state === "STORM" || workflow.state === "RERUN_STORM") return;
 
-    const bounds = mapRef.current?.getBounds() as BBox | null;
+    const bounds = analyzedBBox ?? (mapRef.current?.getBounds() as BBox | null);
     if (!bounds) {
-      toast.error("Map is initializing.");
-      workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
+      toast.error("No study extent is available yet.");
       return;
     }
+
+    if (
+      isRerun &&
+      !hasActiveInterventions(scenario) &&
+      interventionFeatures.length === 0
+    ) {
+      toast.error("Draw a green-infrastructure polygon before rerunning the storm.");
+      setActiveTab("mitigation");
+      return;
+    }
+
+    workflow.advance(isRerun ? "RERUN_STORM" : "STORM");
+    setDrawerOpen(true);
 
     try {
+      const extent = boundsToSimBBox(bounds);
       const stormDefinition =
-        nowSeal?.storm ?? buildStormDefinition(STORM_RAINFALL_MM, STORM_RESOLUTION);
+        nowSeal?.storm ?? buildStormDefinition(stormRainfallMm, stormResolution);
       const seal = createStormSeal(stormDefinition);
       if (isRerun) {
         setPossibleSeal(seal);
       } else {
         setNowSeal(seal);
         setPossibleSeal(null);
+        setFutureSimResult(null);
       }
 
-      const promises = [
-        supabase.functions.invoke("run-simulation", {
-          body: {
-            bbox: boundsToSimBBox(bounds),
-            rainfall_mm: stormDefinition.rainfallDepthMm,
-            resolution: stormDefinition.resolution,
-            include_drainage: stormDefinition.includeDrainage,
-          },
-        })
-      ];
+      const size = LOCAL_GRID[stormDefinition.resolution];
+      const nowSurface = buildRealitySurface({
+        id: "now",
+        baselineLayerHash: "landcover:classified",
+        bbox: extent,
+        rows: size,
+        cols: size,
+        features: [],
+        provenance: SURFACE_PROVENANCE,
+        warnings: [],
+      });
 
-      if (isRerun && result) {
-        const areaM2 = bboxAreaKm2(parseBBox(result.bbox)!) * 1e6;
-        const newFuture = {
-          scenario: scenario,
-          future: projectFuture(result.land_cover, scenario, areaM2)
-        };
-        setCatalystFuture(newFuture);
+      const nowRun = await runLocalStorm({
+        bbox: extent,
+        rainfallDepthMm: stormDefinition.rainfallDepthMm,
+        durationMinutes: stormDefinition.durationMinutes,
+        resolution: stormDefinition.resolution,
+        landCover: result.land_cover,
+        modifiers: nowSurface.modifiers,
+        surfaceId: "now",
+        stormHash: stormDefinition.hash,
+        surfaceHash: nowSurface.surfaceHash,
+      });
+      setSimResult(nowRun);
+      setSimWarnings(nowRun.warnings);
 
-        promises.push(supabase.functions.invoke("run-simulation", {
-          body: {
-            bbox: boundsToSimBBox(bounds),
-            rainfall_mm: stormDefinition.rainfallDepthMm,
-            resolution: stormDefinition.resolution,
-            include_drainage: stormDefinition.includeDrainage,
-          },
-        }));
-      }
-
-      const results = await Promise.all(promises);
-      const { data, error } = results[0];
-
-      if (error) {
-        console.error("run-simulation failed:", error);
-        toast.error("Hydrologic simulation failed.");
-        workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
-        return;
-      }
-
-      const sim = data as SimulationResponse;
-      setSimResult(sim);
-      setActiveTab("simulation");
-      
-      if (results.length > 1 && !results[1].error) {
-        setFutureSimResult(results[1].data as SimulationResponse);
+      if (isRerun) {
+        const possibleSurface = buildRealitySurface({
+          id: "possible",
+          baselineLayerHash: "landcover:classified",
+          bbox: extent,
+          rows: size,
+          cols: size,
+          features: interventionFeatures,
+          provenance: SURFACE_PROVENANCE,
+          warnings: [],
+        });
+        const possibleRun = await runLocalStorm({
+          bbox: extent,
+          rainfallDepthMm: stormDefinition.rainfallDepthMm,
+          durationMinutes: stormDefinition.durationMinutes,
+          resolution: stormDefinition.resolution,
+          landCover: result.land_cover,
+          modifiers: possibleSurface.modifiers,
+          surfaceId: "possible",
+          stormHash: stormDefinition.hash,
+          surfaceHash: possibleSurface.surfaceHash,
+          expectedElevationHash: nowRun.elevationHash,
+        });
+        setFutureSimResult(possibleRun);
+        const areaM2 = bboxAreaKm2(bounds) * 1e6;
+        setCatalystFuture({
+          scenario,
+          future: projectFuture(result.land_cover, scenario, areaM2),
+        });
         workflow.advance("COMPARE");
         setActiveTab("compare");
-        toast.success("Counterfactual simulation complete.");
+        toast.success(
+          possibleRun.waterBalance.runoffM3 < nowRun.waterBalance.runoffM3
+            ? "Same storm, less runoff on the mitigated surface."
+            : "Counterfactual storm complete."
+        );
       } else {
         workflow.advance("STORM_COMPLETE");
-        toast.success("50 mm Design Storm modeled.");
+        setActiveTab("simulation");
+        toast.success(
+          `${stormDefinition.rainfallDepthMm} mm design storm routed on ${nowRun.elevationStatus} terrain.`
+        );
       }
     } catch (e) {
       console.error(e);
-      toast.error("Error executing hydrodynamic simulation.");
+      toast.error("Hydrologic simulation failed.");
       workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
     }
   };
@@ -537,6 +589,7 @@ export default function Analyze() {
             ref={mapRef}
             initialCenter={[initialView.lng, initialView.lat]}
             initialZoom={initialView.zoom}
+            terrainEnabled={terrainEnabled}
             onReady={() => {
               setMapReady(true);
               const bounds = mapRef.current?.getBounds();
@@ -579,8 +632,11 @@ export default function Analyze() {
           {/* Interactive Direct Map Editor for Mitigations */}
           {workflow.state === "REDESIGN" && result && (
             <MapEditor
+              ref={editorRef}
               map={mapInstance}
               bbox={result.bbox}
+              features={interventionFeatures}
+              onChange={setInterventionFeatures}
               cover={result.land_cover}
               onScenarioChange={(s) => setScenario(s)}
               activeIntervention={activeIntervention}
@@ -703,6 +759,16 @@ export default function Analyze() {
             />
           )}
           <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setTerrainEnabled((value) => !value)}
+            title={terrainEnabled ? "Flatten to nadir" : "Tilt into 3D terrain"}
+            aria-pressed={terrainEnabled}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-md"
+          >
+            <Mountain className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{terrainEnabled ? "3D on" : "3D terrain"}</span>
+          </button>
           <button
             onClick={copyShareLink}
             title="Copy coordinate link"
@@ -875,14 +941,16 @@ export default function Analyze() {
                     }}
                     className="w-full rounded-lg h-11 text-sm font-medium gap-2"
                   >
-                    <Droplets className="h-4 w-4" /> {isExample ? "Explore rainfall estimate" : "Run 50 mm Storm Simulation"}
+                    <Droplets className="h-4 w-4" /> Route {stormRainfallMm} mm design storm
                   </Button>
                 </div>
               )}
 
               {/* TAB 2: STORMWATER RUNOFF SIMULATION */}
-              {activeTab === "simulation" && isExample && analyzedBBox && <ExampleStorm cover={result.land_cover} bbox={analyzedBBox} />}
-              {activeTab === "simulation" && !isExample && (
+              {activeTab === "simulation" && isExample && analyzedBBox && (
+                <ExampleStorm cover={result.land_cover} bbox={analyzedBBox} />
+              )}
+              {activeTab === "simulation" && (
                 <div className="space-y-6">
                   <div className="panel rounded-xl border border-border p-4 space-y-4">
                     <div>
@@ -890,7 +958,12 @@ export default function Analyze() {
                         Design Storm Hydrograph
                       </h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        50 mm depth · 60-minute duration · Uniform spatial distribution
+                        {stormRainfallMm} mm depth · 60-minute duration · D8 flow on{" "}
+                        {simResult?.metadata.elevation_status === "observed"
+                          ? "observed Terrarium terrain"
+                          : simResult
+                            ? "illustrative terrain"
+                            : "Terrarium DEM with land-cover retention"}
                       </p>
                     </div>
 
@@ -904,11 +977,10 @@ export default function Analyze() {
                       </Button>
                     ) : (
                       <div className="space-y-4 pt-2">
-                        {/* Simulation Metrics Grid */}
                         <div className="grid grid-cols-2 gap-3">
                           <div className="rounded-lg border border-border bg-background/50 p-3">
                             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Est. Runoff Volume
+                              Runoff volume
                             </span>
                             <div className="mt-1 font-mono text-xl font-bold">
                               {Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³
@@ -916,23 +988,30 @@ export default function Analyze() {
                           </div>
                           <div className="rounded-lg border border-border bg-background/50 p-3">
                             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Infiltrated Volume
+                              Infiltrated volume
                             </span>
                             <div className="mt-1 font-mono text-xl font-bold text-primary">
-                              {Math.round((currentAreaKm2 * 1e6 * 0.05) - (simResult.metadata.runoff_volume_m3 ?? 0)).toLocaleString()} m³
+                              {Math.round(
+                                simResult.metadata.infiltrated_volume_m3 ??
+                                  Math.max(
+                                    0,
+                                    (simResult.metadata.rainfall_volume_m3 ?? 0) -
+                                      (simResult.metadata.runoff_volume_m3 ?? 0)
+                                  )
+                              ).toLocaleString()} m³
                             </div>
                           </div>
                           <div className="rounded-lg border border-border bg-background/50 p-3">
                             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Risk Inundation Zones
+                              Peak discharge
                             </span>
                             <div className="mt-1 font-mono text-xl font-bold text-warning">
-                              {simResult.risk_zones.length} zones
+                              {(simResult.metadata.peak_discharge_m3s ?? 0).toFixed(1)} m³/s
                             </div>
                           </div>
                           <div className="rounded-lg border border-border bg-background/50 p-3">
                             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Flow Path Vectors
+                              Flow paths
                             </span>
                             <div className="mt-1 font-mono text-xl font-bold text-accent">
                               {simResult.flow_paths.length} vectors
@@ -940,13 +1019,38 @@ export default function Analyze() {
                           </div>
                         </div>
 
-                        {/* Layer Visibility Controls */}
+                        {simResult.metadata.hydrograph &&
+                          simResult.metadata.hydrograph.length > 1 && (
+                            <StormHydrograph
+                              series={simResult.metadata.hydrograph}
+                              peakM3s={simResult.metadata.peak_discharge_m3s ?? 0}
+                            />
+                          )}
+
+                        {simResult.metadata.rainfall_volume_m3 != null && (
+                          <WaterBalanceMeter
+                            balance={{
+                              rainfallM3: simResult.metadata.rainfall_volume_m3,
+                              infiltratedM3: simResult.metadata.infiltrated_volume_m3 ?? 0,
+                              storedM3: simResult.metadata.stored_volume_m3 ?? 0,
+                              runoffM3: simResult.metadata.runoff_volume_m3 ?? 0,
+                              closureErrorM3: 0,
+                            }}
+                          />
+                        )}
+
+                        {simWarnings.length > 0 && (
+                          <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            {simWarnings[0]}
+                          </p>
+                        )}
+
                         <div className="border-t border-border/60 pt-3 space-y-2">
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Map Visualization Layers
+                            Map visualization layers
                           </span>
                           <div className="flex items-center justify-between text-xs py-1">
-                            <span className="text-foreground">Inundation Risk Heatmap</span>
+                            <span className="text-foreground">Inundation risk heatmap</span>
                             <button
                               type="button"
                               onClick={() => setShowRiskHeatmap(!showRiskHeatmap)}
@@ -957,7 +1061,7 @@ export default function Analyze() {
                             </button>
                           </div>
                           <div className="flex items-center justify-between text-xs py-1">
-                            <span className="text-foreground">Flow Vectors (Animated)</span>
+                            <span className="text-foreground">Flow vectors (animated)</span>
                             <button
                               type="button"
                               onClick={() => setShowFlowVectors(!showFlowVectors)}
@@ -1008,6 +1112,7 @@ export default function Analyze() {
                           workflow.advance("REDESIGN");
                         }
                       }}
+                      onClearDrawings={() => editorRef.current?.clear()}
                       onScenarioExport={setScenarioExport}
                     />
 
@@ -1015,7 +1120,7 @@ export default function Analyze() {
                       onClick={() => runSimulation(true)}
                       className="w-full rounded-lg h-11 text-sm font-medium gap-2"
                     >
-                      <Play className="h-4 w-4" /> {isExample ? "Compare planning estimates" : "Rerun Storm on Mitigated Surface"}
+                      <Play className="h-4 w-4" /> Rerun the same storm on the mitigated surface
                     </Button>
                   </div>
                 </div>
@@ -1030,7 +1135,9 @@ export default function Analyze() {
                         Baseline vs. Mitigated Comparison
                       </h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {isExample ? "Planning estimates from illustrative land cover and your drawn interventions. No routed storm comparison." : "Side-by-side verification of water absorption gains under identical storm conditions."}
+                        {isExample
+                          ? "The same sealed storm is routed over illustrative land cover, then over your drawn interventions."
+                          : "The same sealed storm and terrain are routed over the current surface and the mitigated surface."}
                       </p>
                     </div>
 
@@ -1060,19 +1167,29 @@ export default function Analyze() {
                               {Math.round(catalystFuture.future.impact.addedRetentionM3).toLocaleString()} m³/yr
                             </span>
                           </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
+                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
                             <span>Estimated Investment</span>
                             <span className="font-mono font-semibold text-foreground">
                               ${Math.round(catalystFuture.future.impact.capexUSD).toLocaleString()}
                             </span>
                           </div>
+                          {simResult?.metadata.runoff_volume_m3 != null &&
+                            futureSimResult?.metadata.runoff_volume_m3 != null && (
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Routed storm runoff</span>
+                                <span className="font-mono font-semibold text-foreground">
+                                  {Math.round(simResult.metadata.runoff_volume_m3).toLocaleString()} →{" "}
+                                  {Math.round(futureSimResult.metadata.runoff_volume_m3).toLocaleString()} m³
+                                </span>
+                              </div>
+                            )}
                         </div>
 
                         <Button
-                          onClick={() => isExample ? setActiveTab("mitigation") : workflow.advance("COMPARE")}
+                          onClick={() => workflow.advance("COMPARE")}
                           className="w-full rounded-lg h-10 text-xs font-medium gap-2"
                         >
-                          <Compass className="h-4 w-4" /> {isExample ? "Keep exploring interventions" : "Open Split-Screen Comparison"}
+                          <Compass className="h-4 w-4" /> Open split-screen comparison
                         </Button>
                       </div>
                     ) : (

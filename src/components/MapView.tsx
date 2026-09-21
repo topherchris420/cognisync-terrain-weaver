@@ -31,6 +31,54 @@ export interface MapViewProps {
   onReady?: (payload: MapViewReadyPayload) => void;
   onCameraChange?: (camera: MapCameraState) => void;
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
+  /** Extra-dimensional terrain from Mapzen Terrarium tiles. */
+  terrainEnabled?: boolean;
+}
+
+const TERRARIUM_SOURCE = "terrarium";
+const HILLSHADE_LAYER = "hillshade";
+
+function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
+  try {
+    if (typeof map.getSource !== "function" || typeof map.addSource !== "function") {
+      return;
+    }
+    if (!map.getSource(TERRARIUM_SOURCE)) {
+      map.addSource(TERRARIUM_SOURCE, {
+        type: "raster-dem",
+        tiles: [
+          "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+        ],
+        tileSize: 256,
+        maxzoom: 15,
+        encoding: "terrarium",
+        attribution: "Elevation © Mapzen / AWS Terrain Tiles",
+      });
+    }
+    if (typeof map.getLayer === "function" && !map.getLayer(HILLSHADE_LAYER)) {
+      map.addLayer(
+        {
+          id: HILLSHADE_LAYER,
+          type: "hillshade",
+          source: TERRARIUM_SOURCE,
+          paint: {
+            "hillshade-exaggeration": 0.4,
+            "hillshade-shadow-color": "#07110e",
+            "hillshade-highlight-color": "#eef5e8",
+            "hillshade-illumination-direction": 315,
+          },
+        },
+        map.getLayer(LABELS_LAYER_ID) ? LABELS_LAYER_ID : undefined
+      );
+    }
+    if (typeof map.setTerrain === "function") {
+      map.setTerrain(
+        terrainEnabled ? { source: TERRARIUM_SOURCE, exaggeration: 1.45 } : null
+      );
+    }
+  } catch (error) {
+    console.warn("Terrain overlay unavailable", error);
+  }
 }
 
 interface ImageryProvider {
@@ -129,6 +177,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     onReady,
     onCameraChange,
     onViewChange,
+    terrainEnabled = false,
   },
   ref
 ) {
@@ -147,6 +196,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   onViewChangeRef.current = onViewChange;
   const onCameraChangeRef = useRef(onCameraChange);
   onCameraChangeRef.current = onCameraChange;
+  const terrainEnabledRef = useRef(terrainEnabled);
+  terrainEnabledRef.current = terrainEnabled;
   const viewRef = useRef<MapCameraState>({
     center: initialCenter,
     zoom: initialZoom,
@@ -169,6 +220,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         pitch: viewRef.current.pitch,
         minZoom: 2,
         maxZoom: 19,
+        maxPitch: 75,
         // Required so we can read pixels off the canvas for AI analysis.
         canvasContextAttributes: { preserveDrawingBuffer: true },
         attributionControl: { compact: true },
@@ -228,8 +280,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       connected = true;
       window.clearTimeout(watchdog);
       setStatus({ kind: "ready" });
+      applyElevationOverlays(map, terrainEnabledRef.current);
       const handle = readyHandleRef.current;
       if (handle) onReadyRef.current?.({ handle, map });
+    });
+
+    map.on("style.load", () => {
+      if (disposed) return;
+      applyElevationOverlays(map, terrainEnabledRef.current);
     });
 
     map.on("error", (e) => {
@@ -268,6 +326,22 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       mapRef.current = null;
     };
   }, [attempt]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    applyElevationOverlays(map, terrainEnabled);
+    if (typeof map.easeTo !== "function") return;
+    if (terrainEnabled) {
+      map.easeTo({
+        pitch: Math.max(map.getPitch?.() ?? 0, 52),
+        bearing: map.getBearing?.() || -18,
+        duration: 900,
+      });
+    } else if ((map.getPitch?.() ?? 0) > 1) {
+      map.easeTo({ pitch: 0, duration: 700 });
+    }
+  }, [terrainEnabled]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -310,6 +384,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         // city labels are text the model would try to read as terrain. The
         // user sees labels; the classifier must not.
         let hadLabels = false;
+        const prevPitch = typeof map.getPitch === "function" ? map.getPitch() : 0;
+        const prevBearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
+        const hadTerrain =
+          typeof map.getTerrain === "function" && Boolean(map.getTerrain());
         try {
           if (!map.getStyle || map.getStyle()) {
             hadLabels = Boolean(map.getLayer(LABELS_LAYER_ID));
@@ -325,6 +403,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             // Ignore layer updates if map style was destroyed
           }
         }
+        if (hadTerrain && typeof map.setTerrain === "function") {
+          map.setTerrain(null);
+        }
+        if (
+          (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&
+          typeof map.jumpTo === "function"
+        ) {
+          map.jumpTo({ pitch: 0, bearing: 0 });
+        }
 
         const repaint = () =>
           new Promise<void>((resolve) => {
@@ -333,13 +420,23 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           });
 
         try {
-          // Force a repaint so the drawing buffer reflects the hidden labels.
+          // Force a repaint so the drawing buffer reflects the hidden labels
+          // and a nadir view — pitched terrain would fool the land-cover model.
           await repaint();
           return map.getCanvas().toDataURL("image/jpeg", 0.82);
         } catch (e) {
           console.error("captureImage failed", e);
           return null;
         } finally {
+          if (hadTerrain && typeof map.setTerrain === "function") {
+            map.setTerrain({ source: TERRARIUM_SOURCE, exaggeration: 1.45 });
+          }
+          if (
+            (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&
+            typeof map.jumpTo === "function"
+          ) {
+            map.jumpTo({ pitch: prevPitch, bearing: prevBearing });
+          }
           if (hadLabels) {
             try {
               if (!map.getStyle || map.getStyle()) {

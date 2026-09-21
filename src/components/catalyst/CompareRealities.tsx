@@ -110,12 +110,20 @@ export function CompareRealities({
 
   if (!open) return null;
 
-  // Calculate the cinematic metrics
-  const runoffBase = baseSimResult?.metadata?.runoff_volume_m3 ?? 12840;
-  const runoffFuture = futureSimResult?.metadata?.runoff_volume_m3 ?? 7320;
-  
-  const runoffReduction = runoffBase > 0 ? ((runoffBase - runoffFuture) / runoffBase) * 100 : 0;
-  const reductionText = `−${Math.abs(Math.round(runoffReduction))}%`;
+  // Never invent runoff. Missing volumes mean the compare HUD shows an em dash.
+  const runoffBase = baseSimResult?.metadata?.runoff_volume_m3;
+  const runoffFuture = futureSimResult?.metadata?.runoff_volume_m3;
+  const canReduce =
+    typeof runoffBase === "number" &&
+    typeof runoffFuture === "number" &&
+    runoffBase > 0;
+  const runoffReduction = canReduce
+    ? ((runoffBase - runoffFuture) / runoffBase) * 100
+    : null;
+  const reductionText =
+    runoffReduction == null
+      ? "—"
+      : `${runoffReduction >= 0 ? "−" : "+"}${Math.abs(Math.round(runoffReduction))}%`;
 
   return (
     <div ref={wrapRef} className="absolute inset-0 z-50 bg-background" data-testid="compare-realities">
@@ -184,18 +192,31 @@ export function CompareRealities({
       <div className="pointer-events-none absolute bottom-12 inset-x-0 flex flex-col items-center justify-end px-6 z-50">
         <div className="cinematic-glow bg-background/80 backdrop-blur-2xl border border-border/50 px-12 py-8 rounded-3xl shadow-2xl reveal is-visible transition-all flex flex-col items-center max-w-4xl w-full">
           
-          <div className="grid grid-cols-3 gap-16 w-full text-center">
+          <div className="grid grid-cols-2 gap-8 lg:grid-cols-4 lg:gap-10 w-full text-center">
             {/* RUNOFF */}
             <div className="flex flex-col items-center justify-center space-y-2">
                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Runoff</span>
                <div className="flex items-center gap-3 font-mono text-3xl font-semibold">
-                 <span className="text-foreground/60">{Math.round(runoffBase).toLocaleString()}</span>
+                 <span className="text-foreground/60">
+                   {typeof runoffBase === "number" ? Math.round(runoffBase).toLocaleString() : "—"}
+                 </span>
                  <span className="text-muted-foreground">→</span>
-                 <span className="text-catalyst">{Math.round(runoffFuture).toLocaleString()} <span className="text-sm">m³</span></span>
+                 <span className="text-catalyst">
+                   {typeof runoffFuture === "number" ? Math.round(runoffFuture).toLocaleString() : "—"}{" "}
+                   <span className="text-sm">m³</span>
+                 </span>
                </div>
             </div>
 
-            {/* RISK */}
+            {/* SCORE */}
+            <div className="flex flex-col items-center justify-center space-y-2">
+               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Absorption</span>
+               <div className="flex items-center gap-3 font-mono text-3xl font-semibold">
+                 <span className="text-foreground/60">{Math.round(currentScore)}</span>
+                 <span className="text-muted-foreground">→</span>
+                 <span className="text-catalyst">{Math.round(futureScore)}</span>
+               </div>
+            </div>
             <div className="flex flex-col items-center justify-center space-y-2">
                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Risk</span>
                <div className="flex items-center gap-3 font-mono text-3xl font-semibold">

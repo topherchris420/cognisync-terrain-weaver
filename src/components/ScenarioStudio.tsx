@@ -38,6 +38,7 @@ interface Props {
   activeIntervention: InterventionKey | null;
   onInterventionSelect: (key: InterventionKey) => void;
   onScenarioExport?: (payload: ScenarioExport | null) => void;
+  onClearDrawings?: () => void;
 }
 
 const riskBadgeClass = (risk: string) =>
@@ -53,7 +54,7 @@ const riskBadgeClass = (risk: string) =>
  * stormwater retention, capital cost, and payback update live, using the
  * same transparent weights that produce the base score.
  */
-export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onInterventionSelect, onScenarioExport }: Props) {
+export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onInterventionSelect, onScenarioExport, onClearDrawings }: Props) {
   const [rainfallMm, setRainfallMm] = useState(
     DEFAULT_ASSUMPTIONS.annualRainfallMm
   );
@@ -144,15 +145,12 @@ export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onIn
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              // Reset scenario by notifying parent of zeroed interventions
-              INTERVENTION_ORDER.forEach(() => {});
-            }}
+            onClick={() => onClearDrawings?.()}
             className="h-8 text-xs text-muted-foreground hover:text-destructive gap-1"
-            title="Active drawings can be cleared directly on map"
+            title="Clear drawn interventions"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            Interventions Active
+            Clear drawings
           </Button>
         )}
       </div>

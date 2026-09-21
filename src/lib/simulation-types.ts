@@ -39,6 +39,16 @@ export interface SimulationResponse {
     computation_time_ms: number;
     /** Total surface runoff volume for the storm, when the engine reports it. */
     runoff_volume_m3?: number;
+    infiltrated_volume_m3?: number;
+    rainfall_volume_m3?: number;
+    stored_volume_m3?: number;
+    peak_discharge_m3s?: number;
+    hydrograph?: Array<{ tMin: number; qM3s: number; rainMm: number }>;
+    elevation_status?: "observed" | "illustrative";
+    elevation_hash?: string;
+    model?: string;
+    surface_id?: "now" | "possible";
+    land_cover_c?: number;
   };
 }
 
