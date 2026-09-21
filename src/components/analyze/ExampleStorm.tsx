@@ -23,7 +23,7 @@ export function ExampleStorm({ cover, bbox }: { cover: LandCover; bbox: BBox }) 
         <div><span className="atlas-eyebrow">Rainfall volume</span><p className="font-mono text-xl">{Math.round(rainVolume).toLocaleString()} <span className="text-xs">m³</span></p></div>
         <div><span className="atlas-eyebrow">Estimated runoff</span><p className="font-mono text-xl text-primary" data-testid="example-runoff">{Math.round(runoff).toLocaleString()} <span className="text-xs">m³</span></p></div>
       </div>
-      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Local estimate: rainfall × area × weighted runoff coefficient. Uses illustrative land cover and the app’s coefficient model. No elevation routing, drainage, flood depths, or live simulation.</p>
+      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Rational Method estimate: rainfall × area × weighted runoff coefficient. The routed D8 storm below uses the same coefficient as cell retention and the Terrarium elevation surface.</p>
     </section>
   );
 }

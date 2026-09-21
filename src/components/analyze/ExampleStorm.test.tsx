@@ -5,11 +5,11 @@ import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
 import { parseBBox } from "@/lib/geo";
 
 describe("example rainfall exploration", () => {
-  it("updates estimated runoff when rainfall changes and identifies its limitations", () => {
+  it("updates estimated runoff when rainfall changes and names the Rational Method", () => {
     render(<ExampleStorm cover={EXAMPLE_ANALYSIS.land_cover} bbox={parseBBox(EXAMPLE_ANALYSIS.bbox)!} />);
     const initial = screen.getByTestId("example-runoff").textContent;
     fireEvent.change(screen.getByLabelText(/rainfall depth/i), { target: { value: "100" } });
     expect(screen.getByTestId("example-runoff").textContent).not.toBe(initial);
-    expect(screen.getByText(/no elevation routing/i)).toBeInTheDocument();
+    expect(screen.getByText(/rational method/i)).toBeInTheDocument();
   });
 });
