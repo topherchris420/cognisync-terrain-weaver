@@ -200,6 +200,7 @@ export default function Analyze() {
   const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
   const [interventionFeatures, setInterventionFeatures] = useState<InterventionFeature[]>([]);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
+  const [terrainExaggeration, setTerrainExaggeration] = useState<number>(6.0);
   const [stormRainfallMm, setStormRainfallMm] = useState(STORM_RAINFALL_MM);
   const [stormResolution, setStormResolution] = useState<"low" | "medium" | "high">(STORM_RESOLUTION);
   const [simWarnings, setSimWarnings] = useState<string[]>([]);
@@ -591,6 +592,7 @@ export default function Analyze() {
             initialCenter={[initialView.lng, initialView.lat]}
             initialZoom={initialView.zoom}
             terrainEnabled={terrainEnabled}
+            terrainExaggeration={terrainExaggeration}
             onReady={() => {
               setMapReady(true);
               const bounds = mapRef.current?.getBounds();
@@ -793,9 +795,31 @@ export default function Analyze() {
                 : "border-border text-muted-foreground"
             )}
           >
-            <Mountain className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{terrainEnabled ? "3D on" : "3D terrain"}</span>
+            <Mountain className={cn("h-3.5 w-3.5", terrainEnabled && "text-primary")} />
+            <span className="hidden sm:inline">
+              {terrainEnabled ? `3D on (${terrainExaggeration.toFixed(1)}x)` : "3D terrain"}
+            </span>
           </button>
+          {terrainEnabled && (
+            <div className="flex items-center gap-1 rounded-md border border-border bg-card/90 backdrop-blur-md p-1 shadow-md text-xs">
+              {[3.5, 6.0, 10.0].map((exag) => (
+                <button
+                  key={exag}
+                  type="button"
+                  onClick={() => setTerrainExaggeration(exag)}
+                  className={cn(
+                    "px-2 py-0.5 rounded font-mono text-[11px] transition-colors",
+                    terrainExaggeration === exag
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                  title={`Set 3D relief exaggeration to ${exag.toFixed(1)}x`}
+                >
+                  {exag.toFixed(1)}x
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={copyShareLink}
             title="Copy coordinate link"

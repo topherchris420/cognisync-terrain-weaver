@@ -289,3 +289,45 @@ describe("MapView camera contract", () => {
     );
   });
 });
+
+describe("MapView 3D terrain contract", () => {
+  beforeEach(() => {
+    maplibre.MockMap.instances.length = 0;
+  });
+
+  it("applies 3D terrain elevation and eases camera pitch when terrain is enabled", () => {
+    const view = render(<MapView terrainEnabled={false} />);
+    const map = currentMap();
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith(null);
+
+    view.rerender(<MapView terrainEnabled={true} terrainExaggeration={6.0} />);
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: "terrarium",
+      exaggeration: 6.0,
+    });
+    expect(map.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pitch: 74,
+      })
+    );
+  });
+
+  it("updates elevation exaggeration when terrainExaggeration prop changes", () => {
+    const view = render(<MapView terrainEnabled={true} terrainExaggeration={3.5} />);
+    const map = currentMap();
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: "terrarium",
+      exaggeration: 3.5,
+    });
+
+    view.rerender(<MapView terrainEnabled={true} terrainExaggeration={10.0} />);
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: "terrarium",
+      exaggeration: 10.0,
+    });
+  });
+});
