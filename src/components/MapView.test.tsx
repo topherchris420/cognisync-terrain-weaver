@@ -3,6 +3,13 @@ import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MapCameraState } from "@/lib/counterfactual/types";
 import { MapView, type MapViewHandle } from "./MapView";
+import {
+  HILLSHADE_EXAGGERATION_RELIEF,
+  TERRARIUM_SOURCE_ID,
+  terrainExaggerationForZoom,
+  terrainPitchForZoom,
+  terrainSky,
+} from "@/lib/terrain-scene";
 
 const maplibre = vi.hoisted(() => {
   type Listener = (event: unknown) => void;
@@ -27,14 +34,38 @@ const maplibre = vi.hoisted(() => {
       this.bearing = camera.bearing;
       this.pitch = camera.pitch;
     });
-    getSource = vi.fn(() => undefined);
-    addSource = vi.fn();
-    addLayer = vi.fn();
+    sources = new Set<string>();
+    layers = new Set<string>();
+    terrain: { source: string; exaggeration: number } | null = null;
+
+    getSource = vi.fn((id: string) =>
+      this.sources.has(id) ? { id } : undefined
+    );
+    addSource = vi.fn((id: string) => {
+      this.sources.add(id);
+    });
+    getLayer = vi.fn((id: string) =>
+      this.layers.has(id) ? { id } : undefined
+    );
+    addLayer = vi.fn((layer: { id: string }) => {
+      this.layers.add(layer.id);
+    });
+    removeLayer = vi.fn((id: string) => {
+      this.layers.delete(id);
+    });
     setPaintProperty = vi.fn();
-    setTerrain = vi.fn();
-    easeTo = vi.fn();
-    getLayer = vi.fn(() => undefined);
     setLayoutProperty = vi.fn();
+    setTerrain = vi.fn(
+      (terrain: { source: string; exaggeration: number } | null) => {
+        this.terrain = terrain;
+      }
+    );
+    getTerrain = vi.fn(() => this.terrain);
+    setSky = vi.fn();
+    setLight = vi.fn();
+    easeTo = vi.fn();
+    isStyleLoaded = vi.fn(() => true);
+    getLayoutProperty = vi.fn(() => "visible");
     triggerRepaint = vi.fn();
     getCanvas = vi.fn(() => ({
       toDataURL: vi.fn(() => "data:image/jpeg;base64,test"),
@@ -69,6 +100,14 @@ const maplibre = vi.hoisted(() => {
 
     once(event: string, listener: Listener) {
       return this.on(event, listener);
+    }
+
+    off(event: string, listener: Listener) {
+      this.listeners.set(
+        event,
+        (this.listeners.get(event) ?? []).filter((item) => item !== listener)
+      );
+      return this;
     }
 
     emit(event: string, payload: unknown = {}) {
@@ -200,6 +239,54 @@ describe("MapView camera contract", () => {
       lng: -73.97,
       zoom: 16,
     });
+  });
+
+  it("ignores terrain overlay failures while imagery is still connecting", () => {
+    render(<MapView />);
+    const map = currentMap();
+
+    act(() => {
+      map.emit("error", { sourceId: "osm-buildings", error: new Error("buildings") });
+      map.emit("error", { sourceId: "terrarium", error: new Error("dem") });
+      map.emit("error", { sourceId: "terrarium", error: new Error("dem again") });
+    });
+
+    expect(map.setStyle).not.toHaveBeenCalled();
+  });
+
+  it("pitches into zoom-scaled relief and restores a flat map", () => {
+    const view = render(<MapView initialZoom={15} />);
+    const map = currentMap();
+
+    view.rerender(<MapView initialZoom={15} terrainEnabled />);
+
+    expect(map.setTerrain).toHaveBeenCalledWith({
+      source: TERRARIUM_SOURCE_ID,
+      exaggeration: terrainExaggerationForZoom(15),
+    });
+    expect(map.setSky).toHaveBeenCalledWith(terrainSky());
+    expect(map.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({ pitch: terrainPitchForZoom(15) })
+    );
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      "hillshade",
+      "hillshade-exaggeration",
+      HILLSHADE_EXAGGERATION_RELIEF
+    );
+    expect(map.layers.has("osm-buildings-3d")).toBe(true);
+
+    map.zoom = 11;
+    act(() => map.emit("zoomend"));
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: TERRARIUM_SOURCE_ID,
+      exaggeration: terrainExaggerationForZoom(11),
+    });
+
+    view.rerender(<MapView initialZoom={15} terrainEnabled={false} />);
+    expect(map.terrain).toBeNull();
+    expect(map.setSky).toHaveBeenLastCalledWith(
+      expect.objectContaining({ "fog-ground-blend": 0, "atmosphere-blend": 0 })
+    );
   });
 });
 

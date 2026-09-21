@@ -347,6 +347,7 @@ export function runHydrology(input: HydrologyInput): SimulationResponseV2 {
         polygon: cellPolygon(bbox, row, col, rows, cols),
         level,
         affected_area_km2: cellAreaM2 / 1e6,
+        flood_depth_m: clamp(value / Math.max(cellAreaM2, 1e-6), 0, 4),
       });
     }
   }

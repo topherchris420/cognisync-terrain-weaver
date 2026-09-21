@@ -188,6 +188,10 @@ describe("surface-aware D8 hydrology", () => {
 
     expect(riskLatitudes.length).toBeGreaterThan(0);
     expect(Math.min(...riskLatitudes)).toBeGreaterThan(midpoint);
+    for (const zone of result.risk_zones) {
+      expect(zone.flood_depth_m).toBeGreaterThan(0);
+      expect(zone.flood_depth_m).toBeLessThanOrEqual(4);
+    }
   });
 
   it("marks synthetic fallback elevation as illustrative and non-optimizable", () => {
