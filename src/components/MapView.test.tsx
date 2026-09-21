@@ -27,6 +27,12 @@ const maplibre = vi.hoisted(() => {
       this.bearing = camera.bearing;
       this.pitch = camera.pitch;
     });
+    getSource = vi.fn(() => undefined);
+    addSource = vi.fn();
+    addLayer = vi.fn();
+    setPaintProperty = vi.fn();
+    setTerrain = vi.fn();
+    easeTo = vi.fn();
     getLayer = vi.fn(() => undefined);
     setLayoutProperty = vi.fn();
     triggerRepaint = vi.fn();
@@ -193,6 +199,48 @@ describe("MapView camera contract", () => {
       lat: 40.75,
       lng: -73.97,
       zoom: 16,
+    });
+  });
+});
+
+describe("MapView 3D terrain contract", () => {
+  beforeEach(() => {
+    maplibre.MockMap.instances.length = 0;
+  });
+
+  it("applies 3D terrain elevation and eases camera pitch when terrain is enabled", () => {
+    const view = render(<MapView terrainEnabled={false} />);
+    const map = currentMap();
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith(null);
+
+    view.rerender(<MapView terrainEnabled={true} terrainExaggeration={6.0} />);
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: "terrarium",
+      exaggeration: 6.0,
+    });
+    expect(map.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pitch: 74,
+      })
+    );
+  });
+
+  it("updates elevation exaggeration when terrainExaggeration prop changes", () => {
+    const view = render(<MapView terrainEnabled={true} terrainExaggeration={3.5} />);
+    const map = currentMap();
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: "terrarium",
+      exaggeration: 3.5,
+    });
+
+    view.rerender(<MapView terrainEnabled={true} terrainExaggeration={10.0} />);
+
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
+      source: "terrarium",
+      exaggeration: 10.0,
     });
   });
 });

@@ -33,12 +33,20 @@ export interface MapViewProps {
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
   /** Extra-dimensional terrain from Mapzen Terrarium tiles. */
   terrainEnabled?: boolean;
+  /** Elevation exaggeration factor (defaults to 6.0 for enhanced 3D relief). */
+  terrainExaggeration?: number;
 }
 
 const TERRARIUM_SOURCE = "terrarium";
 const HILLSHADE_LAYER = "hillshade";
+const SKY_LAYER = "sky-atmosphere";
+const DEFAULT_TERRAIN_EXAGGERATION = 6.0;
 
-function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
+export function applyElevationOverlays(
+  map: MLMap,
+  terrainEnabled: boolean,
+  exaggeration = DEFAULT_TERRAIN_EXAGGERATION
+) {
   try {
     if (typeof map.getSource !== "function" || typeof map.addSource !== "function") {
       return;
@@ -62,19 +70,42 @@ function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
           type: "hillshade",
           source: TERRARIUM_SOURCE,
           paint: {
-            "hillshade-exaggeration": 0.85,
-            "hillshade-shadow-color": "#07110e",
-            "hillshade-highlight-color": "#f4f7ea",
+            "hillshade-exaggeration": terrainEnabled ? 1.4 : 0.85,
+            "hillshade-shadow-color": "#050b14",
+            "hillshade-highlight-color": "#ffffff",
             "hillshade-illumination-direction": 315,
             "hillshade-illumination-anchor": "map",
           },
         },
         map.getLayer(LABELS_LAYER_ID) ? LABELS_LAYER_ID : undefined
       );
+    } else if (typeof map.setPaintProperty === "function" && map.getLayer(HILLSHADE_LAYER)) {
+      map.setPaintProperty(
+        HILLSHADE_LAYER,
+        "hillshade-exaggeration",
+        terrainEnabled ? 1.4 : 0.85
+      );
     }
+
+    if (typeof map.getLayer === "function" && !map.getLayer(SKY_LAYER)) {
+      try {
+        map.addLayer({
+          id: SKY_LAYER,
+          type: "sky",
+          paint: {
+            "sky-type": "atmosphere",
+            "sky-atmosphere-sun": [0.0, 90.0],
+            "sky-atmosphere-sun-intensity": 15,
+          },
+        } as unknown as maplibregl.LayerSpecification);
+      } catch {
+        // Sky layer unsupported or style pending
+      }
+    }
+
     if (typeof map.setTerrain === "function") {
       map.setTerrain(
-        terrainEnabled ? { source: TERRARIUM_SOURCE, exaggeration: 3.2 } : null
+        terrainEnabled ? { source: TERRARIUM_SOURCE, exaggeration } : null
       );
     }
   } catch (error) {
@@ -179,6 +210,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     onCameraChange,
     onViewChange,
     terrainEnabled = false,
+    terrainExaggeration = DEFAULT_TERRAIN_EXAGGERATION,
   },
   ref
 ) {
@@ -199,6 +231,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   onCameraChangeRef.current = onCameraChange;
   const terrainEnabledRef = useRef(terrainEnabled);
   terrainEnabledRef.current = terrainEnabled;
+  const terrainExaggerationRef = useRef(terrainExaggeration);
+  terrainExaggerationRef.current = terrainExaggeration;
   const viewRef = useRef<MapCameraState>({
     center: initialCenter,
     zoom: initialZoom,
@@ -221,7 +255,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         pitch: viewRef.current.pitch,
         minZoom: 2,
         maxZoom: 19,
-        maxPitch: 75,
+        maxPitch: 85,
         // Required so we can read pixels off the canvas for AI analysis.
         canvasContextAttributes: { preserveDrawingBuffer: true },
         attributionControl: { compact: true },
@@ -281,14 +315,22 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       connected = true;
       window.clearTimeout(watchdog);
       setStatus({ kind: "ready" });
-      applyElevationOverlays(map, terrainEnabledRef.current);
+      applyElevationOverlays(
+        map,
+        terrainEnabledRef.current,
+        terrainExaggerationRef.current
+      );
       const handle = readyHandleRef.current;
       if (handle) onReadyRef.current?.({ handle, map });
     });
 
     map.on("style.load", () => {
       if (disposed) return;
-      applyElevationOverlays(map, terrainEnabledRef.current);
+      applyElevationOverlays(
+        map,
+        terrainEnabledRef.current,
+        terrainExaggerationRef.current
+      );
     });
 
     map.on("error", (e) => {
@@ -331,11 +373,11 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    applyElevationOverlays(map, terrainEnabled);
+    applyElevationOverlays(map, terrainEnabled, terrainExaggeration);
     if (typeof map.easeTo !== "function") return;
     if (terrainEnabled) {
       map.easeTo({
-        pitch: Math.max(map.getPitch?.() ?? 0, 68),
+        pitch: Math.max(map.getPitch?.() ?? 0, 74),
         bearing: map.getBearing?.() || -24,
         duration: 1100,
         essential: true,
@@ -343,7 +385,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     } else if ((map.getPitch?.() ?? 0) > 1) {
       map.easeTo({ pitch: 0, duration: 700 });
     }
-  }, [terrainEnabled]);
+  }, [terrainEnabled, terrainExaggeration]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -431,7 +473,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           return null;
         } finally {
           if (hadTerrain && typeof map.setTerrain === "function") {
-            map.setTerrain({ source: TERRARIUM_SOURCE, exaggeration: 3.2 });
+            map.setTerrain({
+              source: TERRARIUM_SOURCE,
+              exaggeration: terrainExaggerationRef.current,
+            });
           }
           if (
             (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&

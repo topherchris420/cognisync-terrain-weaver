@@ -6,8 +6,10 @@ import type { TacticalLayersState } from "./TacticalLayerControls";
 import type { FlowPath, RiskZone } from "@/lib/simulation-types";
 import { FlowLayer, type FlowLayerHandle } from "@/components/FlowLayer";
 import { RiskHeatmap, type RiskHeatmapHandle } from "@/components/RiskHeatmap";
+import { applyElevationOverlays } from "@/components/MapView";
 
 interface TacticalMapViewProps {
+  terrainEnabled?: boolean;
   state: TacticalCOPState;
   layers: TacticalLayersState;
   flowPaths?: FlowPath[];
@@ -37,6 +39,7 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
       riskZones = [],
       center,
       zoom = 14.5,
+      terrainEnabled = true,
       onSelectSensor,
       onSelectNode,
       onSelectCorridor,
@@ -90,12 +93,14 @@ export const TacticalMapView = forwardRef<TacticalMapViewHandle, TacticalMapView
         },
         center,
         zoom,
+        maxPitch: 85,
         attributionControl: false,
       });
 
       map.addControl(new maplibregl.NavigationControl(), "top-right");
 
       map.on("load", () => {
+        applyElevationOverlays(map, terrainEnabled);
         // Add Transit Corridors Source & Layers
         map.addSource(TACTICAL_CORRIDORS_SOURCE, {
           type: "geojson",
