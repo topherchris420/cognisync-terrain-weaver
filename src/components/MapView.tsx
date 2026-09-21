@@ -62,10 +62,11 @@ function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
           type: "hillshade",
           source: TERRARIUM_SOURCE,
           paint: {
-            "hillshade-exaggeration": 0.4,
+            "hillshade-exaggeration": 0.85,
             "hillshade-shadow-color": "#07110e",
-            "hillshade-highlight-color": "#eef5e8",
+            "hillshade-highlight-color": "#f4f7ea",
             "hillshade-illumination-direction": 315,
+            "hillshade-illumination-anchor": "map",
           },
         },
         map.getLayer(LABELS_LAYER_ID) ? LABELS_LAYER_ID : undefined
@@ -73,7 +74,7 @@ function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
     }
     if (typeof map.setTerrain === "function") {
       map.setTerrain(
-        terrainEnabled ? { source: TERRARIUM_SOURCE, exaggeration: 1.45 } : null
+        terrainEnabled ? { source: TERRARIUM_SOURCE, exaggeration: 3.2 } : null
       );
     }
   } catch (error) {
@@ -334,9 +335,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (typeof map.easeTo !== "function") return;
     if (terrainEnabled) {
       map.easeTo({
-        pitch: Math.max(map.getPitch?.() ?? 0, 52),
-        bearing: map.getBearing?.() || -18,
-        duration: 900,
+        pitch: Math.max(map.getPitch?.() ?? 0, 68),
+        bearing: map.getBearing?.() || -24,
+        duration: 1100,
+        essential: true,
       });
     } else if ((map.getPitch?.() ?? 0) > 1) {
       map.easeTo({ pitch: 0, duration: 700 });
@@ -429,7 +431,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           return null;
         } finally {
           if (hadTerrain && typeof map.setTerrain === "function") {
-            map.setTerrain({ source: TERRARIUM_SOURCE, exaggeration: 1.45 });
+            map.setTerrain({ source: TERRARIUM_SOURCE, exaggeration: 3.2 });
           }
           if (
             (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&
