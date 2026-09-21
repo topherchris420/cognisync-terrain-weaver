@@ -7,6 +7,7 @@ import type { MapCameraState } from "@/lib/counterfactual/types";
 import {
   BUILDINGS_LAYER_ID,
   BUILDINGS_SOURCE_ID,
+  DEFAULT_TERRAIN_EXAGGERATION,
   FLOOD_VOLUME_LAYER_ID,
   HILLSHADE_EXAGGERATION_FLAT,
   HILLSHADE_EXAGGERATION_RELIEF,
@@ -81,7 +82,11 @@ function setLayerVisibility(map: MLMap, id: string, visibility: "visible" | "non
  * Hillshade stays on in the flat view. Pitched mode adds a zoom-scaled
  * terrain mesh, building mass, and a sky so the storm has a ground to sit on.
  */
-function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
+export function applyElevationOverlays(
+  map: MLMap,
+  terrainEnabled: boolean,
+  terrainExaggeration?: number
+) {
   try {
     if (typeof map.getSource !== "function" || typeof map.addSource !== "function") {
       return;
@@ -89,7 +94,7 @@ function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
     if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) return;
 
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 15;
-    const exaggeration = terrainExaggerationForZoom(zoom);
+    const exaggeration = terrainExaggeration ?? terrainExaggerationForZoom(zoom);
     const wasDimensional =
       typeof map.getTerrain === "function" && Boolean(map.getTerrain());
 
@@ -110,28 +115,6 @@ function applyElevationOverlays(map: MLMap, terrainEnabled: boolean) {
         "hillshade-exaggeration",
         hillshadeExaggeration
       );
-    } else if (typeof map.setPaintProperty === "function" && map.getLayer(HILLSHADE_LAYER)) {
-      map.setPaintProperty(
-        HILLSHADE_LAYER,
-        "hillshade-exaggeration",
-        terrainEnabled ? 1.4 : 0.85
-      );
-    }
-
-    if (typeof map.getLayer === "function" && !map.getLayer(SKY_LAYER)) {
-      try {
-        map.addLayer({
-          id: SKY_LAYER,
-          type: "sky",
-          paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0.0, 90.0],
-            "sky-atmosphere-sun-intensity": 15,
-          },
-        } as unknown as maplibregl.LayerSpecification);
-      } catch {
-        // Sky layer unsupported or style pending
-      }
     }
 
     if (!terrainEnabled) {
@@ -443,7 +426,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (terrainEnabled) {
       const zoom = map.getZoom?.() ?? 15;
       map.easeTo({
-        pitch: Math.max(map.getPitch?.() ?? 0, terrainPitchForZoom(zoom)),
+        pitch: Math.max(
+          map.getPitch?.() ?? 0,
+          terrainPitchForZoom(zoom, terrainExaggeration)
+        ),
         bearing: map.getBearing?.() || -24,
         duration: 1100,
         essential: true,
@@ -456,7 +442,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !terrainEnabled || typeof map.on !== "function") return;
-    const onZoomEnd = () => applyElevationOverlays(map, true);
+    const onZoomEnd = () =>
+      applyElevationOverlays(map, true, terrainExaggerationRef.current);
     map.on("zoomend", onZoomEnd);
     return () => {
       if (typeof map.off === "function") map.off("zoomend", onZoomEnd);
