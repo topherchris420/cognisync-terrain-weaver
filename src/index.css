@@ -1,0 +1,422 @@
+/* Fonts are loaded via preconnected <link> tags in index.html, not a CSS
+   @import — an @import here blocks CSS parsing on a round-trip to Google. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mannahatta — Tactical OSINT ground station.
+   Near-black glass, hairline rules, one signal cyan. HSL tokens only. */
+
+@layer base {
+  :root {
+    --background: 222 28% 4%;
+    --foreground: 205 18% 93%;
+
+    --card: 222 25% 7%;
+    --card-foreground: 220 12% 94%;
+
+    --popover: 240 26% 5%;
+    --popover-foreground: 220 12% 94%;
+
+    --primary: 190 100% 50%;
+    --primary-foreground: 240 40% 5%;
+
+    --secondary: 240 12% 12%;
+    --secondary-foreground: 220 12% 92%;
+
+    --muted: 240 12% 11%;
+    --muted-foreground: 235 8% 58%;
+
+    --accent: 190 100% 50%;
+    --accent-foreground: 240 40% 5%;
+
+    --destructive: 4 85% 58%;
+    --destructive-foreground: 220 12% 96%;
+
+    --warning: 38 95% 55%;
+    --warning-foreground: 30 40% 8%;
+
+    --border: 240 10% 16%;
+    --input: 240 12% 11%;
+    --ring: 190 100% 50%;
+
+    --radius: 0.125rem;
+
+    --surface-pavement: 235 6% 55%;
+    --surface-building: 20 12% 46%;
+    --surface-vegetation: 145 55% 45%;
+    --surface-water: 190 100% 50%;
+    --surface-soil: 30 40% 48%;
+
+    --gradient-hero: radial-gradient(circle at 20% 20%, hsl(190 100% 50% / 0.16), transparent 55%),
+                     radial-gradient(circle at 80% 30%, hsl(190 100% 50% / 0.08), transparent 55%),
+                     radial-gradient(circle at 50% 90%, hsl(4 85% 58% / 0.06), transparent 60%);
+    --gradient-panel: linear-gradient(180deg, hsl(240 26% 7% / 0.94), hsl(240 26% 4% / 0.94));
+    --shadow-glow: 0 0 32px -10px hsl(190 100% 50% / 0.45);
+    --shadow-panel: 0 18px 46px -22px hsl(240 60% 2% / 0.95);
+
+    --sidebar-background: 240 26% 5%;
+    --sidebar-foreground: 220 12% 92%;
+    --sidebar-primary: 190 100% 50%;
+    --sidebar-primary-foreground: 240 40% 5%;
+    --sidebar-accent: 240 14% 10%;
+    --sidebar-accent-foreground: 220 12% 92%;
+    --sidebar-border: 240 10% 15%;
+    --sidebar-ring: 190 100% 50%;
+
+    /* Catalyst — hidden layer. One restrained gold, used nowhere else. */
+    --catalyst-gold: 41 58% 62%;
+    --catalyst-gold-muted: 41 30% 42%;
+    --catalyst-ink: 40 30% 8%;
+  }
+}
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  /* Consistent, keyboard-friendly focus ring across the app */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .terrain-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .hero-glow {
+    background: var(--gradient-hero);
+  }
+
+  .panel {
+    background: var(--gradient-panel);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .analysis-launch {
+    box-shadow:
+      0 28px 80px -28px hsl(240 80% 1% / 0.95),
+      0 0 0 1px hsl(var(--primary) / 0.04),
+      inset 0 1px 0 hsl(0 0% 100% / 0.04);
+  }
+
+  /* --------------------------------------------------- Ground-station HUD --
+     Hairline glass modules, square corners, mono micro-labels. */
+
+  .hud-panel {
+    background: hsl(240 26% 5% / 0.82);
+    border: 1px solid hsl(var(--border));
+    backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .hud-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(240 20% 9% / 0.7);
+    padding: 0.3rem 0.55rem;
+  }
+
+  .hud-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    line-height: 1;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .hud-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: hsl(var(--foreground));
+  }
+
+  /* Corner ticks — the frame markers of a targeting frame. */
+  .hud-ticks::before,
+  .hud-ticks::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: hsl(var(--primary) / 0.7);
+    pointer-events: none;
+  }
+  .hud-ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .hud-ticks::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+  }
+
+  .signal-dot {
+    width: 5px;
+    height: 5px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.8);
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+
+  .reticle {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.35) 1px, transparent 1px);
+    background-size: 100% 50%, 50% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.25;
+  }
+
+
+  /* Analysis "scanning" sweep — a soft primary band that tracks down the tile
+     being classified, giving the wait a sense of active work. */
+  .scanline {
+    height: 34%;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      hsl(var(--primary) / 0.22),
+      transparent
+    );
+    animation: scan 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes scan {
+    0% {
+      top: -34%;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    85% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+      opacity: 0;
+    }
+  }
+
+  .vignette {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.7);
+    z-index: 5;
+  }
+
+  /* Scroll-reveal: elements start hidden, fade/rise in once observed */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ---------------------------------------------------------- Catalyst --
+     A hidden scientific plate: thin gold rules, editorial serif, no glow
+     beyond a single soft halo. Nothing here is used outside the layer. */
+
+  .catalyst-plate {
+    background:
+      linear-gradient(180deg, hsl(40 12% 9% / 0.96), hsl(40 10% 7% / 0.96));
+    border: 1px solid hsl(var(--catalyst-gold) / 0.28);
+    box-shadow: 0 18px 50px -28px hsl(var(--catalyst-gold) / 0.4);
+  }
+
+  .catalyst-rule {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--catalyst-gold) / 0.5),
+      transparent
+    );
+    transform-origin: left center;
+  }
+
+  .catalyst-serif {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+  }
+
+  .catalyst-body {
+    font-family: 'Lora', Georgia, serif;
+  }
+
+  /* The contour that moves into the map when the layer opens. */
+  .catalyst-contour {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    height: 150vmax;
+    width: 150vmax;
+    margin-left: -75vmax;
+    margin-top: -75vmax;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--catalyst-gold) / 0.55);
+    box-shadow: 0 0 60px -10px hsl(var(--catalyst-gold) / 0.35) inset;
+    animation: catalyst-ripple 3.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* The 79.1 figure separating under a sustained press. */
+  .catalyst-sigil {
+    display: inline-flex;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color 0.4s ease, text-shadow 0.6s ease;
+  }
+
+  .catalyst-sigil[data-holding="true"] {
+    color: hsl(var(--catalyst-gold));
+    text-shadow: 0 0 18px hsl(var(--catalyst-gold) / 0.35);
+  }
+
+  .catalyst-sigil-char {
+    display: inline-block;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+
+  /* The future skin over the satellite imagery: a warm gold veil, and a
+     cooler one for the reconstructed past. Filters only — the map itself is
+     never touched, so every existing overlay keeps working. */
+  .epoch-veil {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    transition: opacity 0.9s ease, background 0.9s ease;
+  }
+
+  .epoch-veil-past {
+    background:
+      radial-gradient(circle at 50% 40%, hsl(40 40% 30% / 0.15), transparent 70%),
+      inset 0 0 100px rgba(0, 0, 0, 0.4);
+    /* No heavy sepia needed, the raster tiles will provide the vintage aesthetic */
+  }
+
+  .epoch-veil-future {
+    background:
+      radial-gradient(circle at 50% 45%, hsl(var(--catalyst-gold) / 0.16), transparent 68%),
+      linear-gradient(180deg, hsl(41 40% 30% / 0.14), hsl(190 45% 22% / 0.2));
+  }
+}
+
+  .hud-corner { position: absolute; width: 3rem; height: 3rem; opacity: 0.8; pointer-events: none; }
+  .hud-corner-tl { top: 1rem; left: 1rem; border-top: 2px solid; border-left: 2px solid; }
+  .hud-corner-tr { top: 1rem; right: 1rem; border-top: 2px solid; border-right: 2px solid; }
+  .hud-corner-bl { bottom: 1rem; left: 1rem; border-bottom: 2px solid; border-left: 2px solid; }
+  .hud-corner-br { bottom: 1rem; right: 1rem; border-bottom: 2px solid; border-right: 2px solid; }
+  .hud-freshness { color: hsl(var(--primary)); letter-spacing: 0.06em; }
+  .target-row { border: 1px solid transparent; transition: background 160ms ease, border-color 160ms ease; }
+  .target-row:hover, .target-row[aria-pressed="true"] { background: hsl(var(--primary) / 0.1); border-color: hsl(var(--primary) / 0.35); }
+  .target-frame { transform: translate(-50%, -50%); min-width: 5rem; padding: 0.35rem 0.5rem; border: 1px solid hsl(var(--primary) / 0.7); background: hsl(var(--background) / 0.78); color: hsl(var(--primary)); text-align: left; display: flex; flex-direction: column; gap: 0.15rem; font-size: 9px; letter-spacing: 0.08em; animation: target-pulse 2.8s ease-in-out infinite; }
+  .target-frame strong { color: hsl(var(--foreground)); font-size: 10px; }
+  .target-frame.alert { border-color: hsl(var(--warning)); color: hsl(var(--warning)); }
+  .target-frame.critical { border-color: hsl(var(--destructive)); color: hsl(var(--destructive)); animation-duration: 1.2s; }
+  @keyframes target-pulse { 0%, 100% { box-shadow: 0 0 0 hsl(var(--primary) / 0); } 50% { box-shadow: 0 0 18px hsl(var(--primary) / 0.18); } }
+
+/* Honour users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  /* Hold the sweep still rather than looping it. */
+  .scanline {
+    animation: none;
+    top: 33%;
+    opacity: 0.5;
+  }
+
+  .catalyst-contour,
+  .catalyst-sigil-char,
+  .epoch-veil {
+    animation: none !important;
+    transition: none !important;
+  }
+
+}
+
+/* MapLibre overrides — keep controls consistent with theme */
+.maplibregl-ctrl-group {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: var(--shadow-panel) !important;
+}
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid hsl(var(--border)) !important;
+}
+.maplibregl-ctrl-attrib {
+  background: hsl(var(--card) / 0.75) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.maplibregl-canvas {
+  outline: none !important;
+}
