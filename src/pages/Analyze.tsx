@@ -18,6 +18,7 @@ import { EraTimeline } from "@/components/historical/EraTimeline";
 import { EraCompare } from "@/components/historical/EraCompare";
 import { DEFAULT_ERA_ID, getEra } from "@/lib/historical/eras";
 import { RecommendationsList } from "@/components/RecommendationsList";
+import { StormComparison } from "@/components/StormComparison";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
@@ -75,7 +76,6 @@ import { generatePDFReport } from "@/lib/pdf-export";
 import { toast } from "sonner";
 import { TacticalHUD } from "@/components/tactical/TacticalHUD";
 import { CommandPalette } from "@/components/tactical/CommandPalette";
-import { DetectionOverlay } from "@/components/tactical/DetectionOverlay";
 import { ExampleStorm } from "@/components/analyze/ExampleStorm";
 import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
 import "@/styles/atlas.css";
@@ -232,7 +232,7 @@ export default function Analyze() {
   // typing and route through runAnalysis so every normal guard still applies.
   useEffect(() => {
     const handleLaunchShortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
+      const target = event.target instanceof Element ? event.target : null;
       const isTyping = target?.matches("input, textarea, select, [contenteditable='true']");
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !isTyping) {
         event.preventDefault();
@@ -268,6 +268,24 @@ export default function Analyze() {
   } | null>(null);
 
   const workflow = useWorkflow();
+  const requestGeneration = useRef(0);
+  const pendingRequest = useRef<"analysis" | "storm" | null>(null);
+  const invalidateRequests = useCallback(() => {
+    requestGeneration.current += 1;
+    pendingRequest.current = null;
+  }, []);
+  useEffect(() => invalidateRequests, [invalidateRequests]);
+
+  const invalidateFuture = () => {
+    if (pendingRequest.current === "storm") {
+      invalidateRequests();
+      workflow.advance("REDESIGN");
+    }
+    setFutureSimResult(null);
+    setPossibleSeal(null);
+    setCatalystFuture(null);
+    setScenarioExport(null);
+  };
 
   const analyzedBBox: BBox | null = useMemo(
     () => (result ? parseBBox(result.bbox) : null),
@@ -356,6 +374,7 @@ export default function Analyze() {
   };
 
   const resetScan = () => {
+    invalidateRequests();
     setAnalysisError(null);
     setResult(null);
     setCapturedTile(null);
@@ -384,23 +403,25 @@ export default function Analyze() {
   };
 
   const runAnalysis = async () => {
-    if (["ANALYZING", "STORM", "RERUN_STORM"].includes(workflow.state) || !mapReady) return;
+    if (pendingRequest.current || !mapReady) return;
     setAnalysisError(null);
     resetScan();
+    const generation = requestGeneration.current;
+    pendingRequest.current = "analysis";
     workflow.advance("ANALYZING");
     setDrawerOpen(true);
     setActiveTab("overview");
 
     try {
+      const bounds = mapRef.current?.getBounds() ?? null;
       const imageDataUrl = await mapRef.current?.captureImage();
+      if (generation !== requestGeneration.current) return;
       if (!imageDataUrl) {
         setAnalysisError("Couldn’t capture imagery. Pan or zoom the map, then try again.");
         workflow.advance("SEARCH");
         return;
       }
       setCapturedTile(imageDataUrl);
-      const bounds = mapRef.current?.getBounds() ?? null;
-
       const { data, error } = await supabase.functions.invoke("analyze-terrain", {
         body: {
           name: isExample ? "Lower Manhattan Watershed" : name.trim() || "Analyzed Site",
@@ -413,6 +434,7 @@ export default function Analyze() {
         },
       });
 
+      if (generation !== requestGeneration.current) return;
       if (error) {
         console.error("analyze-terrain failed:", error);
         setAnalysisError("The analysis service is unavailable. Try again, or explore the example below.");
@@ -425,15 +447,17 @@ export default function Analyze() {
       workflow.advance("ANALYZED");
       toast.success("Surface permeability analysis complete.");
     } catch (e) {
+      if (generation !== requestGeneration.current) return;
       console.error(e);
       setAnalysisError("The scan could not finish. Try again, or explore the example below.");
       workflow.advance("SEARCH");
+    } finally {
+      if (generation === requestGeneration.current) pendingRequest.current = null;
     }
   };
 
   const runSimulation = async (isRerun = false) => {
-    if (!result) return;
-    if (workflow.state === "STORM" || workflow.state === "RERUN_STORM") return;
+    if (!result || pendingRequest.current) return;
 
     const bounds = analyzedBBox ?? (mapRef.current?.getBounds() as BBox | null);
     if (!bounds) {
@@ -443,14 +467,18 @@ export default function Analyze() {
 
     if (
       isRerun &&
-      !hasActiveInterventions(scenario) &&
-      interventionFeatures.length === 0
+      !interventionFeatures.some((feature) => feature.eligibility.eligible && feature.eligibility.validAreaM2 > 0)
     ) {
       toast.error("Draw a green-infrastructure polygon before rerunning the storm.");
       setActiveTab("mitigation");
       return;
     }
 
+    const generation = requestGeneration.current;
+    pendingRequest.current = "storm";
+    setFutureSimResult(null);
+    setPossibleSeal(null);
+    setCatalystFuture(null);
     workflow.advance(isRerun ? "RERUN_STORM" : "STORM");
     setDrawerOpen(true);
 
@@ -459,13 +487,6 @@ export default function Analyze() {
       const stormDefinition =
         nowSeal?.storm ?? buildStormDefinition(stormRainfallMm, stormResolution);
       const seal = createStormSeal(stormDefinition);
-      if (isRerun) {
-        setPossibleSeal(seal);
-      } else {
-        setNowSeal(seal);
-        setPossibleSeal(null);
-        setFutureSimResult(null);
-      }
 
       const size = LOCAL_GRID[stormDefinition.resolution];
       const nowSurface = buildRealitySurface({
@@ -490,8 +511,7 @@ export default function Analyze() {
         stormHash: stormDefinition.hash,
         surfaceHash: nowSurface.surfaceHash,
       });
-      setSimResult(nowRun);
-      setSimWarnings(nowRun.warnings);
+      if (generation !== requestGeneration.current) return;
 
       if (isRerun) {
         const possibleSurface = buildRealitySurface({
@@ -516,12 +536,15 @@ export default function Analyze() {
           surfaceHash: possibleSurface.surfaceHash,
           expectedElevationHash: nowRun.elevationHash,
         });
-        setFutureSimResult(possibleRun);
+        if (generation !== requestGeneration.current) return;
         const areaM2 = bboxAreaKm2(bounds) * 1e6;
-        setCatalystFuture({
-          scenario,
-          future: projectFuture(result.land_cover, scenario, areaM2),
-        });
+        const future = projectFuture(result.land_cover, scenario, areaM2);
+        setSimResult(nowRun);
+        setSimWarnings([...nowRun.warnings, ...possibleRun.warnings]);
+        setNowSeal(seal);
+        setPossibleSeal(seal);
+        setFutureSimResult(possibleRun);
+        setCatalystFuture({ scenario, future });
         workflow.advance("COMPARE");
         setActiveTab("compare");
         toast.success(
@@ -530,6 +553,9 @@ export default function Analyze() {
             : "Counterfactual storm complete."
         );
       } else {
+        setSimResult(nowRun);
+        setSimWarnings(nowRun.warnings);
+        setNowSeal(seal);
         workflow.advance("STORM_COMPLETE");
         setActiveTab("simulation");
         toast.success(
@@ -537,9 +563,15 @@ export default function Analyze() {
         );
       }
     } catch (e) {
+      if (generation !== requestGeneration.current) return;
       console.error(e);
-      toast.error("Hydrologic simulation failed.");
+      setPossibleSeal(null);
+      setFutureSimResult(null);
+      setCatalystFuture(null);
+      toast.error("Hydrologic simulation failed. No new comparison was saved.");
       workflow.advance(isRerun ? "REDESIGN" : "ANALYZED");
+    } finally {
+      if (generation === requestGeneration.current) pendingRequest.current = null;
     }
   };
 
@@ -584,7 +616,7 @@ export default function Analyze() {
       <AppNav />
 
       {/* 2. Main GIS Viewport Area */}
-      <main id="main" className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", (!result || drawerOpen) && "atlas-workspace--docked")}>
+      <main id="main" className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", (!result || (drawerOpen && workflow.state !== "COMPARE")) && "atlas-workspace--docked", workflow.state === "COMPARE" && "atlas-workspace--comparing")}>
         {/* Full-bleed Map Canvas */}
         <div className="atlas-map absolute inset-0 h-full">
           <MapView
@@ -608,7 +640,7 @@ export default function Analyze() {
           )}
 
           {/* Historical timeline: 1609 → today → projected future */}
-          <div className="absolute right-4 top-3 z-30 max-w-[calc(100vw-2rem)]">
+          <div className="atlas-era-controls absolute right-4 top-3 z-30 max-w-[calc(100vw-2rem)]">
             <EraTimeline
               eraId={eraId}
               onChange={setEraId}
@@ -649,9 +681,13 @@ export default function Analyze() {
               map={mapInstance}
               bbox={result.bbox}
               features={interventionFeatures}
-              onChange={setInterventionFeatures}
+              onChange={(features) => { invalidateFuture(); setInterventionFeatures(features); }}
               cover={result.land_cover}
-              onScenarioChange={(s) => setScenario(s)}
+              onScenarioChange={(s) => { invalidateFuture(); setScenario(s); }}
+              onDraftFeedback={(feedback) => {
+                if (feedback && !feedback.eligible) toast.error("This drawing cannot be modeled.", { description: feedback.caveats.join(" ") || "Draw within the analyzed footprint." });
+                else if (feedback?.invalidAreaM2 && feedback.invalidAreaM2 > 0.01) toast.info("Only the eligible part of this drawing is included.");
+              }}
               activeIntervention={activeIntervention}
             />
           )}
@@ -669,7 +705,7 @@ export default function Analyze() {
                       Drawing Mode Active
                     </h3>
                     <p className="text-xs text-foreground font-medium">
-                      Click points on map to sketch area. Double-click or press <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono border">Esc</kbd> when finished.
+                      Click points, then click the first point to finish. <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono border">Esc</kbd> cancels.
                     </p>
                   </div>
                 </div>
@@ -712,11 +748,7 @@ export default function Analyze() {
             />
           )}
 
-          {/* Target Detection Overlay */}
-          <DetectionOverlay
-            riskZones={simResult?.risk_zones ?? []}
-            flowPaths={simResult?.flow_paths ?? []}
-          />
+
         </div>
 
         {/* Tactical Military HUD & Spatial Command Palette */}
@@ -839,6 +871,7 @@ export default function Analyze() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[400px] max-w-[90vw]">
             <div className="panel rounded-xl border border-border p-6 shadow-2xl">
               <AnalyzingState tile={capturedTile} />
+              <Button variant="outline" onClick={resetScan}>Cancel analysis</Button>
             </div>
           </div>
         )}
@@ -859,7 +892,7 @@ export default function Analyze() {
         {result && (
           <aside
             aria-label="Urban Resilience Workbench"
-            hidden={!drawerOpen}
+            hidden={!drawerOpen || workflow.state === "COMPARE"}
             className={cn(
               "atlas-results absolute top-0 bottom-0 left-0 z-30 border-r border-border bg-card flex flex-col",
               drawerOpen ? "translate-x-0" : "-translate-x-full"
@@ -886,7 +919,6 @@ export default function Analyze() {
                   variant="ghost"
                   size="sm"
                   onClick={resetScan}
-                  disabled={["ANALYZING", "STORM", "RERUN_STORM"].includes(workflow.state)}
                   className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
                   title="Reset and clear analysis"
                 >
@@ -1018,6 +1050,20 @@ export default function Analyze() {
                       </p>
                     </div>
 
+                    <div className="space-y-3">
+                      <Label htmlFor="storm-rainfall">Routed precipitation: {stormRainfallMm} mm</Label>
+                      <input id="storm-rainfall" type="range" min="5" max="200" step="5" value={stormRainfallMm}
+                        disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                        onChange={(event) => setStormRainfallMm(Number(event.target.value))} className="w-full accent-primary" />
+                      <Label htmlFor="storm-resolution">Terrain resolution</Label>
+                      <select id="storm-resolution" value={stormResolution}
+                        disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                        onChange={(event) => setStormResolution(event.target.value as "low" | "medium" | "high")}
+                        className="w-full rounded border border-border bg-background p-2 text-sm">
+                        <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+                      </select>
+                      {nowSeal && <p className="text-xs text-muted-foreground">Storm settings are sealed for a fair comparison. Reset the study to choose a different routed storm.</p>}
+                    </div>
                     {!simResult ? (
                       <Button
                         onClick={() => runSimulation(false)}
@@ -1167,7 +1213,13 @@ export default function Analyze() {
                       onScenarioExport={setScenarioExport}
                     />
 
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Explore rainfall sensitivity below using a land-cover estimate. Route the same storm to compare drawn geometry with D8 terrain flow.
+                    </p>
+                    <StormComparison cover={result.land_cover} scenario={scenario} areaM2={currentAreaKm2 * 1e6} />
+
                     <Button
+                      disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
                       onClick={() => runSimulation(true)}
                       className="w-full rounded-lg h-11 text-sm font-medium gap-2"
                     >
@@ -1308,7 +1360,7 @@ export default function Analyze() {
         )}
 
         {/* Expand Sidebar Tab Handle (when drawer is collapsed) */}
-        {result && !drawerOpen && (
+        {result && !drawerOpen && workflow.state !== "COMPARE" && (
           <button
             onClick={() => setDrawerOpen(true)}
             className="absolute top-20 left-0 z-30 flex items-center gap-1.5 rounded-r-lg border border-l-0 border-border bg-card/95 px-3 py-2 text-xs font-medium text-foreground shadow-xl hover:bg-muted transition-colors backdrop-blur-md"
