@@ -8,7 +8,7 @@ import {
 } from "react";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { area, bboxPolygon } from "@turf/turf";
+import { area, bboxPolygon, difference, feature, featureCollection, intersect } from "@turf/turf";
 import type {
   GeoJSONSource,
   IControl,
@@ -113,9 +113,38 @@ function featureId(
 function interventionFromDraft(
   draft: GeoJSON.Feature<PolygonGeometry, Record<string, unknown>>,
   type: InterventionType,
-  context: SpatialContextResult | null
+  context: SpatialContextResult | null,
+  bounds: unknown
 ): InterventionFeature {
   const eligibility = evaluateEligibility(draft.geometry, type, context);
+  const extent = normalizedBbox(bounds);
+  // One canonical clipped geometry drives both costs and grid modifiers.
+  if (eligibility.validGeometry) {
+    try {
+      const clipped = extent ? intersect(featureCollection([
+        feature(eligibility.validGeometry),
+        bboxPolygon([extent.west, extent.south, extent.east, extent.north]),
+      ])) : null;
+      const invalid = clipped
+        ? difference(featureCollection([feature(draft.geometry), clipped]))
+        : feature(draft.geometry);
+      eligibility.validGeometry = clipped?.geometry ?? null;
+      eligibility.invalidGeometry = invalid?.geometry ?? null;
+      eligibility.validAreaM2 = clipped ? area(clipped) : 0;
+      eligibility.invalidAreaM2 = invalid ? area(invalid) : 0;
+      eligibility.eligible = eligibility.validAreaM2 > 0;
+      if (eligibility.invalidAreaM2 > 0.01) {
+        eligibility.reasonCodes.push(eligibility.eligible ? "PARTIALLY_OUTSIDE_ELIGIBLE_SURFACE" : "OUTSIDE_ELIGIBLE_SURFACE");
+        eligibility.caveats.push("Only geometry inside the analyzed study footprint is modeled.");
+      }
+    } catch {
+      eligibility.eligible = false;
+      eligibility.validGeometry = null;
+      eligibility.validAreaM2 = 0;
+      eligibility.invalidGeometry = draft.geometry;
+      eligibility.caveats.push("The drawing could not be clipped to the study footprint.");
+    }
+  }
   return {
     id: featureId(draft),
     type,
@@ -366,7 +395,7 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
         const created = event.features
           .filter((draft) => isPolygonGeometry(draft.geometry))
           .map((draft) =>
-            interventionFromDraft(draft, type, contextRef.current)
+            interventionFromDraft(draft, type, contextRef.current, legacyProjectionRef.current.bbox)
           );
         if (created.length === 0) return;
         onFeedbackRef.current?.(created.at(-1)!.eligibility);
@@ -387,7 +416,8 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           const updated = interventionFromDraft(
             { ...draft, id },
             type,
-            contextRef.current
+            contextRef.current,
+            legacyProjectionRef.current.bbox
           );
           feedback = updated.eligibility;
           if (index >= 0) next[index] = updated;
@@ -444,7 +474,7 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
         draw.getAll().features.map((candidate) => ({
           id: String(candidate.id),
           geometry: candidate.geometry,
-          type: candidate.properties?.interventionType,
+          type: candidate.properties?.interventionType ?? null,
         }))
       );
       if (signature === currentSignature) return;
@@ -457,7 +487,7 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
         });
       }
       syncingRef.current = false;
-    }, [features]);
+    }, [features, map]);
 
     useEffect(() => {
       const draw = drawRef.current;

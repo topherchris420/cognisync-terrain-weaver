@@ -5,10 +5,12 @@ import {
   INTERVENTIONS,
   INTERVENTION_ORDER,
   normalizeScenario,
+  siteCoverShares,
   type Scenario,
   type ScenarioImpact,
 } from "@/lib/scenario";
-import type { FloodRisk, LandCover, LandCoverKey } from "@/lib/types";
+import { ABSORPTION_WEIGHTS } from "@/lib/absorption";
+import type { FloodRisk, LandCover } from "@/lib/types";
 import {
   area as turfArea,
   difference,
@@ -44,14 +46,6 @@ const LAND_KEYS = [
   "pavement",
 ] as const;
 
-function landShare(cover: LandCover, key: LandCoverKey): number {
-  const land = LAND_KEYS.reduce(
-    (sum, candidate) => sum + (Number(cover[candidate]) || 0),
-    0
-  );
-  return land > 0 ? (Number(cover[key]) || 0) / land : 0;
-}
-
 export function deriveScenarioFromFeatures(
   features: InterventionFeature[],
   cover: LandCover,
@@ -62,13 +56,14 @@ export function deriveScenarioFromFeatures(
     Number.isFinite(siteAreaM2) && siteAreaM2 > 0 ? siteAreaM2 : 0;
   if (area === 0) return scenario;
 
+  const physicalShares = siteCoverShares(cover);
   const claimedBySource = new Map<
     string,
     GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>
   >();
   for (const key of INTERVENTION_ORDER) {
     const source = INTERVENTIONS[key].source;
-    const availableAreaM2 = area * landShare(cover, source);
+    const availableAreaM2 = area * physicalShares[source];
     if (availableAreaM2 <= 0) continue;
     const valid = features
       .filter(
@@ -208,11 +203,14 @@ export function projectEditMetrics(
       cols: input.gridShape.cols,
     },
   });
+  const physicalShares = siteCoverShares(input.cover);
+  const baselineRunoffFraction = LAND_KEYS.reduce(
+    (sum, key) => sum + physicalShares[key] * (1 - ABSORPTION_WEIGHTS[key]),
+    0
+  );
   const estimatedRunoffM3 =
-    (siteAreaM2 *
-      rainfallMm *
-      (1 - scenarioImpact.projectedScore / 100)) /
-    1000;
+    (siteAreaM2 * rainfallMm * baselineRunoffFraction) / 1000 -
+    scenarioImpact.addedRetentionM3;
 
   return {
     status:

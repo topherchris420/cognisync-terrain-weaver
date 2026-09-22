@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { area, feature } from "@turf/turf";
 import { assessScenario, DEFAULT_ASSUMPTIONS } from "@/lib/scenario";
 import type { LandCover } from "@/lib/types";
 import type { InterventionFeature } from "./types";
@@ -57,6 +58,22 @@ function makeFeature(
 }
 
 describe("immediate edit projection", () => {
+  it("recovers the actual drawn area on a water-containing site", () => {
+    const waterfront = { pavement: 50, water: 50, soil: 0, vegetation: 0, buildings: 0 };
+    const drawn = makeFeature("trees", "street_trees", 0);
+    const scenario = deriveScenarioFromFeatures([drawn], waterfront, 100_000);
+    const expectedArea = area(feature(geometry));
+    expect(scenario.street_trees).toBeCloseTo(expectedArea / 50_000, 8);
+    expect(assessScenario(waterfront, scenario, 100_000).convertedAreaM2.street_trees).toBeCloseTo(expectedArea, 6);
+  });
+  it("estimates runoff only from land and preserves sub-score-precision edits", () => {
+    const waterfront = { pavement: 50, water: 50, soil: 0, vegetation: 0, buildings: 0 };
+    const input = { features: [], cover: waterfront, siteAreaM2: 1e9, rainfallMm: 1000, gridShape: { rows: 10, cols: 10 } };
+    const baseline = projectEditMetrics(input);
+    const edited = projectEditMetrics({ ...input, features: [makeFeature("trees", "street_trees", 0)] });
+    expect(baseline.estimatedRunoffM3).toBeCloseTo(500_000_000 * 0.88, 5);
+    expect(baseline.estimatedRunoffM3 - edited.estimatedRunoffM3).toBeCloseTo(area(feature(geometry)) * 0.68, 5);
+  });
   const features = [
     makeFeature("roof", "green_roofs", 1_500),
     makeFeature("paving", "permeable_pavement", 1_000),

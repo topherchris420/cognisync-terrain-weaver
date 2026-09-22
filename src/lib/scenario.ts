@@ -151,6 +151,19 @@ function shares(cover: LandCover): Record<AbsorbingKey, number> {
   };
 }
 
+/** Physical footprint shares, including open water in the denominator.
+ * Scores use land-normalized shares; costs and water volumes use these shares.
+ */
+export function siteCoverShares(cover: LandCover): Record<LandCoverKey, number> {
+  const keys = [...ABSORBING, "water"] as const;
+  const values = keys.map((key) => {
+    const value = Number(cover[key]);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return Object.fromEntries(keys.map((key, index) => [key, total > 0 ? values[index] / total : 0])) as Record<LandCoverKey, number>;
+}
+
 /** Weighted absorption (0–1) of the unmodified land. */
 function baseRaw(cover: LandCover): number {
   const s = shares(cover);
@@ -203,7 +216,7 @@ export function assessScenario(
   areaM2: number,
   assumptions: ScenarioAssumptions = DEFAULT_ASSUMPTIONS
 ): ScenarioImpact {
-  const s = shares(cover);
+  const s = siteCoverShares(cover);
   const normalized = normalizeScenario(scenario);
   const area = Number.isFinite(areaM2) && areaM2 > 0 ? areaM2 : 0;
 
@@ -216,21 +229,23 @@ export function assessScenario(
     number
   >;
   let capexUSD = 0;
+  let addedRetentionAreaM2 = 0;
   for (const key of INTERVENTION_ORDER) {
     const def = INTERVENTIONS[key];
     const converted = area * s[def.source] * normalized[key];
     convertedAreaM2[key] = converted;
     capexUSD += converted * def.unitCostUSD;
+    addedRetentionAreaM2 += converted * (def.targetWeight - ABSORPTION_WEIGHTS[def.source]);
   }
   const totalConvertedAreaM2 = Object.values(convertedAreaM2).reduce(
     (a, b) => a + b,
     0
   );
 
-  // 1 mm of rain on 1 m² is 1 litre; the score delta is exactly the change in
-  // the retained fraction of rainfall over the site.
+  // Keep the physical calculation independent of rounded display scores.
+  // One millimetre over one square metre is one litre.
   const addedRetentionM3 =
-    (area * assumptions.annualRainfallMm * (scoreDelta / 100)) / 1000;
+    (addedRetentionAreaM2 * assumptions.annualRainfallMm) / 1000;
   const annualBenefitUSD = addedRetentionM3 * assumptions.benefitPerM3USD;
   const paybackYears =
     capexUSD > 0 && annualBenefitUSD > 0 ? capexUSD / annualBenefitUSD : null;

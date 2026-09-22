@@ -113,6 +113,19 @@ describe("projectScore", () => {
 });
 
 describe("assessScenario", () => {
+  it("excludes water from physical conversion and rainfall", () => {
+    const impact = assessScenario(cover({ pavement: 50, water: 50 }), scenario({ street_trees: 1 }), 1000, { annualRainfallMm: 1000, benefitPerM3USD: 1 });
+    expect(impact.projectedScore).toBe(80);
+    expect(impact.convertedAreaM2.street_trees).toBeCloseTo(500);
+    expect(impact.capexUSD).toBeCloseTo(22500);
+    expect(impact.addedRetentionM3).toBeCloseTo(340);
+  });
+  it("keeps retention below displayed score precision", () => {
+    const impact = assessScenario(cover({ pavement: 100 }), scenario({ street_trees: 0.0001 }), 1000, { annualRainfallMm: 1000, benefitPerM3USD: 1 });
+    expect(impact.scoreDelta).toBe(0);
+    expect(impact.addedRetentionM3).toBeCloseTo(0.068, 8);
+  });
+
   it("computes retention, capex, benefit, and payback for a known case", () => {
     // 1 km² of pure pavement, half depaved to trees, 1000 mm rainfall.
     const impact = assessScenario(

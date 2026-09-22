@@ -10,7 +10,7 @@ import {
   unlockCatalyst,
 } from "./catalyst";
 import { computeAbsorptionScore } from "./absorption";
-import { projectScore, INTERVENTIONS, EMPTY_SCENARIO } from "./scenario";
+import { assessScenario, projectScore, INTERVENTIONS, EMPTY_SCENARIO } from "./scenario";
 import type { LandCover } from "./types";
 
 const MIDTOWN: LandCover = {
@@ -52,6 +52,12 @@ describe("unlock persistence", () => {
 });
 
 describe("solveForTarget", () => {
+  it("uses actual land area for a waterfront budget", () => {
+    const waterfront = { pavement: 50, water: 50, buildings: 0, soil: 0, vegetation: 0 };
+    const solved = solveForTarget(waterfront, 80, 1000, 22500);
+    expect(solved.reachable).toBe(true);
+    expect(assessScenario(waterfront, solved.scenario, 1000).capexUSD).toBeCloseTo(22500);
+  });
   it("reaches the target it claims to reach, verified by the shared scorer", () => {
     const r = solveForTarget(MIDTOWN, DEFAULT_TARGET_SCORE);
     expect(r.reachable).toBe(true);
@@ -99,6 +105,15 @@ describe("evaluateVerdict", () => {
 });
 
 describe("projectFuture", () => {
+  it("preserves cover mass when competing interventions exceed available pavement", () => {
+    const future = projectFuture(MIDTOWN, { ...EMPTY_SCENARIO, street_trees: 1, bioswales: 1 }, 1000);
+    expect(Object.values(future.cover).reduce((sum, value) => sum + value, 0)).toBeCloseTo(100);
+  });
+  it("excludes water from baseline runoff", () => {
+    const waterfront = { pavement: 50, water: 50, buildings: 0, soil: 0, vegetation: 0 };
+    const future = projectFuture(waterfront, EMPTY_SCENARIO, 1000, { annualRainfallMm: 1000, benefitPerM3USD: 1 });
+    expect(future.runoffBeforeM3).toBeCloseTo(440);
+  });
   const areaM2 = 1_000_000;
 
   it("moves depaved surface into vegetation and leaves the tile at 100%", () => {

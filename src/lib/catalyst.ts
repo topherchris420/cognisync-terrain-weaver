@@ -23,6 +23,8 @@ import {
   INTERVENTION_ORDER,
   assessScenario,
   projectScore,
+  normalizeScenario,
+  siteCoverShares,
   type InterventionKey,
   type Scenario,
   type ScenarioAssumptions,
@@ -214,7 +216,7 @@ export function solveForTarget(cover: LandCover, target: number, areaM2?: number
       let fraction = Math.min(room, fractionNeeded);
       
       // Budget constraint
-      const costPerFraction = (areaM2 || 0) * share * def.unitCostUSD;
+      const costPerFraction = (areaM2 || 0) * siteCoverShares(cover)[def.source] * def.unitCostUSD;
       if (maxBudgetUSD && costPerFraction > 0) {
          const affordableFraction = Math.max(0, maxBudgetUSD - spentBudget) / costPerFraction;
          fraction = Math.min(fraction, affordableFraction);
@@ -322,10 +324,11 @@ export function projectFuture(
 ): FutureState {
   const impact = assessScenario(cover, scenario, areaM2, assumptions);
   const next: LandCover = { ...cover };
+  const normalized = normalizeScenario(scenario);
   let engineered = 0;
 
   for (const key of INTERVENTION_ORDER) {
-    const fraction = Math.min(1, Math.max(0, scenario[key] || 0));
+    const fraction = normalized[key];
     if (fraction <= 0) continue;
     const def = INTERVENTIONS[key];
     const movedPct = (Number(cover[def.source]) || 0) * fraction;
@@ -340,17 +343,21 @@ export function projectFuture(
 
   const rainMm = assumptions?.annualRainfallMm ?? 1200;
   const area = Number.isFinite(areaM2) && areaM2 > 0 ? areaM2 : 0;
-  // Runoff is the complement of the retained fraction the score reports.
-  const runoff = (score: number) =>
-    (area * rainMm * (1 - Math.min(100, Math.max(0, score)) / 100)) / 1000;
+  const physicalShares = siteCoverShares(cover);
+  const landKeys = ["vegetation", "soil", "buildings", "pavement"] as const;
+  const runoffFraction = landKeys.reduce(
+    (sum, key) => sum + physicalShares[key] * (1 - ABSORPTION_WEIGHTS[key]),
+    0
+  );
+  const runoffBeforeM3 = (area * rainMm * runoffFraction) / 1000;
 
   return {
     impact,
     cover: next,
     engineeredPct: Math.round(engineered * 10) / 10,
     risk: classifyFloodRisk(impact.projectedScore),
-    runoffBeforeM3: runoff(impact.baseScore),
-    runoffAfterM3: runoff(impact.projectedScore),
+    runoffBeforeM3,
+    runoffAfterM3: Math.max(0, runoffBeforeM3 - impact.addedRetentionM3),
   };
 }
 
