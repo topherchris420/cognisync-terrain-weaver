@@ -9,6 +9,26 @@
 
 # Mannahatta · Urban Resilience Intelligence
 
+### Resilience decision workbench
+
+Open **Explore an example**, then **Mitigation** to try the rainfall sensitivity
+workbench without an analysis-service request. Compare current and proposed
+runoff across 0-200 mm of rain, inspect conserved water budgets, and expand
+the chart's exact data table. This is a fixed-coefficient, land-only planning
+estimate, distinct from the terrain-routed D8 storm; saturation, sewer capacity,
+flood depth and peak discharge are not inferred from this chart.
+
+Draw interventions inside the study footprint, route the sealed storm again,
+then use the synchronized split map to inspect both surfaces. Arrow keys,
+Home/End and touch control the divider; Escape closes it. Editing the proposal
+invalidates its previous storm result, and resetting or changing a study ignores
+late responses from the previous study.
+
+Physical intervention areas and costs exclude open water. Absorption scores
+remain normalized over land; retention volumes use unrounded coefficients so
+small interventions retain their benefit. See [delivery and validation scope](docs/elevation-delivery.md).
+
+
 [![status](https://img.shields.io/badge/status-v0.4-brightgreen.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](./LICENSE)
 [![CI](https://img.shields.io/badge/CI-Passing-success.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver/actions)
