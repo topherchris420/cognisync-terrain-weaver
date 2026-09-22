@@ -47,13 +47,21 @@ export function syntheticElevation(
       const lng = bbox.west + ((col + 0.5) / cols) * (bbox.east - bbox.west);
       const northing = (lat - bbox.south) / Math.max(1e-9, bbox.north - bbox.south);
       const easting = (lng - bbox.west) / Math.max(1e-9, bbox.east - bbox.west);
-      return (
-        18 +
-        northing * 42 +
-        Math.sin(lat * 48) * 6.5 +
-        Math.cos(lng * 31) * 4.2 +
-        easting * 7
-      );
+
+      // Regional slope inland to shore
+      const regionalSlope = 12 + northing * 32 + easting * 10;
+      // Ridge topography and natural landform undulation
+      const ridgeHeight =
+        Math.sin(northing * Math.PI * 2.5 + easting * 1.8) * 8.5 +
+        Math.cos(easting * Math.PI * 3.2 - northing * 1.5) * 5.2;
+      // Valley carving along primary drainage axis
+      const valleyAxis = Math.abs(easting - (0.4 + northing * 0.35));
+      const valleyCarve = Math.exp(-valleyAxis * 6.0) * 9.0;
+      // Micro-terrain detail for natural hydro-flow channeling
+      const detail =
+        Math.sin(lat * 80 + lng * 60) * 1.8 + Math.cos(lat * 120 - lng * 90) * 1.2;
+
+      return Math.max(2.0, regionalSlope + ridgeHeight - valleyCarve + detail);
     })
   );
   return {

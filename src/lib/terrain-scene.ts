@@ -111,8 +111,8 @@ export function hillshadeLayer(
     source: TERRARIUM_SOURCE_ID,
     paint: {
       "hillshade-exaggeration": exaggeration,
-      "hillshade-shadow-color": "#07110e",
-      "hillshade-highlight-color": "#f4f7ea",
+      "hillshade-shadow-color": "#050e14",
+      "hillshade-highlight-color": "#fffbf0",
       "hillshade-illumination-direction": 315,
       "hillshade-illumination-anchor": "map",
     },
@@ -140,11 +140,13 @@ export function buildingsLayer(): FillExtrusionLayerSpecification {
         ["linear"],
         ["coalesce", ["get", "render_height"], 8],
         0,
-        "#d9d3c7",
-        28,
-        "#b7c3c8",
-        90,
-        "#8e9aa3",
+        "#e5e0d8",
+        15,
+        "#d5d0c5",
+        45,
+        "#b2bec3",
+        120,
+        "#7f8c8d",
       ],
       "fill-extrusion-height": [
         "case",
@@ -153,7 +155,7 @@ export function buildingsLayer(): FillExtrusionLayerSpecification {
         8,
       ],
       "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-      "fill-extrusion-opacity": 0.78,
+      "fill-extrusion-opacity": 0.85,
       "fill-extrusion-vertical-gradient": true,
     },
   };
@@ -163,9 +165,9 @@ export function buildingsLayer(): FillExtrusionLayerSpecification {
 export function terrainLight(): LightSpecification {
   return {
     anchor: "map",
-    position: [1.4, 315, 42],
-    color: "#fff6ea",
-    intensity: 0.62,
+    position: [1.35, 315, 45],
+    color: "#fff8ee",
+    intensity: 0.75,
   };
 }
 
@@ -181,13 +183,13 @@ export function flatMapLight(): LightSpecification {
 
 export function terrainSky(): SkySpecification {
   return {
-    "sky-color": "#8ec6ea",
-    "horizon-color": "#f4f7f5",
-    "fog-color": "#d5e3ea",
-    "fog-ground-blend": 0.16,
-    "horizon-fog-blend": 0.32,
-    "sky-horizon-blend": 0.52,
-    "atmosphere-blend": 0.65,
+    "sky-color": "#7bb5e3",
+    "horizon-color": "#eef4f8",
+    "fog-color": "#cde0ec",
+    "fog-ground-blend": 0.12,
+    "horizon-fog-blend": 0.28,
+    "sky-horizon-blend": 0.48,
+    "atmosphere-blend": 0.72,
   };
 }
 
