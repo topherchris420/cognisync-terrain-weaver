@@ -103,6 +103,13 @@ import type { InterventionFeature } from "@/lib/counterfactual/types";
 const STORM_RAINFALL_MM = 50;
 const STORM_RESOLUTION = "medium" as const;
 
+const RELIEF_PRESETS: ReadonlyArray<{ label: string; value: number | null; title: string }> = [
+  { label: "Auto", value: null, title: "Scale relief to the ground in view" },
+  { label: "1×", value: 1, title: "Show relief at true scale" },
+  { label: "3×", value: 3, title: "Stretch relief 3× vertically" },
+  { label: "6×", value: 6, title: "Stretch relief 6× vertically" },
+];
+
 const SURFACE_PROVENANCE = [
   {
     sourceId: "mannahatta-land-cover",
@@ -200,7 +207,9 @@ export default function Analyze() {
   const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
   const [interventionFeatures, setInterventionFeatures] = useState<InterventionFeature[]>([]);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
-  const [terrainExaggeration, setTerrainExaggeration] = useState<number>(6.0);
+  /** null follows the local relief in view. */
+  const [terrainExaggeration, setTerrainExaggeration] = useState<number | null>(null);
+  const [liveRelief, setLiveRelief] = useState<number | null>(null);
   const [stormRainfallMm, setStormRainfallMm] = useState(STORM_RAINFALL_MM);
   const [stormResolution, setStormResolution] = useState<"low" | "medium" | "high">(STORM_RESOLUTION);
   const [simWarnings, setSimWarnings] = useState<string[]>([]);
@@ -624,7 +633,8 @@ export default function Analyze() {
             initialCenter={[initialView.lng, initialView.lat]}
             initialZoom={initialView.zoom}
             terrainEnabled={terrainEnabled}
-            terrainExaggeration={terrainExaggeration}
+            terrainExaggeration={terrainExaggeration ?? undefined}
+            onReliefChange={setLiveRelief}
             onReady={() => {
               setMapReady(true);
               const bounds = mapRef.current?.getBounds();
@@ -805,9 +815,12 @@ export default function Analyze() {
           )}
           {terrainEnabled && (
             <p className="max-w-[18rem] rounded-md border border-border bg-card/90 px-3 py-1.5 text-right text-[10px] leading-snug text-muted-foreground shadow-md backdrop-blur-md">
-              {simResult
-                ? "Pitched relief and buildings. Flood columns follow modeled depth, scaled with the terrain."
-                : "Pitched relief and buildings. The vertical scale eases as you zoom into the block."}
+              {terrainExaggeration === null
+                ? "Auto relief: the vertical scale follows the ground in view, so flat districts get lift and hills stay close to true scale."
+                : terrainExaggeration === 1
+                  ? "True scale: relief at its measured height."
+                  : `Relief stretched ${terrainExaggeration}× vertically. Buildings keep their real height.`}
+              {simResult && " Flood columns follow modeled depth at the same scale."}
             </p>
           )}
           <div className="flex items-center gap-2">
@@ -829,25 +842,32 @@ export default function Analyze() {
           >
             <Mountain className={cn("h-3.5 w-3.5", terrainEnabled && "text-primary")} />
             <span className="hidden sm:inline">
-              {terrainEnabled ? `3D on (${terrainExaggeration.toFixed(1)}x)` : "3D terrain"}
+              {terrainEnabled
+                ? `3D on${liveRelief === null ? "" : ` (${liveRelief.toFixed(1)}×)`}`
+                : "3D terrain"}
             </span>
           </button>
           {terrainEnabled && (
-            <div className="flex items-center gap-1 rounded-md border border-border bg-card/90 backdrop-blur-md p-1 shadow-md text-xs">
-              {[3.5, 6.0, 10.0].map((exag) => (
+            <div
+              role="group"
+              aria-label="Vertical relief scale"
+              className="flex items-center gap-1 rounded-md border border-border bg-card/90 backdrop-blur-md p-1 shadow-md text-xs"
+            >
+              {RELIEF_PRESETS.map((preset) => (
                 <button
-                  key={exag}
+                  key={preset.label}
                   type="button"
-                  onClick={() => setTerrainExaggeration(exag)}
+                  onClick={() => setTerrainExaggeration(preset.value)}
+                  aria-pressed={terrainExaggeration === preset.value}
                   className={cn(
                     "px-2 py-0.5 rounded font-mono text-[11px] transition-colors",
-                    terrainExaggeration === exag
+                    terrainExaggeration === preset.value
                       ? "bg-primary text-primary-foreground font-semibold"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
-                  title={`Set 3D relief exaggeration to ${exag.toFixed(1)}x`}
+                  title={preset.title}
                 >
-                  {exag.toFixed(1)}x
+                  {preset.label}
                 </button>
               ))}
             </div>
