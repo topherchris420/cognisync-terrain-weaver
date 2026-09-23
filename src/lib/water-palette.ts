@@ -20,3 +20,6 @@ export function depthColor(depthM: number): string {
 
 export const FLOW_HEAD = "rgba(118, 205, 228, 0.28)";
 export const FLOW_MOUTH = "rgba(196, 244, 255, 1)";
+
+/** Search radius for a click on ponded water, in CSS pixels. */
+export const POND_HIT_PX = 10;

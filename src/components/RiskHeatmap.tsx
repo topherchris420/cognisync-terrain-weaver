@@ -4,7 +4,7 @@ import maplibregl, { Map as MLMap, GeoJSONSource, Popup } from "maplibre-gl";
 import type { ExpressionSpecification } from "maplibre-gl";
 import type { RiskZone } from "@/lib/simulation-types";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
-import { DEPTH_RAMP, depthColor } from "@/lib/water-palette";
+import { DEPTH_RAMP, POND_HIT_PX, depthColor } from "@/lib/water-palette";
 
 interface RiskHeatmapProps {
   riskZones?: RiskZone[];
@@ -23,6 +23,7 @@ const RISK_OUTLINE_LAYER_ID = "risk-zones-outline-layer";
 const HEAT_SOURCE_ID = "risk-zones-heat-source";
 const HEAT_LAYER_ID = "risk-zones-heat-layer";
 const HEAT_OPACITY = 0.9;
+
 
 /** Ponding appears once the flow front has mostly crossed the study area. */
 const FILL_DELAY_MS = 1500;
@@ -294,29 +295,54 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
   useEffect(() => {
     if (!map || !safeHasStyle(map)) return;
 
-    const handleMouseEnter = () => {
+    // Pools render softer and wider than their cells, so a click anywhere on
+    // the water resolves to the nearest modeled cell within a few pixels.
+    const nearestCell = (point: maplibregl.Point) => {
+      if (!safeGetLayer(map, RISK_LAYER_ID)) return null;
+      const r = POND_HIT_PX;
+      const hits = map.queryRenderedFeatures(
+        [
+          [point.x - r, point.y - r],
+          [point.x + r, point.y + r],
+        ],
+        { layers: [RISK_LAYER_ID] }
+      );
+      let best: { feature: maplibregl.MapGeoJSONFeature; center: [number, number]; d: number } | null = null;
+      for (const feature of hits) {
+        if (feature.geometry.type !== "Polygon") continue;
+        const ring = feature.geometry.coordinates[0].slice(0, -1);
+        const center: [number, number] = [
+          ring.reduce((sum, p) => sum + p[0], 0) / ring.length,
+          ring.reduce((sum, p) => sum + p[1], 0) / ring.length,
+        ];
+        const px = map.project(center);
+        const d = Math.hypot(px.x - point.x, px.y - point.y);
+        if (!best || d < best.d) best = { feature, center, d };
+      }
+      return best;
+    };
+
+    const handleMove = (e: maplibregl.MapMouseEvent) => {
       try {
-        map.getCanvas().style.cursor = "pointer";
+        const over = Boolean(nearestCell(e.point));
+        const canvas = map.getCanvas();
+        if (over) canvas.style.cursor = "pointer";
+        else if (canvas.style.cursor === "pointer" && !map.queryRenderedFeatures(e.point, { layers: ["flow-paths-layer"].filter((id) => safeGetLayer(map, id)) }).length) canvas.style.cursor = "";
       } catch {
         // Ignore cursor updates if canvas is unavailable
       }
     };
 
-    const handleMouseLeave = () => {
-      try {
-        map.getCanvas().style.cursor = "";
-      } catch {
-        // Ignore cursor updates if canvas is unavailable
-      }
-    };
-
-    const handleClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-      if (!e.features || e.features.length === 0) return;
-      const props = e.features[0].properties || {};
+    const handleClick = (e: maplibregl.MapMouseEvent) => {
+      const hit = nearestCell(e.point);
+      if (!hit) return;
+      const props = hit.feature.properties || {};
       const level = (props.level as RiskZone["level"]) || "moderate";
       const areaM2 = Number(props.affected_area_km2 || 0) * 1e6;
       const depth = Number(props.depth_m || 0);
-      const depthText = depth >= 1 ? `${depth.toFixed(2)} m` : `${Math.round(depth * 100)} cm`;
+      // The engine caps standing depth at 4 m; a capped cell is "at least" that.
+      const depthText =
+        depth >= 4 ? "4 m or more" : depth >= 1 ? `${depth.toFixed(2)} m` : `${Math.round(depth * 100)} cm`;
 
       const html = `
         <div class="atlas-popup">
@@ -332,23 +358,19 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
 
       if (popupRef.current) popupRef.current.remove();
       popupRef.current = new maplibregl.Popup({ closeButton: true, className: "atlas-map-popup", maxWidth: "260px" })
-        .setLngLat(e.lngLat)
+        .setLngLat(hit.center)
         .setHTML(html)
         .addTo(map);
     };
 
     if (safeGetLayer(map, RISK_LAYER_ID)) {
-      map.on("mouseenter", RISK_LAYER_ID, handleMouseEnter);
-      map.on("mouseleave", RISK_LAYER_ID, handleMouseLeave);
-      map.on("click", RISK_LAYER_ID, handleClick);
+      map.on("mousemove", handleMove);
+      map.on("click", handleClick);
     }
 
     return () => {
-      if (safeGetLayer(map, RISK_LAYER_ID)) {
-        map.off("mouseenter", RISK_LAYER_ID, handleMouseEnter);
-        map.off("mouseleave", RISK_LAYER_ID, handleMouseLeave);
-        map.off("click", RISK_LAYER_ID, handleClick);
-      }
+      map.off("mousemove", handleMove);
+      map.off("click", handleClick);
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;

@@ -5,7 +5,7 @@ import type { FeatureCollection } from "geojson";
 import type { FlowPath } from "@/lib/simulation-types";
 import { smoothFlowPoints } from "@/lib/simulation";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
-import { FLOW_HEAD as HEAD, FLOW_MOUTH as MOUTH } from "@/lib/water-palette";
+import { FLOW_HEAD as HEAD, FLOW_MOUTH as MOUTH, POND_HIT_PX } from "@/lib/water-palette";
 
 interface FlowLayerProps {
   flowPaths?: FlowPath[];
@@ -298,6 +298,21 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
 
     const handleClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
       if (!e.features || e.features.length === 0) return;
+      // Where a path runs through ponded water, the pool's depth is the
+      // answer people are looking for; it owns the click.
+      const r = POND_HIT_PX;
+      if (
+        safeGetLayer(map, "risk-zones-layer") &&
+        map.queryRenderedFeatures(
+          [
+            [e.point.x - r, e.point.y - r],
+            [e.point.x + r, e.point.y + r],
+          ],
+          { layers: ["risk-zones-layer"] }
+        ).length > 0
+      ) {
+        return;
+      }
       const feat = e.features[0];
       const props = feat.properties || {};
       const vol = Number(props.volume_m3 || 0);
