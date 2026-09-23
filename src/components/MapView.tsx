@@ -81,7 +81,6 @@ function setLayerVisibility(map: MLMap, id: string, visibility: "visible" | "non
 }
 
 /** Atmosphere drawn behind a pitched camera. */
-const SKY_LAYER_ID = "sky-atmosphere";
 /** Camera pitch used when a caller sets an explicit relief factor. */
 const EXPLICIT_RELIEF_PITCH = 74;
 
@@ -130,22 +129,6 @@ export function applyElevationOverlays(
         "hillshade-exaggeration",
         hillshadeExaggeration
       );
-    }
-
-    if (typeof map.getLayer === "function" && !map.getLayer(SKY_LAYER_ID)) {
-      try {
-        map.addLayer({
-          id: SKY_LAYER_ID,
-          type: "sky",
-          paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0.0, 90.0],
-            "sky-atmosphere-sun-intensity": 15,
-          },
-        } as unknown as maplibregl.LayerSpecification);
-      } catch {
-        // Sky layer unsupported or style pending
-      }
     }
 
     if (!terrainEnabled) {
