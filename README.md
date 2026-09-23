@@ -9,26 +9,6 @@
 
 # Mannahatta · Urban Resilience Intelligence
 
-### Resilience decision workbench
-
-Open **Explore an example**, then **Mitigation** to try the rainfall sensitivity
-workbench without an analysis-service request. Compare current and proposed
-runoff across 0-200 mm of rain, inspect conserved water budgets, and expand
-the chart's exact data table. This is a fixed-coefficient, land-only planning
-estimate, distinct from the terrain-routed D8 storm; saturation, sewer capacity,
-flood depth and peak discharge are not inferred from this chart.
-
-Draw interventions inside the study footprint, route the sealed storm again,
-then use the synchronized split map to inspect both surfaces. Arrow keys,
-Home/End and touch control the divider; Escape closes it. Editing the proposal
-invalidates its previous storm result, and resetting or changing a study ignores
-late responses from the previous study.
-
-Physical intervention areas and costs exclude open water. Absorption scores
-remain normalized over land; retention volumes use unrounded coefficients so
-small interventions retain their benefit. See [delivery and validation scope](docs/elevation-delivery.md).
-
-
 [![status](https://img.shields.io/badge/status-v0.4-brightgreen.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](./LICENSE)
 [![CI](https://img.shields.io/badge/CI-Passing-success.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver/actions)
@@ -36,62 +16,98 @@ small interventions retain their benefit. See [delivery and validation scope](do
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](https://github.com/topherchris420/cognisync-terrain-weaver/pulls)
 
-> **Point it at any city block. Get a quantitative climate-resilience diagnostic, a closed water-balance, and a D8 hydrograph back in seconds — in the browser.**
+> **Explore how your neighborhood absorbs rainfall, predict flood risks, and design green solutions—right in your browser.**
 
-**Mannahatta** is an open-source, full-stack geospatial intelligence platform. It turns satellite imagery and high-resolution SRTM elevation grids into real-time surface permeability ledgers, **Urban Absorption Scores**, cloudburst flood hydrographs, and actionable green-infrastructure adaptation roadmaps.
+---
 
-Engineers, urban planners, and municipal climate teams can stress-test depaving interventions, bioswales, green roofs, and tree canopy expansions, simulate **50 mm** design storm hydrographs with real D8 steepest-downhill flow accumulation, inspect animated vector particle flow paths, and generate publication-grade vector PDF dossiers, GeoJSON spatial layers, and tabular CSV analytical datasets.
+## 💡 What is Mannahatta? (In Plain English)
+
+**Mannahatta** is an easy-to-use, open-source web application that helps anyone—from curious residents to city planners—see how well city blocks handle rainwater and heavy storms.
+
+### The Problem
+In modern cities, concrete buildings and asphalt roads cover up natural soil and plants. When heavy rain hits, water cannot soak into the ground. Instead, it rushes down streets as **stormwater runoff**, overloading sewer systems and causing flash floods.
+
+### The Solution
+Mannahatta lets you point a map at any city neighborhood to immediately see:
+1. **How much water the ground can absorb** (an *Urban Absorption Score* from 0 to 100).
+2. **Where floodwater will flow** during severe storms.
+3. **How adding nature back** (like planting trees, rain gardens, green roofs, or porous pavement) can reduce flooding and what it would cost.
 
 ---
 
 ## 🗺 Table of Contents
 
-- [✨ Mission & Origins](#-mission--origins)
-- [⚡ Key Capabilities](#-key-capabilities)
-- [🏛 Architecture & Hydrodynamics](#-architecture--hydrodynamics)
-- [📊 The Urban Absorption Score](#-the-urban-absorption-score)
-- [🌿 The 1609 Ecological Baseline](#-the-1609-ecological-baseline)
-- [🌊 Hydrological Storm Engine](#-hydrological-storm-engine)
-- [🛠 Green Infrastructure Mitigation Studio](#-green-infrastructure-mitigation-studio)
-- [📑 GIS Exports & Data Interoperability](#-gis-exports--data-interoperability)
-- [💻 Tech Stack](#-tech-stack)
-- [🚀 Quickstart Guide](#-quickstart-guide)
+- [💡 What is Mannahatta?](#-what-is-mannahatta-in-plain-english)
+- [✨ The Story Behind the Name](#-the-story-behind-the-name)
+- [🚀 Quick Start: How to Use Mannahatta](#-quick-start-how-to-use-mannahatta)
+- [🌿 Green Solutions You Can Test](#-green-solutions-you-can-test)
+- [🔬 For Engineers & Scientists (Technical Deep-Dive)](#-for-engineers--scientists-technical-deep-dive)
+  - [🏛 Architecture & Hydrodynamics](#-architecture--hydrodynamics)
+  - [📊 The Urban Absorption Score Calculation](#-the-urban-absorption-score-calculation)
+  - [🌊 Hydrological Storm Engine & D8 Flow](#-hydrological-storm-engine--d8-flow)
+  - [📑 GIS Exports & Interoperability](#-gis-exports--interoperability)
+- [💻 Tech Stack & Local Setup](#-tech-stack--local-setup)
 - [📁 Repository Blueprint](#-repository-blueprint)
 - [🗺 Product Roadmap](#-product-roadmap)
 - [🤝 Contributing & License](#-contributing--license)
 
 ---
 
-## ✨ Mission & Origins
+## ✨ The Story Behind the Name
 
-Before Manhattan was a dense grid of asphalt, concrete, and high-rises, it was **Mannahatta**—the "Island of Many Hills" as known by the Lenape people. In 1609, the island boasted over 66 miles of surface streams, rich freshwater wetlands, mature old-growth forests, and zero engineered impervious surfaces.
+Before New York City was a sea of concrete and skyscrapers, the island was known as **Mannahatta** ("Island of Many Hills") by the Lenape people. In 1609, the island had over 66 miles (106 km) of natural streams, lush wetlands, and thick forests that naturally absorbed rain.
 
-Modern cities have capped natural hydrology with impermeable gray infrastructure. During intense cloudburst precipitation, municipal drainage systems collapse under excess runoff.
-
-**Mannahatta** bridges 400 years of environmental change by evaluating every urban block against its pre-development ecological potential, empowering cities to design nature-based stormwater solutions with precision and economic confidence.
+Today, Mannahatta (the app) uses that 1609 natural baseline as a benchmark ($79.1 / 100$). It compares modern concrete neighborhoods against their original natural potential, showing us how we can bring nature back into our cities to prevent flooding.
 
 ---
 
-## ⚡ Key Capabilities
+## 🚀 Quick Start: How to Use Mannahatta
 
-| Capability | Engine / Module | Description |
+You don't need any special engineering knowledge to use Mannahatta! Here is how to get started in 4 simple steps:
+
+### 1. Choose a Location 📍
+Search for any address or city block (or pick a preset like *Manhattan*, *Copenhagen*, *Jakarta*, *Phoenix*, or *Lagos*).
+
+### 2. View the Absorption Score 📊
+Mannahatta analyzes satellite imagery to classify ground surfaces into 5 types: *Vegetation*, *Bare Soil*, *Water*, *Buildings*, and *Pavement*. You get an **Urban Absorption Score (0–100)**:
+- 🟢 **Resilient (55–100)**: Parks and soil absorb most rainfall naturally. Low flood risk.
+- 🟡 **Vulnerable (35–54)**: Moderate concrete cover. Up to half of rainfall turns into runoff.
+- 🔴 **Critical (0–34)**: Mostly concrete and asphalt. High flood risk during storms.
+
+### 3. Simulate a Storm 🌧
+Run a **50 mm** storm simulation to watch simulated rain flow across the 3D terrain. Animated arrows show downhill water flow paths and high-risk flood accumulation areas.
+
+### 4. Design Green Infrastructure 🌳
+Use the built-in drawing tool to draw green solutions directly on the map. Instantly see how much stormwater they save, how much the score improves, and the estimated setup cost. Compare "Before" and "After" maps with an interactive split-screen slider!
+
+---
+
+## 🌿 Green Solutions You Can Test
+
+In the app's **Mitigation Studio**, you can draw 4 types of nature-based solutions ("green infrastructure") over paved or roof areas:
+
+| Green Solution | What It Does | Best Used On |
 |---|---|---|
-| 🛰 **High-Res Satellite Canvas** | `MapView.tsx` | MapLibre GL raster/vector canvas backed by Esri World Imagery with Sentinel-2 cloudless fallback |
-| 🔍 **Global Geocoding & Presets** | `LocationSearch.tsx` | OpenStreetMap Nominatim geocoder with quick-jump presets (*Manhattan*, *Copenhagen*, *Jakarta*, *Phoenix*, *Lagos*) |
-| 📐 **Bounding Box Surface Calc** | `geo.ts` | Real-time viewport bounding box area calculation in $km^2$ and hectares ($ha$) |
-| 🧪 **5-Class Surface Permeability** | `analyze-terrain` | Computer-vision satellite breakdown into *Vegetation*, *Bare Soil*, *Water*, *Buildings*, and *Pavement* |
-| 🎯 **Urban Absorption Score (0–100)** | `absorption.ts` | Weighted surface permeability score with risk banding (*Resilient*, *Vulnerable*, *Critical*) |
-| 🌲 **1609 Ecological Baseline** | `baseline.ts` | Pre-development reference benchmark ($79.1 / 100$) derived from Lenapehoking historical ecology |
-| 🌊 **50 mm Cloudburst Simulation** | `src/lib/hydrology` | Client-side D8 flow accumulation over Mapzen Terrarium DEM (SRTM-derived), with land-cover retention and intervention modifiers |
-| 🌀 **Animated WebGL Flow Vectors** | `FlowLayer.tsx` | Particle flow direction paths and flood risk inundation heatmaps with toggleable layers |
-| ⛰ **3D Terrain** | `MapView.tsx` | MapLibre raster-DEM + hillshade from Terrarium tiles; analysis captures flatten to nadir so vision classification stays honest |
-| 🛠 **Mitigation Scenario Studio** | `ScenarioStudio.tsx` | Interactive polygon drawing for bioswales, green roofs, permeable pavement, and tree canopy |
-| 🪞 **Counterfactual Comparison** | `CompareRealities.tsx` | Synchronized dual-map split-screen visual slider comparing baseline vs mitigated states |
-| 📁 **GIS Dossier & Vector Export** | `pdf-export.ts` | One-click export of executive vector PDF dossiers, RFC 7946 GeoJSON layers, and tabular CSV datasets |
+| 🌳 **Tree Canopy** | Tree leaves catch rain and root systems absorb ground water. | Sidewalks, parking lots, open ground |
+| 🌾 **Bioswales & Rain Gardens** | Shallow, vegetated ditches designed to collect and soak up rainwater runoff. | Pavement edges, road shoulders |
+| 🧱 **Permeable Pavement** | Special porous asphalt or brick pavers that allow water to drain straight through. | Parking lots, sidewalks, driveways |
+| 🪴 **Green Roofs** | Planted rooftop gardens that capture rain before it reaches street level. | Building rooftops |
+
+The app automatically calculates the estimated implementation cost (CAPEX in USD) and how many cubic meters ($m^3$) of stormwater runoff are saved each year.
 
 ---
 
-## 🏛 Architecture & Hydrodynamics
+## 🔬 For Engineers & Scientists (Technical Deep-Dive)
+
+> **Note for developers, GIS analysts, and hydrologists:** The sections below cover the mathematical models, edge functions, raster algorithms, and tech stack driving Mannahatta.
+
+### Workbench Capabilities
+
+Open **Explore an example**, then **Mitigation** to try the rainfall sensitivity workbench without requiring an analysis-service request. Compare current and proposed runoff across 0–200 mm of rain, inspect conserved water budgets, and expand the chart's exact data table. This is a fixed-coefficient, land-only planning estimate, distinct from the terrain-routed D8 storm; saturation, sewer capacity, flood depth, and peak discharge are not inferred from this chart.
+
+Physical intervention areas and costs exclude open water. Absorption scores remain normalized over land; retention volumes use unrounded coefficients so small interventions retain their benefit. See [delivery and validation scope](docs/elevation-delivery.md).
+
+### 🏛 Architecture & Hydrodynamics
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -123,19 +139,13 @@ Modern cities have capped natural hydrology with impermeable gray infrastructure
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 📊 The Urban Absorption Score
+### 📊 The Urban Absorption Score Calculation
 
 The **Urban Absorption Score** is a standardized **0–100** index representing the fraction of precipitation naturally absorbed into the ground.
 
-Each surface class weight ($w_i = 1 - C_i$) is calculated directly from the **Rational Method** runoff coefficient ($Q = CiA$), standard in urban stormwater hydrology (ASCE / Chow, Maidment & Mays):
+Each surface class weight ($w_i = 1 - C_i$) is calculated directly from the **Rational Method** runoff coefficient ($Q = C i A$), standard in urban stormwater hydrology (ASCE / Chow, Maidment & Mays):
 
-```
-             ∑ ( Area_i × Weight_i )
-Absorption = ─────────────────────── × 100
-                 Total Land Area
-```
+$$\text{Absorption} = \frac{\sum (\text{Area}_i \times w_i)}{\text{Total Land Area}} \times 100$$
 
 | Surface Class | Rational Coefficient ($C$) | Absorption Weight ($w_i$) | Hydrological Rationale |
 |---|:---:|:---:|---|
@@ -145,32 +155,11 @@ Absorption = ──────────────────────�
 | 🛣 **Pavement** | `0.70 – 0.95` | **0.12** | Asphalt, concrete roads, parking lots, and sidewalks |
 | 💧 **Water** | *Excluded* | *Excluded* | Open water bodies represent existing hydrologic storage; excluded from denominator |
 
-### Flood Risk Banding Classification
+### 🌊 Hydrological Storm Engine & D8 Flow
 
-- 🟢 **55 – 100 · Resilient (Low Risk)**: Natural soils and canopy absorb the vast majority of storm precipitation.
-- 🟡 **35 – 54 · Vulnerable (Moderate Risk)**: Up to half of storm precipitation turns into surface runoff, straining municipal sewers.
-- 🔴 **0 – 34 · Critical (High Risk)**: Two-thirds or more sheds immediately as surface runoff; extreme risk for cloudburst inundation.
+Storm routing runs directly **in the browser**. The same sealed storm and terrain are applied to NOW (classified land cover) and POSSIBLE (drawn green infrastructure). The live OpenTopography edge function is no longer required for a closed water-balance.
 
----
-
-## 🌿 The 1609 Ecological Baseline
-
-Every scanned urban site is benchmarked against Manhattan’s **1609 pre-development ecological baseline**.
-
-Based on Eric W. Sanderson's landmark *Welikia Project* (Wildlife Conservation Society), pre-colonial Mannahatta featured:
-- **66 miles** of natural surface streams and creeks
-- **21+** distinct wetland and marsh habitats
-- **Zero** engineered impervious surfaces
-
-Using Mannahatta's surface absorption formula, pre-development Manhattan scores **79.1 / 100** (not 100, because pristine woodland and soils still shed 5%–25% during intense storms). This historical benchmark gives cities a clear, scientifically honest target for urban ecological restoration.
-
----
-
-## 🌊 Hydrological Storm Engine
-
-Storm routing now runs **in the browser**. The same sealed storm and the same terrain are applied to NOW (classified land cover) and POSSIBLE (drawn green infrastructure). The live OpenTopography edge function is no longer required for a closed water-balance.
-
-When a user triggers a storm, the engine models a **50 mm / 60 min** uniform design cloudburst:
+When a user triggers a storm simulation, the engine models a **50 mm / 60 min** uniform design cloudburst:
 
 ```
                        D8 Steepest Downhill Direction Matrix
@@ -180,36 +169,13 @@ When a user triggers a storm, the engine models a **50 mm / 60 min** uniform des
                                  [ +1, -1 ]  [ +1,  0 ]  [ +1, +1 ]
 ```
 
-1. **Elevation**: Mapzen Terrarium tiles (SRTM-derived, CORS-open) sampled onto the study grid. If tiles are unreachable, a deterministic slope surface is used and labelled *illustrative*.
-2. **Land-cover retention**: Each cell starts at `1 − C`, where `C` is the composite Rational Method runoff coefficient of the classified mix. Drawn interventions add a retention delta only on overlaying cells.
+1. **Elevation**: Mapzen Terrarium tiles (SRTM-derived, CORS-open) sampled onto the study grid. If tiles are unreachable, a deterministic slope surface is used and labeled *illustrative*.
+2. **Land-cover retention**: Each cell starts at $1 - C$, where $C$ is the composite Rational Method runoff coefficient of the classified mix. Drawn interventions add a retention delta only on overlaying cells.
 3. **D8 routing**: Steepest-downhill accumulation, flow paths, inundation zones, and impact points.
-4. **Closed water-balance**: rainfall = infiltrated + stored + runoff, plus an SCS-style triangular hydrograph scaled so ∫Q dt equals runoff volume.
-5. **Paired identities**: NOW and POSSIBLE share one storm hash and one elevation hash. Compare is refused until those identities match.
+4. **Closed water-balance**: $\text{rainfall} = \text{infiltrated} + \text{stored} + \text{runoff}$, plus an SCS-style triangular hydrograph scaled so $\int Q \, dt$ equals runoff volume.
+5. **Paired identities**: NOW and POSSIBLE share one storm hash and one elevation hash. Comparison is prevented until those identities match.
 
----
-
-## 🛠 Green Infrastructure Mitigation Studio
-
-Planners can draw custom intervention polygons over impervious surfaces to model green infrastructure retrofits in real time:
-
-| Intervention Strategy | Target Surface | Effective Weight ($w_{\text{target}}$) | Unit Capital Cost |
-|---|---|:---:|:---:|
-| 🌳 **Urban Tree Canopy** | Pavement / Soil | **1.00** | $45 / m² |
-| 🌾 **Bioswales & Rain Gardens** | Pavement | **0.90** | $65 / m² |
-| 🧱 **Permeable Paving** | Pavement | **0.75** | $150 / m² |
-| 🪴 **Extensive Green Roofs** | Buildings | **0.60** | $180 / m² |
-
-### Investment & Impact Economics
-
-The engine calculates financial and ecological ROI:
-- **Absorption Gain**: $\Delta\text{Score} = \text{AreaFraction} \times (w_{\text{target}} - w_{\text{source}}) \times 100$
-- **Annual Stormwater Retention Gain**: Expressed in $m^3 / \text{yr}$ saved from municipal storm sewers
-- **Capital Expenditure (CAPEX)**: Total projected implementation cost in USD ($)
-- **Payback Horizon**: Estimated break-even timeframe based on municipal stormwater utility fee offsets
-
----
-
-## 📑 GIS Exports & Data Interoperability
+### 📑 GIS Exports & Interoperability
 
 - 📄 **Executive Vector PDF Dossiers**: Formatted multi-page reports complete with score gauges, land-cover ledgers, flood-risk warnings, and intervention economic tables (`pdf-export.ts`).
 - 🗺 **RFC 7946 GeoJSON Layers**: Standard vector layers with spatial properties for direct import into **QGIS**, **ArcGIS Pro**, **Felt**, or **PostGIS**.
@@ -217,31 +183,20 @@ The engine calculates financial and ecological ROI:
 
 ---
 
-## 💻 Tech Stack
+## 💻 Tech Stack & Local Setup
 
-### Frontend Client
-- **Framework**: React 18, TypeScript, Vite 5
-- **Styling & UI**: Tailwind CSS, Radix UI primitives, Lucide React icons, Sonner toasts
-- **Map & Spatial Canvas**: MapLibre GL JS, `@turf/turf`, `@mapbox/mapbox-gl-draw`
-- **Charts & Graphics**: Recharts, `html-to-image`, `jspdf`
-
-### Edge Functions & Serverless Backend
-- **Runtime**: Deno, TypeScript
-- **Database & Auth**: Supabase Postgres + PostGIS, `@supabase/supabase-js`
-- **Vision AI**: Google Gemini Vision API (`analyze-terrain`) for live land-cover classification
-- **Terrain**: Mapzen Terrarium DEM tiles in the client; OpenTopography remains available on the edge function for legacy callers
-
-### Verification & Testing
-- **Test Runner**: Vitest, `@testing-library/react`, `jsdom`
-- **Linting & Types**: ESLint 9, TypeScript `tsc --noEmit`
-
----
-
-## 🚀 Quickstart Guide
+### Tech Stack
+- **Frontend Client**: React 18, TypeScript, Vite 5, Tailwind CSS, Lucide React icons, Radix UI
+- **Maps & GIS Canvas**: MapLibre GL JS, `@turf/turf`, `@mapbox/mapbox-gl-draw`
+- **Charts & Reports**: Recharts, `html-to-image`, `jspdf`
+- **Edge Backend**: Deno, TypeScript, Supabase Postgres + PostGIS
+- **AI & Computer Vision**: Google Gemini Vision API (`analyze-terrain`) for live land-cover classification
+- **Terrain Data**: Mapzen Terrarium DEM tiles (client-side) / OpenTopography API (edge function)
+- **Testing**: Vitest, ESLint 9, TypeScript `tsc --noEmit`
 
 ### Prerequisites
 - **Node.js**: `v18.0.0` or higher
-- **Package Manager**: `npm` (v9+) or `bun`
+- **Package Manager**: `npm` (v9+)
 
 ### Installation & Local Setup
 
