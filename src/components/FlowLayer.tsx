@@ -407,6 +407,10 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
 
     let revealed = false;
     let dashStep = -1;
+    // Progress advances by capped frame steps, so a busy main thread (tiles,
+    // layer uploads) pauses the water rather than letting it jump ahead.
+    let revealClock = 0;
+    let lastFrame = 0;
 
     const animate = (now: number) => {
       if (!safeGetLayer(map, FLOW_LAYER_ID)) {
@@ -414,10 +418,13 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
         return;
       }
       if (!revealed) {
-        const elapsed = now - revealStartRef.current;
-        const t = Math.max(0, Math.min(1, elapsed / REVEAL_MS));
+        if (now >= revealStartRef.current) {
+          revealClock += lastFrame ? Math.min(now - lastFrame, 50) : 0;
+          lastFrame = now;
+        }
+        const t = Math.max(0, Math.min(1, revealClock / REVEAL_MS));
         // Water accelerates off the high ground, then settles as it pools.
-        const eased = 1 - Math.pow(1 - t, 2.2);
+        const eased = 0.5 - 0.5 * Math.cos(Math.PI * t);
         safePaint(map, FLOW_LAYER_ID, "line-gradient", revealGradient(eased));
         safePaint(map, FLOW_GLOW_LAYER_ID, "line-gradient", revealGradient(eased, true));
         if (t >= 1) {
