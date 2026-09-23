@@ -20,7 +20,7 @@
 
 ---
 
-## 💡 What is Mannahatta? (In Plain English)
+## 💡 What is Mannahatta? 
 
 **Mannahatta** is an easy-to-use, open-source web application that helps anyone—from curious residents to city planners—see how well city blocks handle rainwater and heavy storms.
 
