@@ -1,8 +1,11 @@
-import { forwardRef, useImperativeHandle, useEffect, useRef, useCallback } from "react";
+import { forwardRef, useImperativeHandle, useEffect, useRef, useCallback, useState } from "react";
 import maplibregl, { Map as MLMap, GeoJSONSource, Popup } from "maplibre-gl";
+import type { ExpressionSpecification } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import type { FlowPath } from "@/lib/simulation-types";
 import { smoothFlowPoints } from "@/lib/simulation";
+import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
+import { FLOW_HEAD as HEAD, FLOW_MOUTH as MOUTH } from "@/lib/water-palette";
 
 interface FlowLayerProps {
   flowPaths?: FlowPath[];
@@ -22,6 +25,59 @@ const FLOW_GLOW_LAYER_ID = "flow-paths-glow-layer";
 const FLOW_LAYER_ID = "flow-paths-layer";
 const FLOW_ANIMATION_LAYER_ID = "flow-paths-animation-layer";
 
+/** Time for the first drop to travel from every source cell to its outlet. */
+const REVEAL_MS = 2200;
+/** The front is held back until the rain overlay has had a moment to land. */
+const REVEAL_DELAY_MS = 450;
+
+// Paths are ordered source → outlet, so line-progress is distance downhill.
+// Water gathers as it goes: faint at the head, brightest where it collects.
+const FRONT = "rgba(255, 255, 255, 1)";
+const CLEAR = "rgba(118, 205, 228, 0)";
+const GLOW_HEAD = "rgba(47, 170, 214, 0)";
+const GLOW_MOUTH = "rgba(47, 170, 214, 0.55)";
+
+function mix(a: string, b: string, t: number): string {
+  const pa = a.match(/[\d.]+/g)!.map(Number);
+  const pb = b.match(/[\d.]+/g)!.map(Number);
+  const v = pa.map((x, i) => x + (pb[i] - x) * t);
+  return `rgba(${Math.round(v[0])}, ${Math.round(v[1])}, ${Math.round(v[2])}, ${v[3].toFixed(3)})`;
+}
+
+/** A gradient drawn up to `progress`, with a bright wavefront at the leading edge. */
+function revealGradient(progress: number, glow = false): ExpressionSpecification {
+  const head = glow ? GLOW_HEAD : HEAD;
+  const mouth = glow ? GLOW_MOUTH : MOUTH;
+  if (progress >= 1) {
+    return ["interpolate", ["linear"], ["line-progress"], 0, head, 1, mouth];
+  }
+  const p = Math.max(0.002, Math.min(0.996, progress));
+  const behind = Math.max(0.001, p - 0.06);
+  const stops: (number | string)[] = [0, head];
+  if (behind > 0.001) stops.push(behind, mix(head, mouth, behind));
+  stops.push(p, glow ? mouth : FRONT, Math.min(0.999, p + 0.002), CLEAR, 1, CLEAR);
+  return ["interpolate", ["linear"], ["line-progress"], ...stops] as ExpressionSpecification;
+}
+
+// Cycling dash patterns is the supported way to move dashes along a MapLibre
+// line; there is no animatable dash offset.
+const DASH_SEQUENCE: number[][] = [
+  [0, 4, 3],
+  [0.5, 4, 2.5],
+  [1, 4, 2],
+  [1.5, 4, 1.5],
+  [2, 4, 1],
+  [2.5, 4, 0.5],
+  [3, 4, 0],
+  [0, 0.5, 3, 3.5],
+  [0, 1, 3, 3],
+  [0, 1.5, 3, 2.5],
+  [0, 2, 3, 2],
+  [0, 2.5, 3, 1.5],
+  [0, 3, 3, 1],
+  [0, 3.5, 3, 0.5],
+];
+
 function flowPathsToGeoJSON(paths: FlowPath[]): FeatureCollection {
   return {
     type: "FeatureCollection",
@@ -37,15 +93,6 @@ function flowPathsToGeoJSON(paths: FlowPath[]): FeatureCollection {
       },
     })),
   };
-}
-
-function calculateOpacity(volume_m3: number): number {
-  // Normalize volume to 0.3-1.0 opacity range
-  const minOpacity = 0.3;
-  const maxOpacity = 1.0;
-  // Assume typical volume range 0-1000 m3
-  const normalized = Math.min(volume_m3 / 1000, 1);
-  return minOpacity + (maxOpacity - minOpacity) * normalized;
 }
 
 function safeHasStyle(map: MLMap | null | undefined): boolean {
@@ -97,29 +144,54 @@ function safeRemoveSource(map: MLMap | null | undefined, id: string) {
   }
 }
 
+function safePaint(map: MLMap, layerId: string, property: string, value: unknown) {
+  if (!safeGetLayer(map, layerId)) return;
+  try {
+    map.setPaintProperty(layerId, property, value);
+  } catch {
+    // Layer may have been removed between the check and the write.
+  }
+}
+
 const RELIEF_WIDTH = {
-  glow: 12,
+  glow: 14,
   base: 3.5,
-  dash: 4.5,
+  dash: 2.5,
 } as const;
 
 const FLAT_WIDTH = {
-  glow: 8,
-  base: 2,
-  dash: 3,
+  glow: 10,
+  base: 2.25,
+  dash: 1.75,
 } as const;
+
+/** Heavier paths carry more water: scale width by accumulated volume. */
+function volumeWidth(base: number): ExpressionSpecification {
+  return [
+    "interpolate",
+    ["linear"],
+    ["get", "volume_m3"],
+    0,
+    base * 0.6,
+    400,
+    base,
+    2000,
+    base * 1.6,
+  ];
+}
 
 export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function FlowLayer(
   { flowPaths = [], map, relief = false },
   ref
 ) {
+  const reduceMotion = usePrefersReducedMotion();
   const animationFrameRef = useRef<number | null>(null);
-  const dashOffsetRef = useRef(0);
+  const revealStartRef = useRef<number>(0);
+  const [attached, setAttached] = useState(0);
+  const widths = relief ? RELIEF_WIDTH : FLAT_WIDTH;
 
   const addToMap = useCallback(() => {
     if (!map || !safeHasStyle(map)) return;
-
-    if (!map.isStyleLoaded()) return;
 
     // StrictMode and rapid state changes can invoke this more than once.
     // Reuse an existing source instead of attempting to register it again.
@@ -128,87 +200,52 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     if (!safeGetSource(map, FLOW_SOURCE_ID)) {
       map.addSource(FLOW_SOURCE_ID, {
         type: "geojson",
+        lineMetrics: true,
         data: flowPathsToGeoJSON(flowPaths),
       });
     }
 
-    // Add glowing blur layer underneath
+    const initial = reduceMotion ? 1 : 0;
+
     map.addLayer({
       id: FLOW_GLOW_LAYER_ID,
       type: "line",
       source: FLOW_SOURCE_ID,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
+      layout: { "line-join": "round", "line-cap": "round" },
       paint: {
-        "line-color": "#60a5fa",
-        "line-width": 8,
-        "line-blur": 6,
-        "line-opacity": [
-          "interpolate",
-          ["linear"],
-          ["get", "volume_m3"],
-          0,
-          0.1,
-          1000,
-          0.6,
-        ],
+        "line-width": volumeWidth(widths.glow),
+        "line-blur": 8,
+        "line-gradient": revealGradient(initial, true),
       },
     });
 
-    // Add static line layer (base)
     map.addLayer({
       id: FLOW_LAYER_ID,
       type: "line",
       source: FLOW_SOURCE_ID,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
+      layout: { "line-join": "round", "line-cap": "round" },
       paint: {
-        "line-color": "#3b82f6",
-        "line-width": 2,
-        "line-opacity": [
-          "interpolate",
-          ["linear"],
-          ["get", "volume_m3"],
-          0,
-          0.3,
-          1000,
-          1,
-        ],
+        "line-width": volumeWidth(widths.base),
+        "line-gradient": revealGradient(initial),
       },
     });
 
-    // Add animated dashed line layer
     map.addLayer({
       id: FLOW_ANIMATION_LAYER_ID,
       type: "line",
       source: FLOW_SOURCE_ID,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
+      layout: { "line-join": "round", "line-cap": "butt" },
       paint: {
-        "line-color": "#3b82f6",
-        "line-width": 3,
-        "line-dasharray": [2, 4],
-        "line-opacity": [
-          "interpolate",
-          ["linear"],
-          ["get", "volume_m3"],
-          0,
-          0.3,
-          1000,
-          1,
-        ],
+        "line-color": "#f2fdff",
+        "line-width": widths.dash,
+        "line-dasharray": DASH_SEQUENCE[0],
+        "line-opacity": reduceMotion ? 0.55 : 0,
+        "line-opacity-transition": { duration: 900, delay: 0 },
       },
     });
-  }, [map, flowPaths]);
+  }, [map, flowPaths, reduceMotion, widths]);
 
   const removeFromMap = useCallback(() => {
-    // Stop animation
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -216,7 +253,6 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
 
     if (!map) return;
 
-    // Remove layers & source
     safeRemoveLayer(map, FLOW_ANIMATION_LAYER_ID);
     safeRemoveLayer(map, FLOW_LAYER_ID);
     safeRemoveLayer(map, FLOW_GLOW_LAYER_ID);
@@ -226,8 +262,6 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
   const updatePaths = useCallback(
     (paths: FlowPath[]) => {
       if (!map || !safeHasStyle(map)) return;
-
-      if (!map.isStyleLoaded()) return;
 
       let source = safeGetSource(map, FLOW_SOURCE_ID) as GeoJSONSource | undefined;
       if (!source) {
@@ -241,16 +275,6 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     [map, addToMap]
   );
 
-  // Compute dynamic physical velocity step based on flow paths
-  const calculateVelocityStep = useCallback(() => {
-    if (!flowPaths || flowPaths.length === 0) return 0.5;
-    const totalVel = flowPaths.reduce((sum, p) => sum + (p.velocity_mps || 1.5), 0);
-    const avgVel = totalVel / flowPaths.length;
-    // Scale 1 m/s to ~0.3 step, bounded between 0.2 and 2.5
-    return Math.max(0.2, Math.min(2.5, avgVel * 0.25));
-  }, [flowPaths]);
-
-  // Handle interactive hover / click popup inspection
   const popupRef = useRef<Popup | null>(null);
 
   useEffect(() => {
@@ -270,10 +294,6 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
       } catch {
         // Ignore cursor updates if canvas is unavailable
       }
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
-      }
     };
 
     const handleClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
@@ -283,39 +303,27 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
       const vol = Number(props.volume_m3 || 0);
       const vel = Number(props.velocity_mps || 0);
 
-      const energyLevel = vel > 4 ? "High Kinetic Surge" : vel > 2 ? "Moderate Channeling" : "Standard Runoff";
-      const energyColor = vel > 4 ? "text-destructive font-bold" : vel > 2 ? "text-amber-500 font-bold" : "text-primary font-bold";
+      const character = vel > 4 ? "Fast, concentrated flow" : vel > 2 ? "Channelled flow" : "Sheet runoff";
 
       const html = `
-        <div class="p-2 text-xs font-mono bg-card text-foreground rounded shadow-md border border-border min-w-[180px]">
-          <div class="font-bold text-primary mb-1 border-b border-border pb-1 uppercase tracking-wider flex items-center justify-between">
-            <span>Hydrodynamic Flow Vector</span>
-          </div>
-          <div class="space-y-1 mt-1.5">
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">Discharge Volume:</span>
-              <span class="font-bold">${vol.toLocaleString()} m³</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">Flow Velocity:</span>
-              <span class="font-bold">${vel.toFixed(1)} m/s</span>
-            </div>
-            <div class="flex justify-between items-center pt-1 border-t border-border/50 text-[10px]">
-              <span class="text-muted-foreground">Energy Profile:</span>
-              <span class="${energyColor}">${energyLevel}</span>
-            </div>
-          </div>
+        <div class="atlas-popup">
+          <div class="atlas-popup-title"><span class="atlas-popup-swatch atlas-popup-swatch--flow"></span>Flow path</div>
+          <dl>
+            <div><dt>Water carried</dt><dd>${Math.round(vol).toLocaleString()} m³</dd></div>
+            <div><dt>Velocity</dt><dd>${vel.toFixed(1)} m/s</dd></div>
+          </dl>
+          <p>${character}, routed downhill cell to cell (D8).</p>
         </div>
       `;
 
       if (popupRef.current) popupRef.current.remove();
-      popupRef.current = new maplibregl.Popup({ closeButton: true, className: "hydro-vector-popup" })
+      popupRef.current = new maplibregl.Popup({ closeButton: true, className: "atlas-map-popup", maxWidth: "260px" })
         .setLngLat(e.lngLat)
         .setHTML(html)
         .addTo(map);
     };
 
-    if (map.isStyleLoaded() && safeGetLayer(map, FLOW_LAYER_ID)) {
+    if (safeGetLayer(map, FLOW_LAYER_ID)) {
       map.on("mouseenter", FLOW_LAYER_ID, handleMouseEnter);
       map.on("mouseleave", FLOW_LAYER_ID, handleMouseLeave);
       map.on("click", FLOW_LAYER_ID, handleClick);
@@ -332,75 +340,103 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
         popupRef.current = null;
       }
     };
-  }, [map, flowPaths]);
+  }, [map, flowPaths, attached]);
 
-  // Start animation loop
+  // Sync overlay with the current paths, and restart the downhill reveal for
+  // every new set of paths so each storm is seen travelling the terrain.
+  // Layers can only be added once the style is ready; while tiles are still
+  // streaming in after a camera move, wait for the map to go idle and retry.
   useEffect(() => {
-    if (!map || !safeHasStyle(map)) return;
-
-    const animate = () => {
-      const step = calculateVelocityStep();
-      dashOffsetRef.current += step;
-      if (dashOffsetRef.current > 9) {
-        dashOffsetRef.current = 0;
+    if (!map) return;
+    if (flowPaths.length === 0) {
+      removeFromMap();
+      return;
+    }
+    let cancelled = false;
+    const attach = () => {
+      if (cancelled) return;
+      try {
+        addToMap();
+        updatePaths(flowPaths);
+      } catch {
+        // Style not ready yet
       }
+      if (!safeGetLayer(map, FLOW_LAYER_ID)) {
+        map.once("idle", attach);
+        return;
+      }
+      revealStartRef.current = performance.now() + REVEAL_DELAY_MS;
+      setAttached((n) => n + 1);
+    };
+    attach();
+    return () => {
+      cancelled = true;
+      map.off("idle", attach);
+    };
+  }, [flowPaths, map, addToMap, updatePaths, removeFromMap]);
 
-      if (map.isStyleLoaded() && safeGetLayer(map, FLOW_ANIMATION_LAYER_ID)) {
-        try {
-          map.setPaintProperty(
-            FLOW_ANIMATION_LAYER_ID,
-            "line-dashoffset",
-            dashOffsetRef.current
-          );
-        } catch {
-          // Ignore if layer or map was destroyed
+  useEffect(() => {
+    if (!map || !safeHasStyle(map) || flowPaths.length === 0) return;
+
+    if (reduceMotion) {
+      safePaint(map, FLOW_LAYER_ID, "line-gradient", revealGradient(1));
+      safePaint(map, FLOW_GLOW_LAYER_ID, "line-gradient", revealGradient(1, true));
+      safePaint(map, FLOW_ANIMATION_LAYER_ID, "line-opacity", 0.55);
+      return;
+    }
+
+    const avgVelocity =
+      flowPaths.reduce((sum, p) => sum + (p.velocity_mps || 1.5), 0) / flowPaths.length;
+    // Faster modeled water moves the particles faster, within a readable band.
+    const msPerStep = Math.max(38, Math.min(110, 110 - avgVelocity * 14));
+
+    let revealed = false;
+    let dashStep = -1;
+
+    const animate = (now: number) => {
+      if (!safeGetLayer(map, FLOW_LAYER_ID)) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      if (!revealed) {
+        const elapsed = now - revealStartRef.current;
+        const t = Math.max(0, Math.min(1, elapsed / REVEAL_MS));
+        // Water accelerates off the high ground, then settles as it pools.
+        const eased = 1 - Math.pow(1 - t, 2.2);
+        safePaint(map, FLOW_LAYER_ID, "line-gradient", revealGradient(eased));
+        safePaint(map, FLOW_GLOW_LAYER_ID, "line-gradient", revealGradient(eased, true));
+        if (t >= 1) {
+          revealed = true;
+          safePaint(map, FLOW_ANIMATION_LAYER_ID, "line-opacity", 0.7);
+        }
+      } else {
+        const step = Math.floor(now / msPerStep) % DASH_SEQUENCE.length;
+        if (step !== dashStep) {
+          dashStep = step;
+          safePaint(map, FLOW_ANIMATION_LAYER_ID, "line-dasharray", DASH_SEQUENCE[step]);
         }
       }
-
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    // Start animation once layers are added
-    if (map.isStyleLoaded() && safeGetLayer(map, FLOW_ANIMATION_LAYER_ID)) {
-      animationFrameRef.current = requestAnimationFrame(animate);
-    }
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
-  }, [map, calculateVelocityStep]);
+  }, [map, flowPaths, reduceMotion, attached]);
 
-  // Sync overlay with the current paths: add/update when there are paths,
-  // and tear the layers down again when they're cleared.
-  useEffect(() => {
-    if (!map) return;
-    if (flowPaths.length > 0) {
-      addToMap();
-      updatePaths(flowPaths);
-    } else {
-      removeFromMap();
-    }
-  }, [flowPaths, map, addToMap, updatePaths, removeFromMap]);
+  useEffect(() => removeFromMap, [removeFromMap]);
 
   useEffect(() => {
     if (!map || !safeHasStyle(map)) return;
-    const widths = relief ? RELIEF_WIDTH : FLAT_WIDTH;
-    const paint: Array<[string, number]> = [
-      [FLOW_GLOW_LAYER_ID, widths.glow],
-      [FLOW_LAYER_ID, widths.base],
-      [FLOW_ANIMATION_LAYER_ID, widths.dash],
-    ];
-    for (const [layerId, width] of paint) {
-      if (!safeGetLayer(map, layerId)) continue;
-      try {
-        map.setPaintProperty(layerId, "line-width", width);
-      } catch {
-        // Layer may have been removed between the check and the write.
-      }
-    }
-  }, [map, relief, flowPaths]);
+    safePaint(map, FLOW_GLOW_LAYER_ID, "line-width", volumeWidth(widths.glow));
+    safePaint(map, FLOW_LAYER_ID, "line-width", volumeWidth(widths.base));
+    safePaint(map, FLOW_ANIMATION_LAYER_ID, "line-width", widths.dash);
+  }, [map, widths, flowPaths]);
 
   useImperativeHandle(
     ref,

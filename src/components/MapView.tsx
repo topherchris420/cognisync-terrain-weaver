@@ -170,6 +170,7 @@ export function applyElevationOverlays(
         buildingsLayer(),
         layerBefore(map, [
           FLOOD_VOLUME_LAYER_ID,
+          "risk-zones-heat-layer",
           "risk-zones-layer",
           "flow-paths-glow-layer",
           LABELS_LAYER_ID,
