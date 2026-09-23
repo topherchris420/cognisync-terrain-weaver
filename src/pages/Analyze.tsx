@@ -775,17 +775,12 @@ export default function Analyze() {
 
         <MapKey
           place={(result ? result.location_label : locationLabel) || "Custom map view"}
-          lat={view.lat}
-          lng={view.lng}
           showFlow={Boolean(simResult && showFlowVectors && simResult.flow_paths.length > 0)}
           showPonding={Boolean(simResult && showRiskHeatmap && (simResult.risk_zones?.length ?? 0) > 0)}
           rainfallMm={simResult ? nowSeal?.storm.rainfallDepthMm : undefined}
         />
         {!result && workflow.state !== "ANALYZING" && (
           <aside className="atlas-intro" aria-label="Start a resilience study">
-            <p className="atlas-intro-node" aria-hidden="true">
-              {Math.abs(view.lat).toFixed(4)}° {view.lat >= 0 ? "N" : "S"} · {Math.abs(view.lng).toFixed(4)}° {view.lng >= 0 ? "E" : "W"} · z{view.zoom.toFixed(1)}
-            </p>
             <div>
               <h1>A better future <br />starts with <br /><em>the ground.</em></h1>
               <p className="atlas-intro-copy">See how your city absorbs rain.{" "}<br />Explore the changes that could help it absorb more.</p>

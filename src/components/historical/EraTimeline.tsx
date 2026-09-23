@@ -93,7 +93,7 @@ export function EraTimeline({ eraId, onChange, onCompare, center, className }: P
         </button>
       </div>
 
-      <div className="mt-1.5 flex items-start gap-2 px-1">
+      <div className="atlas-era-caption mt-1.5 flex items-start gap-2 px-1">
         <span
           className={cn(
             "mt-px shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest",
