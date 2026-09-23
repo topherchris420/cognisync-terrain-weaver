@@ -63,9 +63,11 @@ export function FloodVolumeLayer({
     const sync = () => {
       if (!styleReady(map)) return;
       const data = floodVolumeGeoJSON(riskZones);
-      const exaggeration = terrainExaggerationForZoom(
-        typeof map.getZoom === "function" ? map.getZoom() : 15
-      );
+      const exaggeration =
+        map.getTerrain?.()?.exaggeration ??
+        terrainExaggerationForZoom(
+          typeof map.getZoom === "function" ? map.getZoom() : 15
+        );
       const height = floodExtrusionHeightExpression(exaggeration);
 
       try {
@@ -158,13 +160,13 @@ export function FloodVolumeLayer({
 
     sync();
     bindClick();
-    map.on("zoomend", sync);
+    map.on("terrain", sync);
     if (!styleReady(map) || !layerExists(map, FLOOD_VOLUME_LAYER_ID)) {
       map.once("idle", onIdle);
     }
 
     return () => {
-      map.off("zoomend", sync);
+      map.off("terrain", sync);
       map.off("idle", onIdle);
       if (layerExists(map, FLOOD_VOLUME_LAYER_ID)) {
         map.off("click", FLOOD_VOLUME_LAYER_ID, onClick);

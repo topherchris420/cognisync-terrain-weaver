@@ -11,6 +11,7 @@ import {
   HILLSHADE_EXAGGERATION_FLAT,
   HILLSHADE_EXAGGERATION_RELIEF,
   HILLSHADE_LAYER_ID,
+  HILLSHADE_SOURCE_ID,
   TERRAIN_OVERLAY_SOURCE_IDS,
   TERRARIUM_SOURCE_ID,
   buildingsLayer,
@@ -18,12 +19,18 @@ import {
   flatMapLight,
   flatMapSky,
   hillshadeLayer,
+  hillshadeLighting,
+  hillshadeSource,
   terrainExaggerationForZoom,
   terrainLight,
   terrainPitchForZoom,
   terrainSky,
   terrariumSource,
 } from "@/lib/terrain-scene";
+import { RELIEF_RISE_FROM, TerrainRelief } from "@/lib/terrain-relief";
+import { registerTerrariumProtocol } from "@/lib/terrarium-protocol";
+
+registerTerrariumProtocol(maplibregl);
 
 export interface MapViewHandle {
   captureImage: () => Promise<string | null>;
@@ -55,9 +62,11 @@ export interface MapViewProps {
   terrainEnabled?: boolean;
   /**
    * Vertical exaggeration for the terrain mesh. When omitted, the mesh
-   * follows zoom. The Analyze relief presets pass an explicit factor.
+   * follows the local relief in view (Auto).
    */
   terrainExaggeration?: number;
+  /** The mesh scale each time the relief settles, Auto included. */
+  onReliefChange?: (exaggeration: number) => void;
 }
 
 function overlaySourceId(event: unknown): string | undefined {
@@ -80,8 +89,17 @@ function setLayerVisibility(map: MLMap, id: string, visibility: "visible" | "non
   map.setLayoutProperty(id, "visibility", visibility);
 }
 
-/** Atmosphere drawn behind a pitched camera. */
-const SKY_LAYER_ID = "sky-atmosphere";
+/**
+ * Sources and layers can be added once the style document is parsed.
+ * `isStyleLoaded()` also waits for every tile, which is still false when the
+ * first imagery tile lands, so it would skip the overlays on a fresh map.
+ */
+function styleParsed(map: MLMap): boolean {
+  const style = (map as unknown as { style?: { _loaded?: boolean } }).style;
+  if (style && typeof style._loaded === "boolean") return style._loaded;
+  return typeof map.isStyleLoaded !== "function" || Boolean(map.isStyleLoaded());
+}
+
 /** Camera pitch used when a caller sets an explicit relief factor. */
 const EXPLICIT_RELIEF_PITCH = 74;
 
@@ -93,8 +111,11 @@ function explicitExaggeration(exaggeration?: number): number | undefined {
 
 /**
  * Hillshade stays on in the flat view. Pitched mode adds a terrain mesh,
- * building mass, and a sky so the storm has a ground to sit on. An explicit
- * exaggeration overrides the zoom-scaled mesh.
+ * building mass, and a sky so the storm has a ground to sit on.
+ *
+ * The mesh scale is set when the mesh is first added, or when a caller
+ * passes a different one. Otherwise it is left alone so an animation that
+ * owns it (see TerrainRelief) is not snapped to its end value.
  */
 export function applyElevationOverlays(
   map: MLMap,
@@ -105,23 +126,26 @@ export function applyElevationOverlays(
     if (typeof map.getSource !== "function" || typeof map.addSource !== "function") {
       return;
     }
-    if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) return;
+    if (!styleParsed(map)) return;
 
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 15;
-    const meshExaggeration =
-      explicitExaggeration(exaggeration) ?? terrainExaggerationForZoom(zoom);
-    const wasDimensional =
-      typeof map.getTerrain === "function" && Boolean(map.getTerrain());
+    const requested = explicitExaggeration(exaggeration);
+    const currentTerrain =
+      typeof map.getTerrain === "function" ? map.getTerrain() : null;
+    const wasDimensional = Boolean(currentTerrain);
 
     if (!map.getSource(TERRARIUM_SOURCE_ID)) {
       map.addSource(TERRARIUM_SOURCE_ID, terrariumSource());
+    }
+    if (!map.getSource(HILLSHADE_SOURCE_ID)) {
+      map.addSource(HILLSHADE_SOURCE_ID, hillshadeSource());
     }
     const hillshadeExaggeration = terrainEnabled
       ? HILLSHADE_EXAGGERATION_RELIEF
       : HILLSHADE_EXAGGERATION_FLAT;
     if (typeof map.getLayer === "function" && !map.getLayer(HILLSHADE_LAYER_ID)) {
       map.addLayer(
-        hillshadeLayer(hillshadeExaggeration),
+        hillshadeLayer(hillshadeExaggeration, terrainEnabled),
         layerBefore(map, [LABELS_LAYER_ID])
       );
     } else if (typeof map.setPaintProperty === "function") {
@@ -130,23 +154,13 @@ export function applyElevationOverlays(
         "hillshade-exaggeration",
         hillshadeExaggeration
       );
-    }
-
-    if (typeof map.getLayer === "function" && !map.getLayer(SKY_LAYER_ID)) {
-      try {
-        map.addLayer({
-          id: SKY_LAYER_ID,
-          type: "sky",
-          paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0.0, 90.0],
-            "sky-atmosphere-sun-intensity": 15,
-          },
-        } as unknown as maplibregl.LayerSpecification);
-      } catch {
-        // Sky layer unsupported or style pending
+      for (const [property, value] of Object.entries(hillshadeLighting(terrainEnabled))) {
+        map.setPaintProperty(HILLSHADE_LAYER_ID, property, value);
       }
     }
+
+    // Raster labels drape onto the ground and smear once the camera pitches.
+    setLayerVisibility(map, LABELS_LAYER_ID, terrainEnabled ? "none" : "visible");
 
     if (!terrainEnabled) {
       if (typeof map.setTerrain === "function") map.setTerrain(null);
@@ -159,8 +173,15 @@ export function applyElevationOverlays(
       return;
     }
 
-    if (typeof map.setTerrain === "function") {
-      map.setTerrain({ source: TERRARIUM_SOURCE_ID, exaggeration: meshExaggeration });
+    if (
+      typeof map.setTerrain === "function" &&
+      (!currentTerrain ||
+        (requested !== undefined && currentTerrain.exaggeration !== requested))
+    ) {
+      map.setTerrain({
+        source: TERRARIUM_SOURCE_ID,
+        exaggeration: requested ?? terrainExaggerationForZoom(zoom),
+      });
     }
     if (!map.getSource(BUILDINGS_SOURCE_ID)) {
       map.addSource(BUILDINGS_SOURCE_ID, buildingsSource());
@@ -283,11 +304,13 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     onViewChange,
     terrainEnabled = false,
     terrainExaggeration,
+    onReliefChange,
   },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
+  const reliefRef = useRef<TerrainRelief | null>(null);
   const readyHandleRef = useRef<MapViewHandle | null>(null);
   const applyingControlledCameraRef = useRef(false);
   const [status, setStatus] = useState<Status>({ kind: "connecting", provider: 0 });
@@ -305,6 +328,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   terrainEnabledRef.current = terrainEnabled;
   const terrainExaggerationRef = useRef(terrainExaggeration);
   terrainExaggerationRef.current = terrainExaggeration;
+  const onReliefChangeRef = useRef(onReliefChange);
+  onReliefChangeRef.current = onReliefChange;
   const viewRef = useRef<MapCameraState>({
     center: initialCenter,
     zoom: initialZoom,
@@ -357,6 +382,28 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     let tileErrors = 0;
     let watchdog: number | undefined;
 
+    const relief = new TerrainRelief(map, {
+      onSettle: (exaggeration) => onReliefChangeRef.current?.(exaggeration),
+    });
+    reliefRef.current = relief;
+
+    // A style swap drops the mesh; put it back at the scale it was heading to.
+    const restoreOverlays = () => {
+      const enabled = terrainEnabledRef.current;
+      const explicit = explicitExaggeration(terrainExaggerationRef.current);
+      const hadTerrain = Boolean(map.getTerrain?.());
+      applyElevationOverlays(
+        map,
+        enabled,
+        hadTerrain ? undefined : relief.settledValue ?? explicit
+      );
+      if (!enabled) {
+        relief.dispose();
+      } else if (map.getTerrain?.()) {
+        relief.retarget(explicit);
+      }
+    };
+
     const nextProvider = (why: string) => {
       if (disposed || connected) return;
       window.clearTimeout(watchdog);
@@ -387,22 +434,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       connected = true;
       window.clearTimeout(watchdog);
       setStatus({ kind: "ready" });
-      applyElevationOverlays(
-        map,
-        terrainEnabledRef.current,
-        terrainExaggerationRef.current
-      );
+      restoreOverlays();
       const handle = readyHandleRef.current;
       if (handle) onReadyRef.current?.({ handle, map });
     });
 
     map.on("style.load", () => {
       if (disposed) return;
-      applyElevationOverlays(
-        map,
-        terrainEnabledRef.current,
-        terrainExaggerationRef.current
-      );
+      restoreOverlays();
     });
 
     map.on("error", (e) => {
@@ -444,6 +483,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     return () => {
       disposed = true;
       window.clearTimeout(watchdog);
+      relief.dispose();
+      reliefRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -451,8 +492,24 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    applyElevationOverlays(map, terrainEnabled, terrainExaggeration);
+    const relief = reliefRef.current;
+    if (!map || !relief) return;
+    const explicit = explicitExaggeration(terrainExaggeration);
+    const hadTerrain = Boolean(map.getTerrain?.());
+    if (terrainEnabled && !hadTerrain) {
+      // Lay the mesh down nearly flat, then let the ground rise into place.
+      applyElevationOverlays(map, true, RELIEF_RISE_FROM);
+      if (map.getTerrain?.()) relief.rise(explicit);
+    } else if (terrainEnabled) {
+      applyElevationOverlays(map, true);
+      relief.retarget(explicit);
+    } else if (hadTerrain) {
+      relief.sink(() => {
+        if (!terrainEnabledRef.current) applyElevationOverlays(map, false);
+      });
+    } else {
+      applyElevationOverlays(map, false);
+    }
     if (typeof map.easeTo !== "function") return;
     if (terrainEnabled) {
       const zoom = map.getZoom?.() ?? 15;
@@ -470,17 +527,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       map.easeTo({ pitch: 0, duration: 700 });
     }
   }, [terrainEnabled, terrainExaggeration]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !terrainEnabled || typeof map.on !== "function") return;
-    const onZoomEnd = () =>
-      applyElevationOverlays(map, true, terrainExaggerationRef.current);
-    map.on("zoomend", onZoomEnd);
-    return () => {
-      if (typeof map.off === "function") map.off("zoomend", onZoomEnd);
-    };
-  }, [terrainEnabled]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -529,7 +575,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           typeof map.getTerrain === "function" && Boolean(map.getTerrain());
         try {
           if (!map.getStyle || map.getStyle()) {
-            hadLabels = Boolean(map.getLayer(LABELS_LAYER_ID));
+            hadLabels =
+              Boolean(map.getLayer(LABELS_LAYER_ID)) &&
+              map.getLayoutProperty?.(LABELS_LAYER_ID, "visibility") !== "none";
           }
         } catch {
           hadLabels = false;
@@ -545,8 +593,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         if (hadTerrain && typeof map.setTerrain === "function") {
           map.setTerrain(null);
         }
+        // Shading tints the imagery the classifier reads as land cover.
         const hiddenReliefLayers: string[] = [];
-        for (const layerId of [BUILDINGS_LAYER_ID, FLOOD_VOLUME_LAYER_ID]) {
+        for (const layerId of [HILLSHADE_LAYER_ID, BUILDINGS_LAYER_ID, FLOOD_VOLUME_LAYER_ID]) {
           if (typeof map.getLayer !== "function" || !map.getLayer(layerId)) continue;
           let visibility: string | undefined;
           try {
@@ -588,6 +637,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             map.setTerrain({
               source: TERRARIUM_SOURCE_ID,
               exaggeration:
+                reliefRef.current?.settledValue ??
                 explicitExaggeration(terrainExaggerationRef.current) ??
                 terrainExaggerationForZoom(zoom),
             });
