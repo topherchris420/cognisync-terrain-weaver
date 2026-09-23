@@ -89,17 +89,7 @@ function setLayerVisibility(map: MLMap, id: string, visibility: "visible" | "non
   map.setLayoutProperty(id, "visibility", visibility);
 }
 
-/**
- * Sources and layers can be added once the style document is parsed.
- * `isStyleLoaded()` also waits for every tile, which is still false when the
- * first imagery tile lands, so it would skip the overlays on a fresh map.
- */
-function styleParsed(map: MLMap): boolean {
-  const style = (map as unknown as { style?: { _loaded?: boolean } }).style;
-  if (style && typeof style._loaded === "boolean") return style._loaded;
-  return typeof map.isStyleLoaded !== "function" || Boolean(map.isStyleLoaded());
-}
-
+/** Atmosphere drawn behind a pitched camera. */
 /** Camera pitch used when a caller sets an explicit relief factor. */
 const EXPLICIT_RELIEF_PITCH = 74;
 
@@ -154,13 +144,7 @@ export function applyElevationOverlays(
         "hillshade-exaggeration",
         hillshadeExaggeration
       );
-      for (const [property, value] of Object.entries(hillshadeLighting(terrainEnabled))) {
-        map.setPaintProperty(HILLSHADE_LAYER_ID, property, value);
-      }
     }
-
-    // Raster labels drape onto the ground and smear once the camera pitches.
-    setLayerVisibility(map, LABELS_LAYER_ID, terrainEnabled ? "none" : "visible");
 
     if (!terrainEnabled) {
       if (typeof map.setTerrain === "function") map.setTerrain(null);
@@ -191,6 +175,7 @@ export function applyElevationOverlays(
         buildingsLayer(),
         layerBefore(map, [
           FLOOD_VOLUME_LAYER_ID,
+          "risk-zones-heat-layer",
           "risk-zones-layer",
           "flow-paths-glow-layer",
           LABELS_LAYER_ID,
