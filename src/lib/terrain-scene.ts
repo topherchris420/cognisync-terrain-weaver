@@ -8,9 +8,16 @@ import type {
   VectorSourceSpecification,
 } from "maplibre-gl";
 import type { RiskZone } from "@/lib/simulation-types";
+import { TERRARIUM_PROTOCOL } from "@/lib/terrarium-protocol";
 
-/** Mapzen Terrarium RGB elevation, shared by the mesh and the hillshade. */
+/** Mapzen Terrarium RGB elevation for the terrain mesh. */
 export const TERRARIUM_SOURCE_ID = "terrarium";
+/**
+ * The same tiles under a second source for the hillshade. The mesh loads DEM
+ * a zoom level coarser than the view; sharing one source would shade from
+ * that coarser grid.
+ */
+export const HILLSHADE_SOURCE_ID = "terrarium-shade";
 export const HILLSHADE_LAYER_ID = "hillshade";
 export const BUILDINGS_SOURCE_ID = "osm-buildings";
 export const BUILDINGS_LAYER_ID = "osm-buildings-3d";
@@ -20,11 +27,12 @@ export const FLOOD_VOLUME_LAYER_ID = "flood-volume-layer";
 /** Overlay tile failures must not fail the satellite imagery providers. */
 export const TERRAIN_OVERLAY_SOURCE_IDS = [
   TERRARIUM_SOURCE_ID,
+  HILLSHADE_SOURCE_ID,
   BUILDINGS_SOURCE_ID,
 ] as const;
 
-const TERRARIUM_TILES =
-  "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+/** Served through `registerTerrariumProtocol`, which flattens the sea floor. */
+const TERRARIUM_TILES = `${TERRARIUM_PROTOCOL}://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`;
 
 /** Stable TileJSON. The planet extract path inside it changes between builds. */
 const BUILDINGS_TILEJSON = "https://tiles.openfreemap.org/planet";
@@ -61,8 +69,10 @@ const DEPTH_BY_LEVEL: Record<RiskZone["level"], number> = {
   severe: 2.4,
 };
 
-export const HILLSHADE_EXAGGERATION_FLAT = 0.85;
-export const HILLSHADE_EXAGGERATION_RELIEF = 0.4;
+/** A hint of relief over the imagery people read land cover from. */
+export const HILLSHADE_EXAGGERATION_FLAT = 0.3;
+/** MapLibre does not light the mesh, so the hillshade is the only slope cue. */
+export const HILLSHADE_EXAGGERATION_RELIEF = 1;
 
 function lerpStops(
   stops: ReadonlyArray<readonly [number, number]>,
@@ -91,6 +101,66 @@ export function terrainPitchForZoom(zoom: number): number {
   return lerpStops(PITCH_STOPS, zoom);
 }
 
+/**
+ * Auto relief: stretch the ground until its local relief stands at a fixed
+ * share of the view width. A delta city gets lift, a mountain city stays
+ * near true scale, and the same rule holds at every zoom.
+ */
+export const AUTO_RELIEF_TARGET_RATIO = 0.03;
+export const AUTO_RELIEF_MIN = 1.25;
+/**
+ * Outside lidar coverage Terrarium is a surface model: tower blocks are
+ * bumps in the DEM, and past about 4x they stand up as mountains.
+ */
+export const AUTO_RELIEF_MAX = 4;
+/** Below this, Terrarium noise is most of what the samples measure. */
+const AUTO_RELIEF_FLOOR_M = 6;
+const AUTO_RELIEF_MIN_SAMPLES = 12;
+
+function quantile(sorted: number[], q: number): number {
+  const position = (sorted.length - 1) * q;
+  const low = Math.floor(position);
+  const high = Math.ceil(position);
+  return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
+}
+
+/**
+ * Relief in meters between the 5th and 95th percentile of the samples.
+ * Water counts as sea level, matching the display DEM: a harbor channel is
+ * not relief the eye should be scaled to.
+ */
+export function localReliefMeters(elevations: readonly number[]): number | null {
+  const land = elevations
+    .filter((value) => Number.isFinite(value))
+    .map((value) => Math.max(0, value))
+    .sort((a, b) => a - b);
+  if (land.length < AUTO_RELIEF_MIN_SAMPLES) return null;
+  return quantile(land, 0.95) - quantile(land, 0.05);
+}
+
+export function autoTerrainExaggeration(
+  elevations: readonly number[],
+  viewSpanMeters: number
+): number | null {
+  const relief = localReliefMeters(elevations);
+  if (relief === null || !Number.isFinite(viewSpanMeters) || viewSpanMeters <= 0) {
+    return null;
+  }
+  const raw =
+    (AUTO_RELIEF_TARGET_RATIO * viewSpanMeters) /
+    Math.max(AUTO_RELIEF_FLOOR_M, relief);
+  const clamped = Math.min(AUTO_RELIEF_MAX, Math.max(AUTO_RELIEF_MIN, raw));
+  return Math.round(clamped * 20) / 20;
+}
+
+/** Web Mercator ground resolution for MapLibre's 512 px tiles. */
+export function metersPerPixel(latitude: number, zoom: number): number {
+  return (
+    (40_075_016.686 * Math.cos((latitude * Math.PI) / 180)) /
+    (512 * 2 ** zoom)
+  );
+}
+
 export function terrariumSource(): RasterDEMSourceSpecification {
   return {
     type: "raster-dem",
@@ -102,18 +172,61 @@ export function terrariumSource(): RasterDEMSourceSpecification {
   };
 }
 
+/**
+ * Three lights, averaged by MapLibre: a warm key, a cool skylight 60 degrees
+ * round from it, and a faint rim opposite so slopes facing away from the key
+ * still read. All sit near 30 degrees, where flat ground shades to zero and
+ * the imagery underneath keeps its own color. Alpha weights the lights.
+ */
+const HILLSHADE_LIGHTS = [
+  { offset: 0, altitude: 32, highlight: "rgba(255, 238, 204, 0.95)", shadow: "rgba(10, 18, 38, 1)" },
+  { offset: -60, altitude: 30, highlight: "rgba(214, 232, 255, 0.45)", shadow: "rgba(16, 26, 52, 0.6)" },
+  { offset: 75, altitude: 28, highlight: "rgba(255, 250, 240, 0.3)", shadow: "rgba(20, 30, 58, 0.35)" },
+] as const;
+
+/**
+ * Flat maps keep the cartographic northwest key: lit from the south, a
+ * north-up relief reads inside out. A pitched camera has perspective to
+ * settle that, so relief takes a low south-southwest afternoon sun that
+ * side-lights the slopes and walls facing a north-looking camera.
+ */
+const FLAT_KEY_AZIMUTH = 315;
+const RELIEF_KEY_AZIMUTH = 215;
+
+export function hillshadeLighting(relief: boolean) {
+  const key = relief ? RELIEF_KEY_AZIMUTH : FLAT_KEY_AZIMUTH;
+  return {
+    "hillshade-illumination-direction": HILLSHADE_LIGHTS.map(
+      (light) => (key + light.offset + 360) % 360
+    ),
+    "hillshade-illumination-altitude": HILLSHADE_LIGHTS.map((light) => light.altitude),
+    "hillshade-highlight-color": HILLSHADE_LIGHTS.map((light) => light.highlight),
+    "hillshade-shadow-color": HILLSHADE_LIGHTS.map((light) => light.shadow),
+  } satisfies HillshadeLayerSpecification["paint"];
+}
+
+export function hillshadeSource(): RasterDEMSourceSpecification {
+  return {
+    type: "raster-dem",
+    tiles: [TERRARIUM_TILES],
+    tileSize: 256,
+    maxzoom: 15,
+    encoding: "terrarium",
+  };
+}
+
 export function hillshadeLayer(
-  exaggeration: number
+  exaggeration: number,
+  relief = false
 ): HillshadeLayerSpecification {
   return {
     id: HILLSHADE_LAYER_ID,
     type: "hillshade",
-    source: TERRARIUM_SOURCE_ID,
+    source: HILLSHADE_SOURCE_ID,
     paint: {
+      "hillshade-method": "multidirectional",
       "hillshade-exaggeration": exaggeration,
-      "hillshade-shadow-color": "#07110e",
-      "hillshade-highlight-color": "#f4f7ea",
-      "hillshade-illumination-direction": 315,
+      ...hillshadeLighting(relief),
       "hillshade-illumination-anchor": "map",
     },
   };
@@ -135,16 +248,20 @@ export function buildingsLayer(): FillExtrusionLayerSpecification {
     minzoom: 14,
     filter: ["!=", ["get", "hide_3d"], true],
     paint: {
+      // An architect's massing model: warm limestone low-rise cooling to
+      // glass-grey towers, so height reads before the shadows do.
       "fill-extrusion-color": [
         "interpolate",
         ["linear"],
         ["coalesce", ["get", "render_height"], 8],
         0,
-        "#d9d3c7",
-        28,
-        "#b7c3c8",
-        90,
-        "#8e9aa3",
+        "#efe8da",
+        24,
+        "#e4e0d6",
+        70,
+        "#cfd6da",
+        180,
+        "#b4c2cb",
       ],
       "fill-extrusion-height": [
         "case",
@@ -153,19 +270,20 @@ export function buildingsLayer(): FillExtrusionLayerSpecification {
         8,
       ],
       "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-      "fill-extrusion-opacity": 0.78,
+      // Anything below 1 lets far walls show through near ones.
+      "fill-extrusion-opacity": 1,
       "fill-extrusion-vertical-gradient": true,
     },
   };
 }
 
-/** Northwest sun, matching the hillshade illumination direction. */
+/** The relief sun, matching the key light of the hillshade in 3D. */
 export function terrainLight(): LightSpecification {
   return {
     anchor: "map",
-    position: [1.4, 315, 42],
-    color: "#fff6ea",
-    intensity: 0.62,
+    position: [1.5, RELIEF_KEY_AZIMUTH, 48],
+    color: "#fff1dc",
+    intensity: 0.52,
   };
 }
 
@@ -179,15 +297,20 @@ export function flatMapLight(): LightSpecification {
   };
 }
 
+/**
+ * Clear-day aerial perspective. The near ground stays crisp; haze only
+ * starts past the middle distance and matches the horizon, so far terrain
+ * dissolves into the sky instead of stopping at a hard edge.
+ */
 export function terrainSky(): SkySpecification {
   return {
-    "sky-color": "#8ec6ea",
-    "horizon-color": "#f4f7f5",
-    "fog-color": "#d5e3ea",
-    "fog-ground-blend": 0.16,
-    "horizon-fog-blend": 0.32,
-    "sky-horizon-blend": 0.52,
-    "atmosphere-blend": 0.65,
+    "sky-color": "#4f8fcb",
+    "horizon-color": "#e6edf0",
+    "fog-color": "#d9e3e8",
+    "fog-ground-blend": 0.6,
+    "horizon-fog-blend": 0.6,
+    "sky-horizon-blend": 0.55,
+    "atmosphere-blend": 0,
   };
 }
 

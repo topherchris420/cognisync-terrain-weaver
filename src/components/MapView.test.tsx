@@ -1,11 +1,14 @@
 import { createRef } from "react";
 import { act, render } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MapCameraState } from "@/lib/counterfactual/types";
 import { MapView, type MapViewHandle } from "./MapView";
+import { RELIEF_RISE_FROM } from "@/lib/terrain-relief";
 import {
   HILLSHADE_EXAGGERATION_RELIEF,
   TERRARIUM_SOURCE_ID,
+  autoTerrainExaggeration,
+  metersPerPixel,
   terrainExaggerationForZoom,
   terrainPitchForZoom,
   terrainSky,
@@ -61,6 +64,8 @@ const maplibre = vi.hoisted(() => {
       }
     );
     getTerrain = vi.fn(() => this.terrain);
+    queryTerrainElevation?: (lngLat: [number, number]) => number | null;
+    isSourceLoaded?: (id: string) => boolean;
     setSky = vi.fn();
     setLight = vi.fn();
     easeTo = vi.fn();
@@ -145,6 +150,18 @@ vi.mock("maplibre-gl", () => ({
   },
   Map: maplibre.MockMap,
 }));
+
+/** The reduced-motion path commits each relief change without animating. */
+function preferReducedMotion() {
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    ...original(query),
+    matches: query.includes("prefers-reduced-motion"),
+  })) as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+}
 
 function currentMap() {
   const map = maplibre.MockMap.instances.at(-1);
@@ -255,12 +272,17 @@ describe("MapView camera contract", () => {
   });
 
   it("pitches into zoom-scaled relief and restores a flat map", () => {
+    const restoreMotion = preferReducedMotion();
     const view = render(<MapView initialZoom={15} />);
     const map = currentMap();
 
     view.rerender(<MapView initialZoom={15} terrainEnabled />);
 
     expect(map.setTerrain).toHaveBeenCalledWith({
+      source: TERRARIUM_SOURCE_ID,
+      exaggeration: RELIEF_RISE_FROM,
+    });
+    expect(map.setTerrain).toHaveBeenLastCalledWith({
       source: TERRARIUM_SOURCE_ID,
       exaggeration: terrainExaggerationForZoom(15),
     });
@@ -275,11 +297,16 @@ describe("MapView camera contract", () => {
     );
     expect(map.layers.has("osm-buildings-3d")).toBe(true);
 
-    map.zoom = 11;
-    act(() => map.emit("zoomend"));
+    const exaggeration = map.terrain?.exaggeration ?? 1;
+    const hills = Array.from({ length: 121 }, (_, index) => (index % 11) * 4);
+    let sample = 0;
+    map.queryTerrainElevation = vi.fn(() => hills[sample++ % hills.length] * exaggeration);
+    map.isSourceLoaded = vi.fn(() => true);
+    act(() => map.emit("idle"));
+    const spanMeters = 1024 * metersPerPixel(map.center.lat, 15);
     expect(map.setTerrain).toHaveBeenLastCalledWith({
       source: TERRARIUM_SOURCE_ID,
-      exaggeration: terrainExaggerationForZoom(11),
+      exaggeration: autoTerrainExaggeration(hills, spanMeters),
     });
 
     view.rerender(<MapView initialZoom={15} terrainEnabled={false} />);
@@ -287,13 +314,63 @@ describe("MapView camera contract", () => {
     expect(map.setSky).toHaveBeenLastCalledWith(
       expect.objectContaining({ "fog-ground-blend": 0, "atmosphere-blend": 0 })
     );
+    restoreMotion();
+  });
+
+  it("raises the ground from nearly flat after the tilt starts", () => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+        "performance",
+      ],
+    });
+    try {
+      const onReliefChange = vi.fn();
+      const view = render(<MapView initialZoom={15} onReliefChange={onReliefChange} />);
+      const map = currentMap();
+
+      view.rerender(
+        <MapView
+          initialZoom={15}
+          terrainEnabled
+          terrainExaggeration={3}
+          onReliefChange={onReliefChange}
+        />
+      );
+      expect(map.terrain?.exaggeration).toBe(RELIEF_RISE_FROM);
+
+      act(() => {
+        vi.advanceTimersByTime(2500);
+      });
+      const midway = map.terrain?.exaggeration ?? 0;
+      expect(midway).toBeGreaterThan(RELIEF_RISE_FROM);
+      expect(midway).toBeLessThan(3);
+      expect(map.triggerRepaint).toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(map.setTerrain).toHaveBeenLastCalledWith({
+        source: TERRARIUM_SOURCE_ID,
+        exaggeration: 3,
+      });
+      expect(onReliefChange).toHaveBeenLastCalledWith(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
 describe("MapView 3D terrain contract", () => {
+  let restoreMotion: () => void;
   beforeEach(() => {
     maplibre.MockMap.instances.length = 0;
+    restoreMotion = preferReducedMotion();
   });
+  afterEach(() => restoreMotion());
 
   it("applies 3D terrain elevation and eases camera pitch when terrain is enabled", () => {
     const view = render(<MapView terrainEnabled={false} />);

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RiskZone } from "@/lib/simulation-types";
 import {
+  AUTO_RELIEF_MAX,
+  AUTO_RELIEF_MIN,
+  autoTerrainExaggeration,
+  localReliefMeters,
   MAX_FLOOD_DISPLAY_M,
   MIN_FLOOD_DISPLAY_M,
   floodDepthMeters,
@@ -37,6 +41,27 @@ describe("terrain exaggeration", () => {
     expect(terrainPitchForZoom(9)).toBe(72);
     expect(terrainPitchForZoom(15)).toBe(64);
     expect(terrainPitchForZoom(18)).toBe(58);
+  });
+});
+
+describe("auto relief", () => {
+  const ramp = (low: number, high: number, count = 121) =>
+    Array.from({ length: count }, (_, index) => low + ((high - low) * index) / (count - 1));
+
+  it("measures the ground between the 5th and 95th percentile", () => {
+    expect(localReliefMeters(ramp(0, 10, 8))).toBeNull();
+    expect(localReliefMeters(ramp(0, 100))).toBeCloseTo(90, 5);
+    const withTower = [...ramp(0, 100), 900];
+    expect(localReliefMeters(withTower)).toBeLessThan(100);
+    expect(localReliefMeters([...ramp(-40, 0), ...ramp(0, 10)])).toBeLessThan(11);
+  });
+
+  it("lifts flat districts and holds mountains near true scale", () => {
+    expect(autoTerrainExaggeration(ramp(0, 100), 6000)).toBe(2);
+    expect(autoTerrainExaggeration(ramp(0, 2), 5000)).toBe(AUTO_RELIEF_MAX);
+    expect(autoTerrainExaggeration(ramp(0, 1500), 8000)).toBe(AUTO_RELIEF_MIN);
+    expect(autoTerrainExaggeration(ramp(0, 30), 0)).toBeNull();
+    expect(autoTerrainExaggeration([], 2000)).toBeNull();
   });
 });
 
