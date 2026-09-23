@@ -56,12 +56,12 @@ export function BaselineComparison({
   return (
     <section
       aria-labelledby={headingId}
-      className={cn("panel rounded-xl border border-border p-5", className)}
+      className={cn("atlas-baseline", className)}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3
           id={headingId}
-          className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+          className="atlas-section-title"
         >
           Against the 1609 baseline
         </h3>
@@ -80,7 +80,7 @@ export function BaselineComparison({
         </span>
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-foreground">
+      <p className="mt-2 text-sm leading-relaxed text-foreground/90">
         {baselineSentence(cmp)}
       </p>
 
@@ -139,30 +139,22 @@ export function BaselineComparison({
           as a comparison ("of benchmark", "below benchmark") rather than as
           retention or loss -- this site never held the benchmark's capacity to
           lose unless it happens to sit in Manhattan. */}
-      <dl className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-border bg-background/40 p-3">
-          <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            Of benchmark
-          </dt>
-          <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
-            {cmp.benchmarkPct}%
-          </dd>
+      <dl className="atlas-stats mt-5">
+        <div>
+          <dt>Of benchmark</dt>
+          <dd>{cmp.benchmarkPct}%</dd>
         </div>
-        <div className="rounded-lg border border-border bg-background/40 p-3">
-          <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            Below benchmark
-          </dt>
-          <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
+        <div>
+          <dt>Below benchmark</dt>
+          <dd>
             {cmp.shortfall > 0 ? `−${cmp.shortfall.toFixed(1)}` : "0"}
-            <span className="ml-1 text-xs font-normal text-muted-foreground">
-              pts
-            </span>
+            <small>pts</small>
           </dd>
         </div>
       </dl>
 
       {!compact && (
-        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+        <p className="atlas-section-note mt-4">
           A fixed reference every site is measured against, wherever it is —
           not a reconstruction of what stood on this particular ground. It is
           our estimate of Manhattan's pre-development land cover, scored with

@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import { Compass, ArrowLeft, Map as MapIcon } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/AppNav";
 import { usePageTitle } from "@/hooks/use-page-title";
+import "@/styles/atlas.css";
 
 const NotFound = () => {
   usePageTitle("Page not found");
@@ -17,39 +18,30 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="atlas-app atlas-page flex min-h-screen flex-col">
       <AppNav />
 
-      <main id="main" className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-20">
-        <div className="absolute inset-0 hero-glow" aria-hidden />
-        <div className="absolute inset-0 terrain-grid opacity-30" aria-hidden />
-
-        <div className="relative text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
-            <Compass className="h-7 w-7" />
-          </div>
-
-          <div className="mt-6 font-mono text-6xl font-bold tracking-tight text-primary md:text-7xl">
-            404
-          </div>
-          <h1 className="mt-3 text-2xl font-semibold">Off the map</h1>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            We couldn't find{" "}
-            <span className="font-mono text-foreground">{location.pathname}</span>.
-            It may have moved, or the coordinates were never charted.
+      <main id="main" className="atlas-lost px-6 py-20 md:px-16">
+        <div className="atlas-lost-inner">
+          <h1>
+            Off the <em>map.</em>
+          </h1>
+          <p>
+            Nothing is charted at <code>{location.pathname}</code>. It may have
+            moved, or the address was never surveyed.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg">
+          <div className="mt-9 flex flex-wrap items-center gap-3">
+            <Button asChild className="atlas-primary h-11 gap-2 px-5">
               <Link to="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to overview
+                <ArrowLeft className="h-4 w-4" />
+                Back to the atlas
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/analyze">
-                <MapIcon className="mr-2 h-4 w-4" />
-                Analyze a location
+            <Button asChild variant="ghost" className="h-11 gap-1.5 px-4 text-muted-foreground hover:text-foreground">
+              <Link to="/dashboard">
+                Browse the public index
+                <ArrowUpRight className="h-4 w-4" />
               </Link>
             </Button>
           </div>
