@@ -22,7 +22,7 @@ export const EXAMPLE_ANALYSIS: AnalysisRecord = {
     { title: "Make room for street trees", description: "Model connected tree pits along paved streets to increase permeable surface and shade.", priority: "high", category: "green" },
     { title: "Put rooftops to work", description: "Test vegetated roofs as a way to retain rainfall where ground-level space is limited.", priority: "medium", category: "green" },
   ],
-  ai_notes: "Illustrative data for exploring the interface, not observed land cover or a site assessment. Scores use the same published weights as live scans. Costs and retention are planning estimates.",
+  ai_notes: "Illustrative land cover, not observed. Scores use the same published weights as live scans; costs and retention are planning estimates.",
   status: "example",
   created_at: "2026-09-10T00:00:00.000Z",
 };
