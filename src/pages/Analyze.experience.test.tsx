@@ -24,8 +24,15 @@ describe("atlas first-use experience", () => {
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
     expect(screen.getByText("Illustrative example")).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: /urban resilience workbench/i })).toBeVisible();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Storm Sim" }), { button: 0, ctrlKey: false });
-    expect(screen.getByRole("slider", { name: /rainfall depth/i })).toHaveValue("50");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Storm" }), { button: 0, ctrlKey: false });
+    const rainfall = screen.getByRole("slider", { name: /rainfall depth/i });
+    expect(rainfall).toHaveValue("50");
+    expect(screen.getAllByRole("slider", { name: /rainfall/i })).toHaveLength(1);
+    const initialRunoff = screen.getByTestId("storm-estimate-runoff").textContent;
+    fireEvent.change(rainfall, { target: { value: "100" } });
+    expect(screen.getByTestId("storm-estimate-runoff").textContent).not.toBe(initialRunoff);
+    expect(screen.getByText(/rational method/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /route 100 mm storm/i })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(screen.getByRole("button", { name: /explore an example/i })).toBeInTheDocument();
     expect(screen.queryByText("Illustrative example")).not.toBeInTheDocument();

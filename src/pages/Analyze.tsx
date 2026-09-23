@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { AppNav } from "@/components/AppNav";
@@ -28,8 +28,7 @@ import { EMPTY_SCENARIO, hasActiveInterventions } from "@/lib/scenario";
 import { MapEditor, type MapEditorHandle } from "@/components/MapEditor";
 import { riskLabel } from "@/lib/absorption";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2,
@@ -37,23 +36,17 @@ import {
   Droplets,
   Paintbrush,
   Link2,
-  MapPin,
   FileText,
   FileSpreadsheet,
   FileJson,
-  Layers,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  EyeOff,
   RotateCcw,
   ArrowRight,
-  Sliders,
-  BarChart3,
-  Waves,
   ShieldCheck,
   Compass,
   Mountain,
+  Check,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useWorkflow } from "@/hooks/useWorkflow";
@@ -71,12 +64,13 @@ import {
   exportFilename,
   type BBox,
 } from "@/lib/geo";
-import { boundsToSimBBox } from "@/lib/simulation";
+import { boundsToSimBBox, estimateRunoffVolumeM3 } from "@/lib/simulation";
 import { generatePDFReport } from "@/lib/pdf-export";
 import { toast } from "sonner";
 import { TacticalHUD } from "@/components/tactical/TacticalHUD";
 import { CommandPalette } from "@/components/tactical/CommandPalette";
-import { ExampleStorm } from "@/components/analyze/ExampleStorm";
+import { StormRain } from "@/components/analyze/StormRain";
+import { MapKey } from "@/components/analyze/MapKey";
 import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
 import "@/styles/atlas.css";
 import { AnalysisLaunchPanel } from "@/components/analyze/AnalysisLaunchPanel";
@@ -220,6 +214,13 @@ export default function Analyze() {
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "simulation" | "mitigation" | "compare" | "export">("overview");
+  const workbenchScrollRef = useRef<HTMLDivElement>(null);
+
+  // Each tab is its own page of the study; arriving mid-scroll from the last
+  // one hides its heading and its first control.
+  useEffect(() => {
+    if (workbenchScrollRef.current) workbenchScrollRef.current.scrollTop = 0;
+  }, [activeTab]);
 
   // When an intervention tool becomes active, auto-collapse drawer for clear map view
   useEffect(() => {
@@ -733,6 +734,11 @@ export default function Analyze() {
             </div>
           )}
 
+          <StormRain
+            raining={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+            rainfallMm={nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm}
+          />
+
           {/* Split-Screen Comparative Mode */}
           {catalystFuture && workflow.state === "COMPARE" && (
             <CompareRealities
@@ -767,16 +773,22 @@ export default function Analyze() {
           onExportPdf={handleExportPDF}
         />
 
-        <div className="atlas-map-heading">
-          <span className="atlas-eyebrow">Resilience atlas / study area</span>
-          <p>{result ? result.location_label : locationLabel || "Custom map view"}</p>
-        </div>
+        <MapKey
+          place={(result ? result.location_label : locationLabel) || "Custom map view"}
+          lat={view.lat}
+          lng={view.lng}
+          showFlow={Boolean(simResult && showFlowVectors && simResult.flow_paths.length > 0)}
+          showPonding={Boolean(simResult && showRiskHeatmap && (simResult.risk_zones?.length ?? 0) > 0)}
+          rainfallMm={simResult ? nowSeal?.storm.rainfallDepthMm : undefined}
+        />
         {!result && workflow.state !== "ANALYZING" && (
           <aside className="atlas-intro" aria-label="Start a resilience study">
+            <p className="atlas-intro-node" aria-hidden="true">
+              {Math.abs(view.lat).toFixed(4)}° {view.lat >= 0 ? "N" : "S"} · {Math.abs(view.lng).toFixed(4)}° {view.lng >= 0 ? "E" : "W"} · z{view.zoom.toFixed(1)}
+            </p>
             <div>
-              <span className="atlas-eyebrow text-primary">Fieldwork for a changing planet</span>
               <h1>A better future <br />starts with <br /><em>the ground.</em></h1>
-              <p className="atlas-intro-copy">See how your city absorbs rain.<br />Explore the changes that could help it absorb more.</p>
+              <p className="atlas-intro-copy">See how your city absorbs rain.{" "}<br />Explore the changes that could help it absorb more.</p>
             </div>
             <div className="atlas-search">
               <label htmlFor="location-search" className="atlas-eyebrow">01 / Find your place</label>
@@ -882,7 +894,9 @@ export default function Analyze() {
             <div className="panel rounded-full border border-primary/40 bg-card/95 px-6 py-3 shadow-2xl backdrop-blur-md flex items-center gap-3">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-sm font-medium text-foreground">
-                {workflow.state === "STORM" ? "Simulating 50 mm / 60-minute design storm…" : "Simulating mitigated watershed response…"}
+                {workflow.state === "STORM"
+                  ? `Routing ${nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm} mm of rain downhill…`
+                  : "Routing the same storm over your redesign…"}
               </span>
             </div>
           </div>
@@ -898,23 +912,16 @@ export default function Analyze() {
               drawerOpen ? "translate-x-0" : "-translate-x-full"
             )}
           >
-            {/* Workbench Drawer Header */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/40 shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/15 text-primary border border-primary/30">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-sm font-semibold truncate leading-tight">
-                    {result.location_label || result.name}
-                  </h2>
-                  <p className="text-[11px] font-mono text-muted-foreground truncate">
-                    {currentAreaKm2.toFixed(2)} km² · {Math.round(currentAreaKm2 * 100)} ha
-                  </p>
-                </div>
+            <div className="atlas-results-head">
+              <div className="min-w-0">
+                <h2 className="atlas-results-title">{result.location_label || result.name}</h2>
+                <p className="atlas-results-meta">
+                  {currentAreaKm2.toFixed(2)} km² · {Math.round(currentAreaKm2 * 100)} ha
+                  {simResult ? ` · ${simResult.metadata.elevation_status === "observed" ? "observed" : "illustrative"} terrain` : ""}
+                </p>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -926,11 +933,12 @@ export default function Analyze() {
                   Reset
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
                   onClick={() => setDrawerOpen(false)}
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  title="Collapse sidebar"
+                  title="Collapse panel"
+                  aria-label="Collapse panel"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -938,156 +946,168 @@ export default function Analyze() {
             </div>
 
             {isExample && <div className="atlas-example-notice"><strong>Illustrative example</strong><span>Explore the tools with sample data. Not a site assessment.</span></div>}
-            {/* Workbench Navigation Tabs */}
-            <div className="border-b border-border bg-card px-2 shrink-0">
-              <Tabs
-                value={activeTab}
-                onValueChange={(val) => setActiveTab(val as typeof activeTab)}
-                className="w-full"
-              >
-                <TabsList className="grid grid-cols-5 h-9 bg-transparent p-0">
-                  <TabsTrigger
-                    value="overview"
-                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                  >
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="simulation"
-                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                  >
-                    Storm Sim
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="mitigation"
-                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                  >
-                    Mitigation
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="compare"
-                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                  >
-                    Compare
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="export"
-                    className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                  >
-                    Export
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
 
-            {/* Tab Contents Scroll Area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* TAB 1: OVERVIEW & LAND COVER */}
+            <Tabs
+              value={activeTab}
+              onValueChange={(val) => setActiveTab(val as typeof activeTab)}
+              className="atlas-steps shrink-0"
+            >
+              <TabsList className="atlas-steps-list">
+                {([
+                  { value: "overview", label: "Overview", done: true },
+                  { value: "simulation", label: "Storm", done: Boolean(simResult) },
+                  { value: "mitigation", label: "Mitigation", done: interventionFeatures.some((f) => f.eligibility.eligible) },
+                  { value: "compare", label: "Compare", done: Boolean(catalystFuture) },
+                  { value: "export", label: "Export", done: false },
+                ] as const).map((step) => (
+                  <TabsTrigger key={step.value} value={step.value} className="atlas-step" data-done={step.done || undefined}>
+                    <span className="atlas-step-mark" aria-hidden="true">
+                      {step.done && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                    </span>
+                    {step.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
+            <div ref={workbenchScrollRef} className="atlas-results-body flex-1 overflow-y-auto">
               {activeTab === "overview" && (
-                <div className="space-y-6">
-                  {isExample && <p className="text-xs leading-relaxed text-muted-foreground">{result.ai_notes}</p>}
-                  {/* Absorption Score Gauge */}
-                  <div className="panel rounded-xl border border-border p-4">
+                <div className="atlas-tab">
+                  {isExample && <p className="atlas-section-note">{result.ai_notes}</p>}
+
+                  <section className="atlas-section atlas-section--lead">
                     <AbsorptionScoreGauge score={Number(result.absorption_score)} />
-                  </div>
+                  </section>
 
-                  {/* 5-Class Land Cover Composition Breakdown */}
-                  <div className="panel rounded-xl border border-border p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-                      Land-Cover Classification & Hydrologic Weights
-                    </h3>
+                  <BaselineComparison score={Number(result.absorption_score)} className="atlas-section" />
+
+                  <section className="atlas-section" aria-labelledby="land-cover-title">
+                    <h3 id="land-cover-title" className="atlas-section-title">What the ground is made of</h3>
+                    <p className="atlas-section-note mb-4">Classified land cover and the hydrologic weight each class carries.</p>
                     <LandCoverBreakdown cover={result.land_cover} />
-                  </div>
+                  </section>
 
-                  {/* Pre-development Baseline Comparison */}
-                  <BaselineComparison score={Number(result.absorption_score)} />
-
-                  {/* Observed 1609 land cover for this ground, where surveyed */}
                   <Historical1609Panel
                     state={welikia1609}
                     presentScore={Number(result.absorption_score)}
                   />
 
-                  {/* Prioritized Climate Adaptation Recommendations */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                      Prioritized Interventions
-                    </h3>
+                  <section className="atlas-section" aria-labelledby="recs-title">
+                    <h3 id="recs-title" className="atlas-section-title mb-4">Where to start</h3>
                     <RecommendationsList items={result.recommendations ?? []} />
-                  </div>
+                  </section>
 
-                  {/* Quick Action to Trigger Simulation */}
-                  <Button
-                    onClick={() => {
-                      setActiveTab("simulation");
-                      runSimulation(false);
-                    }}
-                    className="w-full rounded-lg h-11 text-sm font-medium gap-2"
-                  >
-                    <Droplets className="h-4 w-4" /> Route {stormRainfallMm} mm design storm
-                  </Button>
+                  <div className="atlas-tab-footer">
+                    <Button
+                      onClick={() => {
+                        setActiveTab("simulation");
+                        runSimulation(false);
+                      }}
+                      disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                      className="atlas-primary w-full h-11 text-sm font-medium gap-2"
+                    >
+                      <Droplets className="h-4 w-4" /> Route {nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm} mm design storm
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {/* TAB 2: STORMWATER RUNOFF SIMULATION */}
-              {activeTab === "simulation" && isExample && analyzedBBox && (
-                <ExampleStorm cover={result.land_cover} bbox={analyzedBBox} />
-              )}
               {activeTab === "simulation" && (
-                <div className="space-y-6">
-                  <div className="panel rounded-xl border border-border p-4 space-y-4">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        Design Storm Hydrograph
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {stormRainfallMm} mm depth · 60-minute duration · D8 flow on{" "}
-                        {simResult?.metadata.elevation_status === "observed"
-                          ? "observed Terrarium terrain"
-                          : simResult
-                            ? "illustrative terrain"
-                            : "Terrarium DEM with land-cover retention"}
-                      </p>
+                <div className="atlas-tab">
+                  <section className="atlas-section atlas-section--lead" aria-labelledby="storm-title">
+                    <h3 id="storm-title" className="atlas-section-title">Where does the rain go?</h3>
+                    <p className="atlas-section-note">
+                      One hour of uniform rain, routed cell to cell down the steepest slope (D8) on{" "}
+                      {simResult?.metadata.elevation_status === "observed"
+                        ? "observed Terrarium terrain"
+                        : simResult
+                          ? "illustrative terrain"
+                          : "Terrarium elevation"}
+                      , with land cover setting how much each cell holds back.
+                    </p>
+
+                    <div className="atlas-control mt-5">
+                      <label htmlFor="storm-rainfall" className="atlas-control-label">
+                        <span>Rainfall depth</span>
+                        <span className="atlas-control-value">
+                          {nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm}
+                          <small>mm</small>
+                        </span>
+                      </label>
+                      <input
+                        id="storm-rainfall"
+                        type="range"
+                        min="5"
+                        max="200"
+                        step="5"
+                        value={nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm}
+                        disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                        onChange={(event) => setStormRainfallMm(Number(event.target.value))}
+                        className="atlas-range"
+                        style={{ "--fill": `${(((nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm) - 5) / 195) * 100}%` } as CSSProperties}
+                      />
+                      <div className="atlas-range-ticks" aria-hidden="true"><span>5 mm</span><span>200 mm</span></div>
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="storm-rainfall">Routed precipitation: {stormRainfallMm} mm</Label>
-                      <input id="storm-rainfall" type="range" min="5" max="200" step="5" value={stormRainfallMm}
-                        disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                        onChange={(event) => setStormRainfallMm(Number(event.target.value))} className="w-full accent-primary" />
-                      <Label htmlFor="storm-resolution">Terrain resolution</Label>
-                      <select id="storm-resolution" value={stormResolution}
-                        disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                        onChange={(event) => setStormResolution(event.target.value as "low" | "medium" | "high")}
-                        className="w-full rounded border border-border bg-background p-2 text-sm">
-                        <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
-                      </select>
-                      {nowSeal && <p className="text-xs text-muted-foreground">Storm settings are sealed for a fair comparison. Reset the study to choose a different routed storm.</p>}
+                    <div className="atlas-control mt-5">
+                      <span className="atlas-control-label" id="storm-resolution-label">Terrain resolution</span>
+                      <div role="radiogroup" aria-labelledby="storm-resolution-label" className="atlas-segmented">
+                        {(["low", "medium", "high"] as const).map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            role="radio"
+                            aria-checked={stormResolution === level}
+                            disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                            onClick={() => setStormResolution(level)}
+                          >
+                            {level.charAt(0).toUpperCase() + level.slice(1)}
+                            <small>{LOCAL_GRID[level]}²</small>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    {!simResult ? (
+
+                    {analyzedBBox && (() => {
+                      const depth = nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm;
+                      const rainVolume = bboxAreaKm2(analyzedBBox) * 1e6 * depth / 1000;
+                      const estimate = estimateRunoffVolumeM3(result.land_cover, depth, analyzedBBox);
+                      return (
+                        <dl className="atlas-stats atlas-stats--estimate mt-5" aria-live="polite">
+                          <div><dt>Rain on the site</dt><dd>{Math.round(rainVolume).toLocaleString()}<small>m³</small></dd></div>
+                          <div><dt>Estimated runoff</dt><dd className="text-primary" data-testid="storm-estimate-runoff">{Math.round(estimate).toLocaleString()}<small>m³</small></dd></div>
+                        </dl>
+                      );
+                    })()}
+                    <p className="atlas-section-note mt-3">
+                      Rational Method estimate: rainfall × area × weighted runoff coefficient. Routing adds the terrain: where the water travels, and where it collects.
+                    </p>
+                    {nowSeal && <p className="atlas-section-note mt-2">Storm settings are sealed so the redesign faces the same storm. Reset the study to choose another.</p>}
+
+                    {!simResult && (
                       <Button
                         onClick={() => runSimulation(false)}
                         disabled={workflow.state === "STORM"}
-                        className="w-full rounded-lg h-11 text-sm font-medium gap-2"
+                        className="atlas-primary mt-5 w-full h-11 text-sm font-medium gap-2"
                       >
-                        <Play className="h-4 w-4" /> Execute Simulation
+                        {workflow.state === "STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        {workflow.state === "STORM" ? "Routing storm…" : `Route ${stormRainfallMm} mm storm`}
                       </Button>
-                    ) : (
-                      <div className="space-y-4 pt-2">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="rounded-lg border border-border bg-background/50 p-3">
-                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Runoff volume
-                            </span>
-                            <div className="mt-1 font-mono text-xl font-bold">
-                              {Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³
-                            </div>
+                    )}
+                  </section>
+
+                  {simResult && (
+                    <>
+                      <section className="atlas-section" aria-labelledby="storm-result-title">
+                        <h3 id="storm-result-title" className="atlas-section-title">What the storm did</h3>
+                        <dl className="atlas-stats mt-4">
+                          <div>
+                            <dt>Runoff</dt>
+                            <dd>{Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()}<small>m³</small></dd>
                           </div>
-                          <div className="rounded-lg border border-border bg-background/50 p-3">
-                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Infiltrated volume
-                            </span>
-                            <div className="mt-1 font-mono text-xl font-bold text-primary">
+                          <div>
+                            <dt>Infiltrated</dt>
+                            <dd className="text-primary">
                               {Math.round(
                                 simResult.metadata.infiltrated_volume_m3 ??
                                   Math.max(
@@ -1095,26 +1115,18 @@ export default function Analyze() {
                                     (simResult.metadata.rainfall_volume_m3 ?? 0) -
                                       (simResult.metadata.runoff_volume_m3 ?? 0)
                                   )
-                              ).toLocaleString()} m³
-                            </div>
+                              ).toLocaleString()}<small>m³</small>
+                            </dd>
                           </div>
-                          <div className="rounded-lg border border-border bg-background/50 p-3">
-                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Peak discharge
-                            </span>
-                            <div className="mt-1 font-mono text-xl font-bold text-warning">
-                              {(simResult.metadata.peak_discharge_m3s ?? 0).toFixed(1)} m³/s
-                            </div>
+                          <div>
+                            <dt>Peak discharge</dt>
+                            <dd>{(simResult.metadata.peak_discharge_m3s ?? 0).toFixed(1)}<small>m³/s</small></dd>
                           </div>
-                          <div className="rounded-lg border border-border bg-background/50 p-3">
-                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                              Flow paths
-                            </span>
-                            <div className="mt-1 font-mono text-xl font-bold text-accent">
-                              {simResult.flow_paths.length} vectors
-                            </div>
+                          <div>
+                            <dt>Flow paths</dt>
+                            <dd>{simResult.flow_paths.length}<small>routed</small></dd>
                           </div>
-                        </div>
+                        </dl>
 
                         {simResult.metadata.hydrograph &&
                           simResult.metadata.hydrograph.length > 1 && (
@@ -1126,6 +1138,7 @@ export default function Analyze() {
 
                         {simResult.metadata.rainfall_volume_m3 != null && (
                           <WaterBalanceMeter
+                            className="mt-6"
                             balance={{
                               rainfallM3: simResult.metadata.rainfall_volume_m3,
                               infiltratedM3: simResult.metadata.infiltrated_volume_m3 ?? 0,
@@ -1137,66 +1150,52 @@ export default function Analyze() {
                         )}
 
                         {simWarnings.length > 0 && (
-                          <p className="text-[11px] leading-relaxed text-muted-foreground">
-                            {simWarnings[0]}
-                          </p>
+                          <p className="atlas-section-note mt-4">{simWarnings[0]}</p>
                         )}
+                      </section>
 
-                        <div className="border-t border-border/60 pt-3 space-y-2">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Map visualization layers
-                          </span>
-                          <div className="flex items-center justify-between text-xs py-1">
-                            <span className="text-foreground">Inundation risk heatmap</span>
-                            <button
-                              type="button"
-                              onClick={() => setShowRiskHeatmap(!showRiskHeatmap)}
-                              className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                            >
-                              {showRiskHeatmap ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4" />}
-                              <span>{showRiskHeatmap ? "Visible" : "Hidden"}</span>
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between text-xs py-1">
-                            <span className="text-foreground">Flow vectors (animated)</span>
-                            <button
-                              type="button"
-                              onClick={() => setShowFlowVectors(!showFlowVectors)}
-                              className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                            >
-                              {showFlowVectors ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4" />}
-                              <span>{showFlowVectors ? "Visible" : "Hidden"}</span>
-                            </button>
-                          </div>
+                      <section className="atlas-section" aria-labelledby="layers-title">
+                        <h3 id="layers-title" className="atlas-section-title">On the map</h3>
+                        <div className="atlas-toggles mt-3">
+                          <label className="atlas-toggle">
+                            <span className="atlas-toggle-swatch atlas-toggle-swatch--pond" aria-hidden="true" />
+                            <span className="flex-1">
+                              Ponding depth
+                              <small>Where routed water collects</small>
+                            </span>
+                            <Switch checked={showRiskHeatmap} onCheckedChange={setShowRiskHeatmap} aria-label="Show ponding depth" />
+                          </label>
+                          <label className="atlas-toggle">
+                            <span className="atlas-toggle-swatch atlas-toggle-swatch--flow" aria-hidden="true" />
+                            <span className="flex-1">
+                              Flow paths
+                              <small>Animated, source to outlet</small>
+                            </span>
+                            <Switch checked={showFlowVectors} onCheckedChange={setShowFlowVectors} aria-label="Show flow paths" />
+                          </label>
                         </div>
+                      </section>
 
+                      <div className="atlas-tab-footer">
                         <Button
                           onClick={() => {
                             workflow.advance("REDESIGN");
                             setActiveTab("mitigation");
                           }}
-                          className="w-full rounded-lg h-10 text-xs font-medium gap-2"
+                          className="atlas-primary w-full h-11 text-sm font-medium gap-2"
                         >
-                          <Paintbrush className="h-4 w-4" /> Open Mitigation Studio
+                          <Paintbrush className="h-4 w-4" /> Redesign the ground
                         </Button>
                       </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* TAB 3: GREEN INFRASTRUCTURE MITIGATION STUDIO */}
               {activeTab === "mitigation" && (
-                <div className="space-y-6">
-                  <div className="panel rounded-xl border border-border p-4 space-y-4">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        Green Infrastructure Design
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Select interventions to model permeable retrofits and calculate runoff reduction.
-                      </p>
-                    </div>
+                <div className="atlas-tab">
+                  <section className="atlas-section atlas-section--lead" aria-labelledby="mitigation-title">
+                    <h3 id="mitigation-title" className="atlas-section-title mb-2">Give the water somewhere to go</h3>
 
                     <ScenarioStudio
                       cover={result.land_cover}
@@ -1212,147 +1211,130 @@ export default function Analyze() {
                       onClearDrawings={() => editorRef.current?.clear()}
                       onScenarioExport={setScenarioExport}
                     />
+                  </section>
 
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      Explore rainfall sensitivity below using a land-cover estimate. Route the same storm to compare drawn geometry with D8 terrain flow.
+                  <section className="atlas-section">
+                    <p className="atlas-section-note mb-4">
+                      Explore rainfall sensitivity with a land-cover estimate, then route the same storm to compare drawn geometry with D8 terrain flow.
                     </p>
                     <StormComparison cover={result.land_cover} scenario={scenario} areaM2={currentAreaKm2 * 1e6} />
+                  </section>
 
+                  <div className="atlas-tab-footer">
                     <Button
                       disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
                       onClick={() => runSimulation(true)}
-                      className="w-full rounded-lg h-11 text-sm font-medium gap-2"
+                      className="atlas-primary w-full h-11 text-sm font-medium gap-2"
                     >
-                      <Play className="h-4 w-4" /> Rerun the same storm on the mitigated surface
+                      {workflow.state === "RERUN_STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                      Rerun the same storm on the redesign
                     </Button>
                   </div>
                 </div>
               )}
 
-              {/* TAB 4: SCENARIO COMPARISON */}
               {activeTab === "compare" && (
-                <div className="space-y-6">
-                  <div className="panel rounded-xl border border-border p-4 space-y-4">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        Baseline vs. Mitigated Comparison
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {isExample
-                          ? "The same sealed storm is routed over illustrative land cover, then over your drawn interventions."
-                          : "The same sealed storm and terrain are routed over the current surface and the mitigated surface."}
-                      </p>
-                    </div>
+                <div className="atlas-tab">
+                  <section className="atlas-section atlas-section--lead" aria-labelledby="compare-title">
+                    <h3 id="compare-title" className="atlas-section-title">Same storm, two grounds</h3>
+                    <p className="atlas-section-note">
+                      {isExample
+                        ? "The same sealed storm is routed over illustrative land cover, then over your drawn interventions."
+                        : "The same sealed storm and terrain are routed over the current surface and the mitigated surface."}
+                    </p>
 
                     {catalystFuture ? (
-                      <div className="space-y-3 pt-2">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="rounded-lg border border-border bg-background/50 p-3">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Baseline Score</span>
-                            <div className="font-mono text-2xl font-bold">{catalystFuture.future.impact.baseScore.toFixed(0)}</div>
-                            <span className="text-xs text-muted-foreground">{riskLabel(catalystFuture.future.impact.baseRisk)}</span>
+                      <>
+                        <div className="atlas-versus mt-5">
+                          <div>
+                            <span>Today</span>
+                            <strong>{catalystFuture.future.impact.baseScore.toFixed(0)}</strong>
+                            <em>{riskLabel(catalystFuture.future.impact.baseRisk)} risk</em>
                           </div>
-                          <div className="rounded-lg border border-border bg-background/50 p-3">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mitigated Score</span>
-                            <div className="font-mono text-2xl font-bold text-primary">
-                              {catalystFuture.future.impact.projectedScore.toFixed(0)}
-                            </div>
-                            <span className="text-xs text-primary font-medium">
-                              +{Math.round(catalystFuture.future.impact.scoreDelta)} pts
-                            </span>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          <div data-future>
+                            <span>Redesigned</span>
+                            <strong>{catalystFuture.future.impact.projectedScore.toFixed(0)}</strong>
+                            <em>+{Math.round(catalystFuture.future.impact.scoreDelta)} pts</em>
                           </div>
                         </div>
 
-                        <div className="rounded-lg border border-border bg-background/50 p-3">
-                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span>Added Retention</span>
-                            <span className="font-mono font-semibold text-foreground">
-                              {Math.round(catalystFuture.future.impact.addedRetentionM3).toLocaleString()} m³/yr
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span>Estimated Investment</span>
-                            <span className="font-mono font-semibold text-foreground">
-                              ${Math.round(catalystFuture.future.impact.capexUSD).toLocaleString()}
-                            </span>
-                          </div>
+                        <dl className="atlas-ledger mt-5">
                           {simResult?.metadata.runoff_volume_m3 != null &&
                             futureSimResult?.metadata.runoff_volume_m3 != null && (
-                              <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Routed storm runoff</span>
-                                <span className="font-mono font-semibold text-foreground">
-                                  {Math.round(simResult.metadata.runoff_volume_m3).toLocaleString()} →{" "}
-                                  {Math.round(futureSimResult.metadata.runoff_volume_m3).toLocaleString()} m³
-                                </span>
+                              <div>
+                                <dt>Routed storm runoff</dt>
+                                <dd>
+                                  {Math.round(simResult.metadata.runoff_volume_m3).toLocaleString()} → {Math.round(futureSimResult.metadata.runoff_volume_m3).toLocaleString()} m³
+                                </dd>
                               </div>
                             )}
-                        </div>
+                          <div>
+                            <dt>Added retention</dt>
+                            <dd>{Math.round(catalystFuture.future.impact.addedRetentionM3).toLocaleString()} m³/yr</dd>
+                          </div>
+                          <div>
+                            <dt>Estimated investment</dt>
+                            <dd>${Math.round(catalystFuture.future.impact.capexUSD).toLocaleString()}</dd>
+                          </div>
+                        </dl>
 
                         <Button
                           onClick={() => workflow.advance("COMPARE")}
-                          className="w-full rounded-lg h-10 text-xs font-medium gap-2"
+                          className="atlas-primary mt-6 w-full h-11 text-sm font-medium gap-2"
                         >
                           <Compass className="h-4 w-4" /> Open split-screen comparison
                         </Button>
-                      </div>
+                      </>
                     ) : (
-                      <p className="text-xs text-muted-foreground py-4 text-center">
-                        Configure interventions in the Mitigation tab and rerun the simulation to view comparative metrics.
-                      </p>
+                      <div className="atlas-empty mt-5">
+                        <p>Nothing to compare yet.</p>
+                        <p>Draw at least one intervention in Mitigation, then rerun the same storm on the redesign.</p>
+                        <Button variant="outline" size="sm" className="mt-4" onClick={() => setActiveTab("mitigation")}>
+                          Go to Mitigation
+                        </Button>
+                      </div>
                     )}
-                  </div>
+                  </section>
                 </div>
               )}
 
-              {/* TAB 5: EXPORT & REPORTS */}
               {activeTab === "export" && (
-                <div className="space-y-4">
-                  <div className="panel rounded-xl border border-border p-4 space-y-3">
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                      Export Analysis Data & Reports
-                    </h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Download publication-ready resilience dossiers and geospatial layer data for policy, GIS, and civil engineering workflows.
+                <div className="atlas-tab">
+                  <section className="atlas-section atlas-section--lead" aria-labelledby="export-title">
+                    <h3 id="export-title" className="atlas-section-title">Take the study with you</h3>
+                    <p className="atlas-section-note">
+                      Resilience dossiers and geospatial layers for policy, GIS, and civil engineering workflows.
+                      {isExample ? " Example exports are labelled as illustrative." : ""}
                     </p>
 
-                    <div className="space-y-2 pt-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleExportPDF}
-                        className="w-full justify-start gap-2.5 h-11 text-xs"
-                      >
-                        <FileText className="h-4 w-4 text-primary" />
-                        <div className="text-left">
-                          <div className="font-medium">Download PDF Resilience Dossier</div>
-                          <div className="text-[10px] text-muted-foreground">Formatted report with charts and recommendations</div>
-                        </div>
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        onClick={handleExportGeoJSON}
-                        className="w-full justify-start gap-2.5 h-11 text-xs"
-                      >
-                        <FileJson className="h-4 w-4 text-accent" />
-                        <div className="text-left">
-                          <div className="font-medium">Export GeoJSON Feature Layers</div>
-                          <div className="text-[10px] text-muted-foreground">Spatial boundary and land-cover polygons for QGIS/ArcGIS</div>
-                        </div>
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        onClick={handleExportCSV}
-                        className="w-full justify-start gap-2.5 h-11 text-xs"
-                      >
-                        <FileSpreadsheet className="h-4 w-4 text-warning" />
-                        <div className="text-left">
-                          <div className="font-medium">Export Attribute Table (CSV)</div>
-                          <div className="text-[10px] text-muted-foreground">Tabular percentages and hydrologic scores</div>
-                        </div>
-                      </Button>
+                    <div className="atlas-exports mt-5">
+                      <button type="button" onClick={handleExportPDF}>
+                        <FileText className="h-4 w-4" aria-hidden="true" />
+                        <span>
+                          <strong>PDF resilience dossier</strong>
+                          <small>Formatted report with charts and recommendations</small>
+                        </span>
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <button type="button" onClick={handleExportGeoJSON}>
+                        <FileJson className="h-4 w-4" aria-hidden="true" />
+                        <span>
+                          <strong>GeoJSON feature layers</strong>
+                          <small>Study boundary and land-cover attributes for QGIS or ArcGIS</small>
+                        </span>
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <button type="button" onClick={handleExportCSV}>
+                        <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
+                        <span>
+                          <strong>Attribute table (CSV)</strong>
+                          <small>Tabular percentages and hydrologic scores</small>
+                        </span>
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </button>
                     </div>
-                  </div>
+                  </section>
                 </div>
               )}
             </div>

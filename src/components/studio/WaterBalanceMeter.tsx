@@ -15,22 +15,20 @@ export function WaterBalanceMeter({ balance, className }: WaterBalanceMeterProps
   const total = balance.rainfallM3;
   const segments = [
     { key: "infiltrated", label: "Infiltrated", value: balance.infiltratedM3, className: "bg-primary" },
-    { key: "stored", label: "Stored", value: balance.storedM3, className: "bg-accent" },
-    { key: "runoff", label: "Runoff", value: balance.runoffM3, className: "bg-warning" },
+    { key: "stored", label: "Stored", value: balance.storedM3, className: "bg-[hsl(var(--surface-soil))]" },
+    { key: "runoff", label: "Runoff", value: balance.runoffM3, className: "bg-[#56c3df]" },
   ];
 
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-baseline justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Water balance
-        </h4>
+        <h4 className="atlas-subtitle">Where the rain went</h4>
         <span className="font-mono text-[11px] text-muted-foreground">
           {Math.round(total).toLocaleString()} m³ rain
         </span>
       </div>
       <div
-        className="flex h-2.5 overflow-hidden rounded-full border border-border bg-muted"
+        className="flex h-2 gap-px overflow-hidden rounded-sm bg-muted"
         role="img"
         aria-label="Rainfall partitioned into infiltration, storage, and runoff"
       >
@@ -46,8 +44,8 @@ export function WaterBalanceMeter({ balance, className }: WaterBalanceMeterProps
       <dl className="grid grid-cols-3 gap-2 text-[11px]">
         {segments.map((segment) => (
           <div key={segment.key}>
-            <dt className="text-muted-foreground">{segment.label}</dt>
-            <dd className="font-mono font-semibold">
+            <dt className="flex items-center gap-1.5 text-muted-foreground"><span className={cn("h-1.5 w-1.5 rounded-full", segment.className)} aria-hidden="true" />{segment.label}</dt>
+            <dd className="mt-0.5 font-mono tabular-nums text-foreground">
               {Math.round(segment.value).toLocaleString()} m³
             </dd>
           </div>

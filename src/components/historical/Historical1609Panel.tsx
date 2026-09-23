@@ -26,8 +26,8 @@ export function Historical1609Panel({
 }: Historical1609PanelProps) {
   if (state.loading) {
     return (
-      <div className="panel rounded-xl border border-border p-4">
-        <p className="text-xs text-muted-foreground">
+      <div className="atlas-section">
+        <p className="atlas-section-note">
           Reading the 1609 record for this ground…
         </p>
       </div>
@@ -36,9 +36,9 @@ export function Historical1609Panel({
 
   if (state.error || !state.lookup) {
     return (
-      <div className="panel rounded-xl border border-border p-4 space-y-1">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          1609 Land Cover
+      <div className="atlas-section space-y-1">
+        <h3 className="atlas-section-title">
+          This ground in 1609
         </h3>
         <p className="text-xs text-muted-foreground">
           {state.error ?? "The 1609 record could not be loaded."}
@@ -52,11 +52,11 @@ export function Historical1609Panel({
 
   if (lookup.status === "unavailable") {
     return (
-      <div className="panel rounded-xl border border-border p-4 space-y-3">
+      <div className="atlas-section space-y-3">
         <div className="flex items-center gap-2">
           <MapPinOff className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            1609 Land Cover · Not Surveyed Here
+          <h3 className="atlas-section-title">
+            This ground in 1609: not surveyed
           </h3>
         </div>
         <p className="text-xs text-muted-foreground">{lookup.unavailableReason}</p>
@@ -76,15 +76,16 @@ export function Historical1609Panel({
   const delta = Math.round((score - presentScore) * 10) / 10;
 
   return (
-    <div className="panel rounded-xl border border-border p-4 space-y-4">
+    <div className="atlas-section space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Leaf className="h-4 w-4 text-primary" />
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            1609 Land Cover · Observed
+          <Leaf className="h-4 w-4 text-primary" aria-hidden="true" />
+          <h3 className="atlas-section-title">
+            This ground in 1609
           </h3>
         </div>
-        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">
+        <span className="mt-1 shrink-0 font-mono text-[10px] text-muted-foreground">
+          observed ·{" "}
           {lookup.blockCount.toLocaleString()}{" "}
           {lookup.blockCount === 1 ? "block" : "blocks"}
         </span>
@@ -92,15 +93,15 @@ export function Historical1609Panel({
 
       <div className="flex items-end gap-4">
         <div>
-          <div className="font-mono text-3xl font-bold text-foreground">
+          <div className="atlas-reading-number atlas-reading-number--sm">
             {score.toFixed(0)}
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             Absorption in 1609
           </div>
         </div>
         {delta > 0 && (
-          <div className="pb-1 text-xs text-muted-foreground">
+          <div className="pb-5 text-xs text-muted-foreground">
             <span className="font-mono text-foreground">
               −{delta.toFixed(0)}
             </span>{" "}
@@ -116,9 +117,9 @@ export function Historical1609Panel({
               <span className="text-muted-foreground">{CLASS_LABELS[key]}</span>
               <span className="font-mono text-foreground">{cover[key]}%</span>
             </div>
-            <div className="h-1 w-full overflow-hidden rounded bg-muted">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded bg-primary"
+                className="h-full rounded-full bg-primary/80"
                 style={{ width: `${cover[key]}%` }}
               />
             </div>
