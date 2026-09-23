@@ -99,6 +99,10 @@ function explicitExaggeration(exaggeration?: number): number | undefined {
     : undefined;
 }
 
+function styleParsed(map: MLMap): boolean {
+  return Boolean(!map.getStyle || map.getStyle());
+}
+
 /**
  * Hillshade stays on in the flat view. Pitched mode adds a terrain mesh,
  * building mass, and a sky so the storm has a ground to sit on.
