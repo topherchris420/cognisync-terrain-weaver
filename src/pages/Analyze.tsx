@@ -695,25 +695,19 @@ export default function Analyze() {
 
           {/* Floating On-Map Drawing Mode Action Banner */}
           {workflow.state === "REDESIGN" && activeIntervention && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
-              <div className="panel rounded-xl border border-accent/60 bg-card/95 p-4 shadow-2xl backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4">
+            <div className="absolute top-32 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
+              <div className="atlas-float flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent border border-accent/40">
-                    <Paintbrush className="h-5 w-5 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-accent">
-                      Drawing Mode Active
-                    </h3>
-                    <p className="text-xs text-foreground font-medium">
-                      Click points, then click the first point to finish. <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono border">Esc</kbd> cancels.
-                    </p>
-                  </div>
+                  <Paintbrush className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <p className="text-[13px] leading-snug text-foreground">
+                    Click to place points; click the first point to close the shape.{" "}
+                    <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">Esc</kbd> cancels.
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     onClick={() => setActiveIntervention(null)}
                     className="h-8 text-xs flex-1 sm:flex-none"
                   >
@@ -725,9 +719,9 @@ export default function Analyze() {
                       setActiveIntervention(null);
                       setDrawerOpen(true);
                     }}
-                    className="h-8 text-xs flex-1 sm:flex-none gap-1 bg-accent text-accent-foreground hover:bg-accent/90"
+                    className="atlas-primary h-8 text-xs flex-1 sm:flex-none"
                   >
-                    Done Drawing
+                    Done drawing
                   </Button>
                 </div>
               </div>
@@ -885,10 +879,10 @@ export default function Analyze() {
 
         {/* 7. Active Simulation Banner */}
         {(workflow.state === "STORM" || workflow.state === "RERUN_STORM") && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40">
-            <div className="panel rounded-full border border-primary/40 bg-card/95 px-6 py-3 shadow-2xl backdrop-blur-md flex items-center gap-3">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-sm font-medium text-foreground">
+          <div className="absolute top-32 left-1/2 -translate-x-1/2 z-40">
+            <div className="atlas-float flex items-center gap-3 px-5" role="status">
+              <Droplets className="h-4 w-4 animate-pulse text-[hsl(var(--water))]" aria-hidden="true" />
+              <span className="text-sm text-foreground">
                 {workflow.state === "STORM"
                   ? `Routing ${nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm} mm of rain downhill…`
                   : "Routing the same storm over your redesign…"}
