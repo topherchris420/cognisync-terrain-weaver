@@ -7,6 +7,7 @@ import {
   MapEditor,
   type MapEditorHandle,
 } from "./MapEditor";
+import { isMapDrawing } from "@/lib/map-drawing";
 
 const drawMocks = vi.hoisted(() => [] as Array<{
   add: ReturnType<typeof vi.fn>;
@@ -14,6 +15,7 @@ const drawMocks = vi.hoisted(() => [] as Array<{
   deleteAll: ReturnType<typeof vi.fn>;
   getAll: ReturnType<typeof vi.fn>;
   changeMode: ReturnType<typeof vi.fn>;
+  trash: ReturnType<typeof vi.fn>;
   state: GeoJSON.Feature[];
 }>);
 
@@ -39,6 +41,7 @@ vi.mock("@mapbox/mapbox-gl-draw", () => ({
       features: this.state,
     }));
     changeMode = vi.fn();
+    trash = vi.fn();
     constructor() {
       drawMocks.push(this);
     }
@@ -258,5 +261,69 @@ describe("MapEditor", () => {
     view.rerender(<MapEditor ref={ref} {...props} features={[]} />);
     await waitFor(() => expect(drawMocks[0].deleteAll).toHaveBeenCalled());
     expect(drawMocks[0].changeMode).toHaveBeenCalledWith("draw_polygon");
+  });
+  it("attaches Draw even while an animated layer keeps map.loaded() false", () => {
+    // loaded() lives on the prototype, as on a real map, so it can be answered for.
+    const map = Object.assign(Object.create({ loaded: () => false }), createMapMock());
+    let loadedDuringAttach: boolean | undefined;
+    map.addControl = vi.fn(() => {
+      loadedDuringAttach = map.loaded();
+      map.addSource("mapbox-gl-draw-cold");
+    });
+    render(<MapEditor map={map as unknown as MapLibreMap} bbox={[[0, 0], [1, 1]]} activeIntervention="street_trees" features={[]} />);
+    expect(loadedDuringAttach).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(map, "loaded")).toBe(false);
+    expect(map.loaded()).toBe(false);
+  });
+
+  it("keeps an open shape when the tool is put down with Done", () => {
+    const map = createMapMock();
+    const onChange = vi.fn();
+    const props = { map: map as unknown as MapLibreMap, bbox: [[0, 0], [1, 1]], features: [], onChange };
+    const view = render(<MapEditor {...props} activeIntervention="street_trees" />);
+    // Leaving draw mode is when Draw closes a shape with 3+ points.
+    drawMocks[0].changeMode.mockImplementation((mode: string) => {
+      if (mode === "simple_select") {
+        map.handlers.get("draw.create")?.({ features: [{ type: "Feature", id: "open", properties: {}, geometry: polygon }] });
+      }
+    });
+    act(() => view.rerender(<MapEditor {...props} activeIntervention={null} />));
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject([{ id: "open", type: "street_trees" }]);
+  });
+
+  it("discards the shape in progress on cancel", () => {
+    const map = createMapMock();
+    const onChange = vi.fn();
+    const ref = createRef<MapEditorHandle>();
+    const props = { map: map as unknown as MapLibreMap, bbox: [[0, 0], [1, 1]], features: [], onChange };
+    const view = render(<MapEditor ref={ref} {...props} activeIntervention="street_trees" />);
+    act(() => ref.current?.cancelDraft());
+    expect(drawMocks[0].trash).toHaveBeenCalledOnce();
+    act(() => view.rerender(<MapEditor ref={ref} {...props} activeIntervention={null} />));
+    act(() => map.handlers.get("draw.create")?.({ features: [{ type: "Feature", id: "stray", properties: {}, geometry: polygon }] }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(drawMocks[0].delete).toHaveBeenCalledWith(["stray"]);
+  });
+
+  it("re-arms the tool after a shape closes, once the sync has run", () => {
+    const map = createMapMock();
+    const onChange = vi.fn();
+    const props = { map: map as unknown as MapLibreMap, bbox: [[0, 0], [1, 1]], activeIntervention: "street_trees" as const, onChange };
+    const view = render(<MapEditor {...props} features={[]} />);
+    const armed = () => drawMocks[0].changeMode.mock.calls.filter(([mode]) => mode === "draw_polygon").length;
+    expect(armed()).toBe(1);
+    act(() => map.handlers.get("draw.create")?.({ features: [{ type: "Feature", id: "one", properties: {}, geometry: polygon }] }));
+    act(() => view.rerender(<MapEditor {...props} features={onChange.mock.calls.at(-1)?.[0]} />));
+    expect(armed()).toBe(2);
+  });
+
+  it("marks the map as drawing so water layers hold their popups", () => {
+    const container = document.createElement("div");
+    const map = { ...createMapMock(), getContainer: () => container };
+    const props = { map: map as unknown as MapLibreMap, bbox: [[0, 0], [1, 1]], features: [] };
+    const view = render(<MapEditor {...props} activeIntervention="bioswales" />);
+    expect(isMapDrawing(map as unknown as MapLibreMap)).toBe(true);
+    view.rerender(<MapEditor {...props} activeIntervention={null} />);
+    expect(isMapDrawing(map as unknown as MapLibreMap)).toBe(false);
   });
 });

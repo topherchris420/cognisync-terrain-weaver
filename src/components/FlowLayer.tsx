@@ -6,6 +6,7 @@ import type { FlowPath } from "@/lib/simulation-types";
 import { smoothFlowPoints } from "@/lib/simulation";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { FLOW_HEAD as HEAD, FLOW_MOUTH as MOUTH, POND_HIT_PX } from "@/lib/water-palette";
+import { isMapDrawing } from "@/lib/map-drawing";
 
 interface FlowLayerProps {
   flowPaths?: FlowPath[];
@@ -281,6 +282,7 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     if (!map || !safeHasStyle(map)) return;
 
     const handleMouseEnter = () => {
+      if (isMapDrawing(map)) return;
       try {
         map.getCanvas().style.cursor = "pointer";
       } catch {
@@ -289,6 +291,7 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     };
 
     const handleMouseLeave = () => {
+      if (isMapDrawing(map)) return;
       try {
         map.getCanvas().style.cursor = "";
       } catch {
@@ -297,7 +300,7 @@ export const FlowLayer = forwardRef<FlowLayerHandle, FlowLayerProps>(function Fl
     };
 
     const handleClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-      if (!e.features || e.features.length === 0) return;
+      if (!e.features || e.features.length === 0 || isMapDrawing(map)) return;
       // Where a path runs through ponded water, the pool's depth is the
       // answer people are looking for; it owns the click.
       const r = POND_HIT_PX;
