@@ -70,6 +70,17 @@ export const INTERVENTIONS: Record<InterventionKey, InterventionDef> = {
   },
 };
 
+/**
+ * One hue per intervention, shared by the map editor and the studio, so a
+ * drawn shape and the tool that made it read as the same thing.
+ */
+export const INTERVENTION_COLORS: Record<InterventionKey, string> = {
+  street_trees: "#86d67a",
+  bioswales: "#4cc9a4",
+  permeable_pavement: "#e3c98f",
+  green_roofs: "#c3e86a",
+};
+
 export const INTERVENTION_ORDER: InterventionKey[] = [
   "street_trees",
   "bioswales",

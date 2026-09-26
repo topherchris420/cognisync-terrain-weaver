@@ -5,6 +5,7 @@ import type { ExpressionSpecification } from "maplibre-gl";
 import type { RiskZone } from "@/lib/simulation-types";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { DEPTH_RAMP, POND_HIT_PX, depthColor } from "@/lib/water-palette";
+import { isMapDrawing } from "@/lib/map-drawing";
 
 interface RiskHeatmapProps {
   riskZones?: RiskZone[];
@@ -323,6 +324,7 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
     };
 
     const handleMove = (e: maplibregl.MapMouseEvent) => {
+      if (isMapDrawing(map)) return;
       try {
         const over = Boolean(nearestCell(e.point));
         const canvas = map.getCanvas();
@@ -334,6 +336,7 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
     };
 
     const handleClick = (e: maplibregl.MapMouseEvent) => {
+      if (isMapDrawing(map)) return;
       const hit = nearestCell(e.point);
       if (!hit) return;
       const props = hit.feature.properties || {};

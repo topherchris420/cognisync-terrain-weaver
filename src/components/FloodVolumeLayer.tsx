@@ -8,6 +8,7 @@ import {
   floodVolumeGeoJSON,
   terrainExaggerationForZoom,
 } from "@/lib/terrain-scene";
+import { isMapDrawing } from "@/lib/map-drawing";
 
 interface FloodVolumeLayerProps {
   map?: MLMap | null;
@@ -133,7 +134,7 @@ export function FloodVolumeLayer({
       }
     ) => {
       const depth = Number(event.features?.[0]?.properties?.depth_m);
-      if (!Number.isFinite(depth)) return;
+      if (!Number.isFinite(depth) || isMapDrawing(map)) return;
       const level = escapeHtml(
         String(event.features?.[0]?.properties?.level ?? "flood")
       );

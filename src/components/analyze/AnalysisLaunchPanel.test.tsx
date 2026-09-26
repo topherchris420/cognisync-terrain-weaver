@@ -16,7 +16,7 @@ describe("AnalysisLaunchPanel", () => {
 
     expect(screen.getByText("Lower Manhattan")).toBeInTheDocument();
     expect(screen.getByText("0.85")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /initialize terrain scan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /scan this area/i }));
     expect(onAnalyze).toHaveBeenCalledOnce();
   });
 

@@ -98,6 +98,18 @@ function resultFrom(
   };
 }
 
+/**
+ * The mapped surface a drawing must land on to be modeled, or null when the
+ * intervention can be placed on any classified ground in the study area.
+ */
+export function requiredEligibilityLayer(
+  type: InterventionType
+): "buildings" | "pavement" | null {
+  if (type === "green_roofs") return "buildings";
+  if (type === "permeable_pavement") return "pavement";
+  return null;
+}
+
 export function evaluateEligibility(
   draft: PolygonGeometry,
   type: InterventionType,
@@ -114,9 +126,8 @@ export function evaluateEligibility(
     );
   }
 
-  if (type === "green_roofs" || type === "permeable_pavement") {
-    const requiredClass =
-      type === "green_roofs" ? "buildings" : "pavement";
+  const requiredClass = requiredEligibilityLayer(type);
+  if (requiredClass) {
     const candidates = polygonFeatures(context, requiredClass);
     const sourceIds = new Set(
       candidates

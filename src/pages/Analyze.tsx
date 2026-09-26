@@ -24,7 +24,15 @@ import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
 import type { FutureState } from "@/lib/catalyst";
 import type { Scenario, InterventionKey, ScenarioExport } from "@/lib/scenario";
-import { EMPTY_SCENARIO, hasActiveInterventions } from "@/lib/scenario";
+import {
+  DEFAULT_ASSUMPTIONS,
+  EMPTY_SCENARIO,
+  INTERVENTIONS,
+  INTERVENTION_COLORS,
+  INTERVENTION_ORDER,
+  assessScenario,
+  formatCompactUSD,
+} from "@/lib/scenario";
 import { MapEditor, type MapEditorHandle } from "@/components/MapEditor";
 import { riskLabel } from "@/lib/absorption";
 import { Button } from "@/components/ui/button";
@@ -47,6 +55,8 @@ import {
   Compass,
   Mountain,
   Check,
+  Undo2,
+  Lock,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useWorkflow } from "@/hooks/useWorkflow";
@@ -58,6 +68,7 @@ import type { SimulationResponse } from "@/lib/simulation-types";
 import {
   bboxAreaKm2,
   parseBBox,
+  recordAreaM2,
   analysesToCSV,
   analysesToGeoJSON,
   downloadTextFile,
@@ -88,6 +99,7 @@ import { StormTelemetryReadout } from "@/components/studio/StormTelemetryReadout
 import { StormHydrograph } from "@/components/studio/StormHydrograph";
 import { WaterBalanceMeter } from "@/components/studio/WaterBalanceMeter";
 import { buildRealitySurface } from "@/lib/counterfactual/modifiers";
+import { requiredEligibilityLayer } from "@/lib/counterfactual/eligibility";
 import {
   LOCAL_GRID,
   runLocalStorm,
@@ -121,6 +133,19 @@ const SURFACE_PROVENANCE = [
 ];
 
 const DEFAULT_VIEW = { lat: 40.7075, lng: -74.009, zoom: 15 };
+
+/**
+ * This page loads no mapped footprints, so tools whose shapes must land on
+ * them would reject every drawing. Say so on the tool instead.
+ */
+const UNAVAILABLE_TOOLS: Partial<Record<InterventionKey, string>> = Object.fromEntries(
+  INTERVENTION_ORDER.flatMap((key) => {
+    const layer = requiredEligibilityLayer(key);
+    return layer
+      ? [[key, `Needs mapped ${layer === "buildings" ? "building footprints" : "pavement"}, which aren't loaded for this place yet.`]]
+      : [];
+  })
+);
 
 export function buildStormDefinition(
   rainfallDepthMm: number,
@@ -231,9 +256,11 @@ export default function Analyze() {
     if (workbenchScrollRef.current) workbenchScrollRef.current.scrollTop = 0;
   }, [activeTab]);
 
-  // When an intervention tool becomes active, auto-collapse drawer for clear map view
+  // Narrow screens hand the whole map to the drawing tool. Wide ones keep the
+  // drawer, so the map doesn't slide under the cursor and the tool list can
+  // count shapes as they land.
   useEffect(() => {
-    if (activeIntervention) {
+    if (activeIntervention && window.innerWidth < 1024) {
       setDrawerOpen(false);
     }
   }, [activeIntervention]);
@@ -253,20 +280,6 @@ export default function Analyze() {
     return () => window.removeEventListener("keydown", handleLaunchShortcut);
   });
 
-  // Global escape key handler to cancel drawing or close open modals
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (activeIntervention) {
-          setActiveIntervention(null);
-          toast.info("Drawing cancelled");
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIntervention]);
-
   const determinism: DeterminismReport | null = useMemo(
     () => (nowSeal && possibleSeal ? checkStormDeterminism(nowSeal, possibleSeal) : null),
     [nowSeal, possibleSeal]
@@ -278,6 +291,29 @@ export default function Analyze() {
   } | null>(null);
 
   const workflow = useWorkflow();
+
+  // Escape abandons the shape in progress; Cmd/Ctrl+Z takes back the last one.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target instanceof Element ? e.target : null;
+      const isTyping = target?.matches("input, textarea, select, [contenteditable='true']");
+      if (e.key.toLowerCase() === "z" && (e.metaKey || e.ctrlKey) && !e.shiftKey && !isTyping && workflow.state === "REDESIGN") {
+        e.preventDefault();
+        editorRef.current?.undo();
+        return;
+      }
+      if (e.key === "Escape") {
+        if (activeIntervention) {
+          editorRef.current?.cancelDraft();
+          setActiveIntervention(null);
+          toast.info("Drawing cancelled");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeIntervention, workflow.state]);
+
   const requestGeneration = useRef(0);
   const pendingRequest = useRef<"analysis" | "storm" | null>(null);
   const invalidateRequests = useCallback(() => {
@@ -304,6 +340,25 @@ export default function Analyze() {
 
   /** Real 1609 cover for the analyzed site, or an explicit "not surveyed" state. */
   const welikia1609 = useWelikia1609(analyzedBBox);
+
+  /** What each tool has placed, counting only the part that can be modeled. */
+  const drawnByType = useMemo(() => {
+    const totals: Partial<Record<InterventionKey, { count: number; areaM2: number }>> = {};
+    for (const feature of interventionFeatures) {
+      if (feature.type === "wetland" || !feature.eligibility.eligible) continue;
+      const entry = (totals[feature.type] ??= { count: 0, areaM2: 0 });
+      entry.count += 1;
+      entry.areaM2 += feature.eligibility.validAreaM2;
+    }
+    return totals;
+  }, [interventionFeatures]);
+  const hasEligibleDrawing = Object.keys(drawnByType).length > 0;
+
+  /** The redesign's headline figures, carried onto the map while drawing. */
+  const liveProjection = useMemo(() => {
+    if (!result || !hasEligibleDrawing) return null;
+    return assessScenario(result.land_cover, scenario, recordAreaM2(result), DEFAULT_ASSUMPTIONS);
+  }, [result, scenario, hasEligibleDrawing]);
 
 
   const currentAreaKm2 = analyzedBBox ? bboxAreaKm2(analyzedBBox) : viewportArea;
@@ -703,37 +758,79 @@ export default function Analyze() {
             />
           )}
 
-          {/* Floating On-Map Drawing Mode Action Banner */}
+          {/* Floating on-map drawing banner: the tool, how to draw, and what it's worth so far */}
           {workflow.state === "REDESIGN" && activeIntervention && (
-            <div className="absolute top-32 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
-              <div className="atlas-float flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center gap-3">
-                  <Paintbrush className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <p className="text-[13px] leading-snug text-foreground">
-                    Click to place points; click the first point to close the shape.{" "}
-                    <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">Esc</kbd> cancels.
-                  </p>
+            <div className="absolute bottom-12 sm:bottom-auto sm:top-32 left-1/2 -translate-x-1/2 z-40 w-full max-w-xl px-4">
+              <div
+                className="atlas-float animate-in fade-in slide-in-from-bottom-2 sm:slide-in-from-top-2"
+                style={{ borderColor: `${INTERVENTION_COLORS[activeIntervention]}66` }}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span
+                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded"
+                      style={{ background: INTERVENTION_COLORS[activeIntervention], color: "hsl(168 30% 8%)" }}
+                      aria-hidden="true"
+                    >
+                      <Paintbrush className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium leading-snug text-foreground">
+                        {INTERVENTIONS[activeIntervention].label}
+                      </p>
+                      <p className="text-[12px] leading-snug text-muted-foreground">
+                        Click to place points; click the first point to close.{" "}
+                        <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">Esc</kbd> cancels.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto">
+                    {interventionFeatures.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => editorRef.current?.undo()}
+                        className="h-8 gap-1 px-2 text-xs"
+                        title="Undo last shape (Ctrl/⌘ Z)"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" aria-hidden="true" /> Undo
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        editorRef.current?.cancelDraft();
+                        setActiveIntervention(null);
+                      }}
+                      className="h-8 text-xs flex-1 sm:flex-none"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setActiveIntervention(null);
+                        setDrawerOpen(true);
+                      }}
+                      className="atlas-primary h-8 text-xs flex-1 sm:flex-none"
+                    >
+                      Done drawing
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setActiveIntervention(null)}
-                    className="h-8 text-xs flex-1 sm:flex-none"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setActiveIntervention(null);
-                      setDrawerOpen(true);
-                    }}
-                    className="atlas-primary h-8 text-xs flex-1 sm:flex-none"
-                  >
-                    Done drawing
-                  </Button>
-                </div>
+                {liveProjection && (
+                  <div className="atlas-draw-live" aria-live="polite">
+                    <span>Score</span>
+                    <strong>{liveProjection.baseScore.toFixed(0)}</strong>
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                    <strong data-up>{liveProjection.projectedScore.toFixed(0)}</strong>
+                    <em>+{liveProjection.scoreDelta.toFixed(1)}</em>
+                    <span className="atlas-draw-live-sep" aria-hidden="true" />
+                    <span>Cost</span>
+                    <strong>{formatCompactUSD(liveProjection.capexUSD)}</strong>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1035,63 +1132,80 @@ export default function Analyze() {
                       , with land cover setting how much each cell holds back.
                     </p>
 
-                    <div className="atlas-control mt-5">
-                      <label htmlFor="storm-rainfall" className="atlas-control-label">
-                        <span>Rainfall depth</span>
-                        <span className="atlas-control-value">
-                          {nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm}
-                          <small>mm</small>
-                        </span>
-                      </label>
-                      <input
-                        id="storm-rainfall"
-                        type="range"
-                        min="5"
-                        max="200"
-                        step="5"
-                        value={nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm}
-                        disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                        onChange={(event) => setStormRainfallMm(Number(event.target.value))}
-                        className="atlas-range"
-                        style={{ "--fill": `${(((nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm) - 5) / 195) * 100}%` } as CSSProperties}
-                      />
-                      <div className="atlas-range-ticks" aria-hidden="true"><span>5 mm</span><span>200 mm</span></div>
-                    </div>
-
-                    <div className="atlas-control mt-5">
-                      <span className="atlas-control-label" id="storm-resolution-label">Terrain resolution</span>
-                      <div role="radiogroup" aria-labelledby="storm-resolution-label" className="atlas-segmented">
-                        {(["low", "medium", "high"] as const).map((level) => (
-                          <button
-                            key={level}
-                            type="button"
-                            role="radio"
-                            aria-checked={stormResolution === level}
-                            disabled={Boolean(nowSeal) || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                            onClick={() => setStormResolution(level)}
-                          >
-                            {level.charAt(0).toUpperCase() + level.slice(1)}
-                            <small>{LOCAL_GRID[level]}²</small>
-                          </button>
-                        ))}
+                    {nowSeal ? (
+                      <>
+                        <div className="atlas-sealed mt-5">
+                          <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                          <div className="min-w-0 flex-1">
+                            <strong>{nowSeal.storm.rainfallDepthMm} mm in {nowSeal.storm.durationMinutes} min</strong>
+                            <span>
+                              {nowSeal.storm.resolution.charAt(0).toUpperCase() + nowSeal.storm.resolution.slice(1)} grid · {LOCAL_GRID[nowSeal.storm.resolution]}² cells
+                            </span>
+                          </div>
+                          <em>Sealed</em>
+                        </div>
+                        <p className="atlas-section-note mt-2">The redesign will face this exact storm. Reset the study to choose another.</p>
+                      </>
+                    ) : (
+                      <>
+                      <div className="atlas-control mt-5">
+                        <label htmlFor="storm-rainfall" className="atlas-control-label">
+                          <span>Rainfall depth</span>
+                          <span className="atlas-control-value">
+                            {stormRainfallMm}
+                            <small>mm</small>
+                          </span>
+                        </label>
+                        <input
+                          id="storm-rainfall"
+                          type="range"
+                          min="5"
+                          max="200"
+                          step="5"
+                          value={stormRainfallMm}
+                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                          onChange={(event) => setStormRainfallMm(Number(event.target.value))}
+                          className="atlas-range"
+                          style={{ "--fill": `${((stormRainfallMm - 5) / 195) * 100}%` } as CSSProperties}
+                        />
+                        <div className="atlas-range-ticks" aria-hidden="true"><span>5 mm</span><span>200 mm</span></div>
                       </div>
-                    </div>
 
-                    {analyzedBBox && (() => {
-                      const depth = nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm;
-                      const rainVolume = bboxAreaKm2(analyzedBBox) * 1e6 * depth / 1000;
-                      const estimate = estimateRunoffVolumeM3(result.land_cover, depth, analyzedBBox);
-                      return (
-                        <dl className="atlas-stats atlas-stats--estimate mt-5" aria-live="polite">
-                          <div><dt>Rain on the site</dt><dd>{Math.round(rainVolume).toLocaleString()}<small>m³</small></dd></div>
-                          <div><dt>Estimated runoff</dt><dd className="text-primary" data-testid="storm-estimate-runoff">{Math.round(estimate).toLocaleString()}<small>m³</small></dd></div>
-                        </dl>
-                      );
-                    })()}
-                    <p className="atlas-section-note mt-3">
-                      Rational Method estimate: rainfall × area × weighted runoff coefficient. Routing adds the terrain: where the water travels, and where it collects.
-                    </p>
-                    {nowSeal && <p className="atlas-section-note mt-2">Storm settings are sealed so the redesign faces the same storm. Reset the study to choose another.</p>}
+                      <div className="atlas-control mt-5">
+                        <span className="atlas-control-label" id="storm-resolution-label">Terrain resolution</span>
+                        <div role="radiogroup" aria-labelledby="storm-resolution-label" className="atlas-segmented">
+                          {(["low", "medium", "high"] as const).map((level) => (
+                            <button
+                              key={level}
+                              type="button"
+                              role="radio"
+                              aria-checked={stormResolution === level}
+                              disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                              onClick={() => setStormResolution(level)}
+                            >
+                              {level.charAt(0).toUpperCase() + level.slice(1)}
+                              <small>{LOCAL_GRID[level]}²</small>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {analyzedBBox && (() => {
+                        const depth = stormRainfallMm;
+                        const rainVolume = bboxAreaKm2(analyzedBBox) * 1e6 * depth / 1000;
+                        const estimate = estimateRunoffVolumeM3(result.land_cover, depth, analyzedBBox);
+                        return (
+                          <dl className="atlas-stats atlas-stats--estimate mt-5" aria-live="polite">
+                            <div><dt>Rain on the site</dt><dd>{Math.round(rainVolume).toLocaleString()}<small>m³</small></dd></div>
+                            <div><dt>Estimated runoff</dt><dd className="text-primary" data-testid="storm-estimate-runoff">{Math.round(estimate).toLocaleString()}<small>m³</small></dd></div>
+                          </dl>
+                        );
+                      })()}
+                      <p className="atlas-section-note mt-3">
+                        Rational Method estimate: rainfall × area × weighted runoff coefficient. Routing adds the terrain: where the water travels, and where it collects.
+                      </p>
+                      </>
+                    )}
 
                     {!simResult && (
                       <Button
@@ -1109,6 +1223,19 @@ export default function Analyze() {
                     <>
                       <section className="atlas-section" aria-labelledby="storm-result-title">
                         <h3 id="storm-result-title" className="atlas-section-title">What the storm did</h3>
+                        {(simResult.metadata.rainfall_volume_m3 ?? 0) > 0 && (
+                          <div className="atlas-headline mt-4">
+                            <span className="atlas-headline-figure">
+                              {Math.round(((simResult.metadata.runoff_volume_m3 ?? 0) / simResult.metadata.rainfall_volume_m3!) * 100)}
+                              <small>%</small>
+                            </span>
+                            <p>
+                              of the rain ran off instead of soaking in. That is{" "}
+                              <strong>{Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³</strong> heading
+                              for the drains, about {Math.max(1, Math.round((simResult.metadata.runoff_volume_m3 ?? 0) / 2500)).toLocaleString()} Olympic pools.
+                            </p>
+                          </div>
+                        )}
                         <dl className="atlas-stats mt-4">
                           <div>
                             <dt>Runoff</dt>
@@ -1219,6 +1346,8 @@ export default function Analyze() {
                       }}
                       onClearDrawings={() => editorRef.current?.clear()}
                       onScenarioExport={setScenarioExport}
+                      drawn={drawnByType}
+                      unavailable={UNAVAILABLE_TOOLS}
                     />
                   </section>
 
@@ -1230,13 +1359,16 @@ export default function Analyze() {
                   </section>
 
                   <div className="atlas-tab-footer">
+                    {!hasEligibleDrawing && (
+                      <p className="atlas-footer-hint">Draw at least one shape inside the study area to unlock the rerun.</p>
+                    )}
                     <Button
-                      disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                      disabled={!hasEligibleDrawing || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
                       onClick={() => runSimulation(true)}
                       className="atlas-primary w-full h-11 text-sm font-medium gap-2"
                     >
                       {workflow.state === "RERUN_STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                      Rerun the same storm on the redesign
+                      {workflow.state === "RERUN_STORM" ? "Routing the same storm…" : "Rerun the same storm on the redesign"}
                     </Button>
                   </div>
                 </div>
@@ -1275,6 +1407,11 @@ export default function Analyze() {
                                 <dt>Routed storm runoff</dt>
                                 <dd>
                                   {Math.round(simResult.metadata.runoff_volume_m3).toLocaleString()} → {Math.round(futureSimResult.metadata.runoff_volume_m3).toLocaleString()} m³
+                                  {simResult.metadata.runoff_volume_m3 > 0 && (
+                                    <span className="atlas-delta">
+                                      {Math.round(((futureSimResult.metadata.runoff_volume_m3 - simResult.metadata.runoff_volume_m3) / simResult.metadata.runoff_volume_m3) * 100)}%
+                                    </span>
+                                  )}
                                 </dd>
                               </div>
                             )}

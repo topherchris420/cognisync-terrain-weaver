@@ -38,4 +38,18 @@ describe("atlas first-use experience", () => {
     expect(screen.queryByText("Illustrative example")).not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalled();
   });
+
+  it("leads a routed storm with its answer and holds the rerun until something is drawn", async () => {
+    render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
+    expect(await screen.findByText(/of the rain ran off instead of soaking in/i)).toBeInTheDocument();
+    expect(screen.getByText("50 mm in 60 min")).toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: /rainfall depth/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /redesign the ground/i }));
+    expect(screen.getByRole("button", { name: /rerun the same storm/i })).toBeDisabled();
+    expect(screen.getByText(/draw at least one shape/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /green roofs/i })).toBeDisabled();
+  });
 });

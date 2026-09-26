@@ -35,7 +35,7 @@ const App = () => (
         {/* The design system is dark-only; without this, sonner follows the OS
             theme and renders white toasts over the dark UI on light-mode
             machines (no ThemeProvider is mounted to say otherwise). */}
-        <Sonner theme="dark" />
+        <Sonner theme="dark" position="bottom-center" offset={20} />
         <SensorOpticsProvider>
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ScrollToTop />

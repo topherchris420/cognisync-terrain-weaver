@@ -19,6 +19,7 @@ import { ABSORPTION_WEIGHTS } from "@/lib/absorption";
 import { parseBBox } from "@/lib/geo";
 import {
   INTERVENTIONS,
+  INTERVENTION_COLORS,
   type InterventionKey,
   type Scenario,
 } from "@/lib/scenario";
@@ -27,6 +28,7 @@ import type { LandCover } from "@/lib/types";
 import { evaluateEligibility } from "@/lib/counterfactual/eligibility";
 import { stableHash } from "@/lib/counterfactual/hashing";
 import { deriveScenarioFromFeatures } from "@/lib/counterfactual/projected-metrics";
+import { setMapDrawing } from "@/lib/map-drawing";
 import type {
   EligibilityResult,
   InterventionFeature,
@@ -41,10 +43,81 @@ const INVALID_SOURCE_ID = "mannahatta-editor-invalid-source";
 const INVALID_FILL_ID = "mannahatta-editor-invalid-fill";
 const INVALID_OUTLINE_ID = "mannahatta-editor-invalid-outline";
 const INVALID_PATTERN_ID = "mannahatta-editor-invalid-hatch";
+/** Draw's own source for settled features; present once Draw has attached. */
+const DRAW_COLD_SOURCE_ID = "mapbox-gl-draw-cold";
+
+/** A shape still being drawn has no intervention yet; it takes the UI accent. */
+const DRAFT_COLOR = "#d6e8a4";
+const interventionColor: unknown[] = [
+  "match",
+  ["get", "user_interventionType"],
+  ...Object.entries(INTERVENTION_COLORS).flat(),
+  DRAFT_COLOR,
+];
+const isActive: unknown[] = ["==", ["get", "active"], "true"];
+const polygonFilter = ["all", ["==", "$type", "Polygon"]];
+
+/**
+ * Draw's default theme drives line-dasharray from data, which MapLibre
+ * rejects, so drawn shapes lost their outline and kept only a 10% fill.
+ * These layers are MapLibre-safe and colour each shape by what it is.
+ */
+const DRAW_STYLES = [
+  {
+    id: "gl-draw-polygon-fill",
+    type: "fill",
+    filter: polygonFilter,
+    paint: {
+      "fill-color": interventionColor,
+      "fill-opacity": ["case", isActive, 0.22, 0.34],
+    },
+  },
+  {
+    id: "gl-draw-polygon-halo",
+    type: "line",
+    filter: polygonFilter,
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#08120f", "line-width": 5, "line-opacity": 0.45 },
+  },
+  {
+    id: "gl-draw-polygon-stroke",
+    type: "line",
+    filter: ["all", ["==", "$type", "Polygon"], ["!=", "active", "true"]],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": interventionColor, "line-width": 2.25 },
+  },
+  {
+    id: "gl-draw-polygon-stroke-active",
+    type: "line",
+    filter: ["all", ["any", ["==", "$type", "Polygon"], ["==", "$type", "LineString"]], ["==", "active", "true"]],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": interventionColor, "line-width": 2.25, "line-dasharray": [1.5, 1.25] },
+  },
+  {
+    id: "gl-draw-vertex-halo",
+    type: "circle",
+    filter: ["all", ["==", "$type", "Point"], ["==", "meta", "vertex"], ["!=", "mode", "simple_select"]],
+    paint: { "circle-radius": ["case", isActive, 7, 5.5], "circle-color": "#08120f", "circle-opacity": 0.6 },
+  },
+  {
+    id: "gl-draw-vertex",
+    type: "circle",
+    filter: ["all", ["==", "$type", "Point"], ["==", "meta", "vertex"], ["!=", "mode", "simple_select"]],
+    paint: { "circle-radius": ["case", isActive, 5, 3.75], "circle-color": "#ffffff" },
+  },
+  {
+    id: "gl-draw-midpoint",
+    type: "circle",
+    filter: ["all", ["==", "$type", "Point"], ["==", "meta", "midpoint"]],
+    paint: { "circle-radius": 3, "circle-color": DRAFT_COLOR, "circle-opacity": 0.85 },
+  },
+];
 
 export interface MapEditorHandle {
   undo: () => void;
   clear: () => void;
+  /** Discard the shape in progress; leaving the tool otherwise keeps it. */
+  cancelDraft: () => void;
 }
 
 export interface MapEditorProps {
@@ -304,6 +377,10 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
     const historyRef = useRef<InterventionFeature[][]>([]);
     const featuresRef = useRef(features);
     const activeRef = useRef(activeIntervention);
+    /** The tool the current draft was started with; outlives a "Done" click. */
+    const draftTypeRef = useRef<InterventionType | null>(null);
+    /** A shape just closed while its tool is still armed: start the next one. */
+    const rearmRef = useRef(false);
     const contextRef = useRef(context);
     const controlledRef = useRef(controlled);
     const onChangeRef = useRef(onChange);
@@ -356,6 +433,16 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           const previous = historyRef.current.pop();
           if (previous) commit(previous, false);
         },
+        cancelDraft() {
+          const draw = drawRef.current;
+          if (!draw || draftTypeRef.current === null) return;
+          draftTypeRef.current = null;
+          try {
+            draw.trash();
+          } catch {
+            // Nothing in progress to discard
+          }
+        },
         clear() {
           if (featuresRef.current.length === 0) return;
           commit([]);
@@ -371,18 +458,49 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
         displayControlsDefault: false,
         controls: {},
         userProperties: true,
+        styles: DRAW_STYLES as object[],
+        // Closing a shape means clicking its first point; Draw's 2 px default
+        // makes that a pixel hunt, so the shape kept growing instead.
+        clickBuffer: 10,
+        touchBuffer: 24,
       });
+
+      // Draw attaches its sources and layers only once map.loaded() is true.
+      // A routed storm's flow animation restyles the map every frame, so
+      // loaded() never settles and every drawing would silently vanish. A
+      // loaded style is all Draw needs, so answer for that until it attaches.
+      const loadable = map as unknown as { loaded?: () => boolean };
+      const shimLoaded = !Object.prototype.hasOwnProperty.call(map, "loaded");
+      if (shimLoaded) {
+        loadable.loaded = () =>
+          safeHasStyle(map) &&
+          (typeof map.isStyleLoaded !== "function" || map.isStyleLoaded() !== false);
+      }
+      let attachPoll: number | undefined;
+      const releaseLoaded = () => {
+        if (attachPoll !== undefined) window.clearInterval(attachPoll);
+        attachPoll = undefined;
+        if (shimLoaded) delete loadable.loaded;
+      };
+
       try {
         map.addControl(draw as unknown as IControl, "top-left");
       } catch (error) {
+        releaseLoaded();
         console.warn("Failed to add MapboxDraw control", error);
         return;
+      }
+      if (safeGetSource(map, DRAW_COLD_SOURCE_ID)) releaseLoaded();
+      else {
+        attachPoll = window.setInterval(() => {
+          if (safeGetSource(map, DRAW_COLD_SOURCE_ID)) releaseLoaded();
+        }, 50);
       }
       drawRef.current = draw;
 
       const create = (event: DrawEvent) => {
         if (syncingRef.current) return;
-        const type = activeRef.current;
+        const type = activeRef.current ?? draftTypeRef.current;
         if (!type) {
           draw.delete(
             event.features
@@ -399,6 +517,7 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           );
         if (created.length === 0) return;
         onFeedbackRef.current?.(created.at(-1)!.eligibility);
+        rearmRef.current = activeRef.current !== null;
         commit([...featuresRef.current, ...created]);
       };
 
@@ -446,6 +565,7 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
       map.on("draw.update", update);
       map.on("draw.delete", remove);
       return () => {
+        releaseLoaded();
         map.off("draw.create", create);
         map.off("draw.update", update);
         map.off("draw.delete", remove);
@@ -477,16 +597,26 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           type: candidate.properties?.interventionType ?? null,
         }))
       );
-      if (signature === currentSignature) return;
-      syncingRef.current = true;
-      draw.deleteAll();
-      if (features.length > 0) {
-        draw.add({
-          type: "FeatureCollection",
-          features: features.map(drawFeature),
-        });
+      if (signature !== currentSignature) {
+        syncingRef.current = true;
+        draw.deleteAll();
+        if (features.length > 0) {
+          draw.add({
+            type: "FeatureCollection",
+            features: features.map(drawFeature),
+          });
+        }
+        syncingRef.current = false;
       }
-      syncingRef.current = false;
+      // Re-arm only after the sync, which would otherwise wipe the new draft.
+      if (rearmRef.current) {
+        rearmRef.current = false;
+        const type = activeRef.current;
+        if (type && type !== "wetland") {
+          draftTypeRef.current = type;
+          draw.changeMode("draw_polygon");
+        }
+      }
     }, [features, map]);
 
     useEffect(() => {
@@ -496,14 +626,21 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
         typeof map?.getCanvas === "function" ? map.getCanvas().style : null;
 
       const style = getCanvasStyle();
-      if (activeIntervention && activeIntervention !== "wetland") {
+      const drawing = Boolean(activeIntervention && activeIntervention !== "wetland");
+      if (drawing) {
+        draftTypeRef.current = activeIntervention;
         draw.changeMode("draw_polygon");
         if (style) style.cursor = "crosshair";
       } else {
+        // Leaving draw mode closes a shape with three or more points; it keeps
+        // the tool it was started with, so "Done" never throws work away.
         draw.changeMode("simple_select");
+        draftTypeRef.current = null;
         if (style) style.cursor = "";
       }
+      setMapDrawing(map, drawing);
       return () => {
+        setMapDrawing(map, false);
         const s = getCanvasStyle();
         if (s) s.cursor = "";
       };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   ArrowRight,
   Banknote,
@@ -8,7 +8,7 @@ import {
   Timer,
   TrendingUp,
 } from "lucide-react";
-import { PenTool } from "lucide-react";
+import { Check, PenTool } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   DEFAULT_ASSUMPTIONS,
   EMPTY_SCENARIO,
   INTERVENTIONS,
+  INTERVENTION_COLORS,
   INTERVENTION_ORDER,
   assessScenario,
   formatCompactUSD,
@@ -39,6 +40,16 @@ interface Props {
   onInterventionSelect: (key: InterventionKey) => void;
   onScenarioExport?: (payload: ScenarioExport | null) => void;
   onClearDrawings?: () => void;
+  /** What has been drawn with each tool, so the list doubles as an inventory. */
+  drawn?: Partial<Record<InterventionKey, { count: number; areaM2: number }>>;
+  /** Tools that cannot be modeled here, with the reason shown in their place. */
+  unavailable?: Partial<Record<InterventionKey, string>>;
+}
+
+function formatArea(m2: number) {
+  if (m2 >= 1e6) return `${(m2 / 1e6).toFixed(2)} km²`;
+  if (m2 >= 1e4) return `${(m2 / 1e4).toFixed(1)} ha`;
+  return `${Math.round(m2).toLocaleString()} m²`;
 }
 
 const riskBadgeClass = (risk: string) =>
@@ -54,7 +65,7 @@ const riskBadgeClass = (risk: string) =>
  * stormwater retention, capital cost, and payback update live, using the
  * same transparent weights that produce the base score.
  */
-export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onInterventionSelect, onScenarioExport, onClearDrawings }: Props) {
+export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onInterventionSelect, onScenarioExport, onClearDrawings, drawn = {}, unavailable = {} }: Props) {
   const [rainfallMm, setRainfallMm] = useState(
     DEFAULT_ASSUMPTIONS.annualRainfallMm
   );
@@ -76,44 +87,48 @@ export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onIn
 
   return (
     <div className="space-y-4">
-      <div className="text-xs text-muted-foreground mb-4">
-        Select a tool below and draw directly on the map to place interventions.
-        Costs and absorption impact update instantly based on the drawn area.
-      </div>
+      <p className="atlas-section-note">
+        Pick a tool, then draw on the map. Each shape converts the ground beneath
+        it, and the projection below updates as you go.
+      </p>
       {/* Map tool shortcuts; geometry remains canonical. */}
-      <div className="space-y-4">
+      <div className="atlas-tools" role="group" aria-label="Green infrastructure tools">
         {INTERVENTION_ORDER.map((key) => {
           const def = INTERVENTIONS[key];
           const sourceShare = Number(cover[def.source] ?? 0);
-          const disabled = sourceShare <= 0;
+          const blocked = unavailable[key];
+          const disabled = sourceShare <= 0 || Boolean(blocked);
+          const isActive = activeIntervention === key;
+          const placed = drawn[key];
           return (
-            <div key={key} className={cn(disabled && "opacity-45")}>
-              <div className="flex items-baseline justify-between gap-2">
-                <Label className="text-sm font-medium">
-                  {def.label}
-                </Label>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {(scenario[key] * 100).toFixed(1)}% of {def.source} · ${def.unitCostUSD}/m²
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-2">
-                  <Button
-                    variant={activeIntervention === key ? "default" : "outline"}
-                    size="sm"
-                    className="gap-2 shrink-0"
-                    onClick={() => onInterventionSelect(key)}
-                    disabled={disabled}
-                  >
-                    <PenTool className="h-3.5 w-3.5" />
-                    {activeIntervention === key ? "Drawing..." : "Draw"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {disabled
-                      ? `No ${def.source} detected in this tile.`
-                      : def.description}
-                  </p>
-                </div>
-              </div>
+            <button
+              key={key}
+              type="button"
+              className="atlas-tool"
+              data-active={isActive || undefined}
+              data-placed={placed && placed.count > 0 ? true : undefined}
+              style={{ "--tool": INTERVENTION_COLORS[key] } as CSSProperties}
+              onClick={() => onInterventionSelect(key)}
+              disabled={disabled}
+              aria-pressed={isActive}
+            >
+              <span className="atlas-tool-swatch" aria-hidden="true">
+                {isActive ? <PenTool className="h-3.5 w-3.5" /> : placed && placed.count > 0 ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+              </span>
+              <span className="atlas-tool-body">
+                <span className="atlas-tool-name">{def.label}</span>
+                <span className="atlas-tool-meta">
+                  {sourceShare <= 0
+                    ? `No ${def.source} detected in this tile.`
+                    : blocked
+                    ? blocked
+                    : placed && placed.count > 0
+                    ? `${placed.count} ${placed.count === 1 ? "shape" : "shapes"} · ${formatArea(placed.areaM2)} · ${(scenario[key] * 100).toFixed(1)}% of ${def.source}`
+                    : `${def.description} $${def.unitCostUSD}/m².`}
+                </span>
+              </span>
+              <span className="atlas-tool-action">{disabled ? "Unavailable" : isActive ? "Drawing…" : "Draw"}</span>
+            </button>
           );
         })}
       </div>
