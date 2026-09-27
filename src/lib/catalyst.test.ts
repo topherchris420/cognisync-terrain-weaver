@@ -142,3 +142,37 @@ describe("projectFuture", () => {
     expect(f.impact.baseScore).toBeCloseTo(computeAbsorptionScore(MIDTOWN), 1);
   });
 });
+describe("bounded solver regression", () => {
+  const paved = { vegetation: 0, soil: 0, water: 0, buildings: 0, pavement: 100 };
+  it("upgrades an already allocated surface to reach the true ceiling", () => {
+    const r = solveForTarget(paved, 90, 1000);
+    expect(r.reachable).toBe(true);
+    expect(r.scenario.bioswales).toBeCloseTo(1);
+    expect(r.scenario.street_trees).toBeCloseTo(0);
+    expect(r.costUSD).toBeCloseTo(65000);
+  });
+  it("mixes competing options on the cost envelope", () => {
+    const r = solveForTarget(paved, 85, 1000);
+    expect(r.scenario.street_trees).toBeCloseTo(.5);
+    expect(r.scenario.bioswales).toBeCloseTo(.5);
+    expect(r.costUSD).toBeCloseTo(55000);
+  });
+  it("honors a zero budget and rejects an unsized budget", () => {
+    const r = solveForTarget(paved, 45, 1000, 0);
+    expect(r.scenario).toEqual(EMPTY_SCENARIO);
+    expect(r.reachable).toBe(false);
+    expect(r.bindingConstraint).toBe("budget");
+    expect(() => solveForTarget(paved, 45, undefined, 100)).toThrow();
+    expect(() => solveForTarget(paved, NaN)).toThrow();
+  });
+  it("matches exhaustive feasible portfolios at a budget boundary", () => {
+    const cover = { ...paved, pavement: 60, buildings: 40 };
+    const r = solveForTarget(cover, 100, 1000, 42000);
+    expect(assessScenario(cover, r.scenario, 1000).capexUSD).toBeLessThanOrEqual(42000.001);
+    for (let trees = 0; trees <= 10; trees++) for (let swales = 0; swales <= 10 - trees; swales++) for (let roofs = 0; roofs <= 10; roofs++) {
+      const scenario = { ...EMPTY_SCENARIO, street_trees: trees / 10, bioswales: swales / 10, green_roofs: roofs / 10 };
+      const impact = assessScenario(cover, scenario, 1000);
+      if (impact.capexUSD <= 42000) expect(r.achievedScore).toBeGreaterThanOrEqual(impact.projectedScore - .05);
+    }
+  });
+});

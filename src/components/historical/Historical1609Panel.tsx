@@ -56,7 +56,7 @@ export function Historical1609Panel({
         <div className="flex items-center gap-2">
           <MapPinOff className="h-4 w-4 text-muted-foreground" />
           <h3 className="atlas-section-title">
-            This ground in 1609: not surveyed
+            This ground in 1609: no reconstruction
           </h3>
         </div>
         <p className="text-xs text-muted-foreground">{lookup.unavailableReason}</p>
@@ -85,7 +85,7 @@ export function Historical1609Panel({
           </h3>
         </div>
         <span className="mt-1 shrink-0 font-mono text-[10px] text-muted-foreground">
-          observed ·{" "}
+          reconstructed ·{" "}
           {lookup.blockCount.toLocaleString()}{" "}
           {lookup.blockCount === 1 ? "block" : "blocks"}
         </span>
@@ -97,7 +97,7 @@ export function Historical1609Panel({
             {score.toFixed(0)}
           </div>
           <div className="text-xs text-muted-foreground">
-            Absorption in 1609
+            Modeled absorption · 1609
           </div>
         </div>
         {delta > 0 && (
@@ -105,7 +105,7 @@ export function Historical1609Panel({
             <span className="font-mono text-foreground">
               −{delta.toFixed(0)}
             </span>{" "}
-            points lost since
+            points below the reconstruction
           </div>
         )}
       </div>
@@ -133,6 +133,7 @@ export function Historical1609Panel({
         </p>
       )}
 
+      <p className="text-xs text-muted-foreground">Ecological communities are reconstructed and reduced to block bounding boxes, not surveyed habitat boundaries. This ecology layer does not describe the full history of Lenape settlement and stewardship.</p>
       <p className="text-[10px] leading-relaxed text-muted-foreground">
         {source.method} Source:{" "}
         <a

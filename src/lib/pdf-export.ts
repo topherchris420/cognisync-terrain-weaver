@@ -156,6 +156,10 @@ export function generatePDFReport(
   // Header
   addHeader();
 
+  addText(analysis.status === "example" ? "ILLUSTRATIVE EXAMPLE - not a site measurement" : "INFERRED land cover / DERIVED screening score", 10, true);
+  addText("Model: absorption-weights-2026-07. Not validated against observed flooding. This report does not contain a routed storm comparison.", 9);
+  yPos += 3;
+
   // Site Information
   addSectionTitle("Site Information");
   addText(analysis.name, 12, true);
@@ -424,6 +428,12 @@ export function generatePDFReport(
     footerY
   );
 
+  for (let page = 1; page <= doc.getNumberOfPages(); page++) {
+    doc.setPage(page);
+    doc.setFontSize(7);
+    doc.setTextColor(...colors.muted);
+    doc.text(analysis.status === "example" ? "ILLUSTRATIVE EXAMPLE | screening only" : "INFERRED INPUTS | derived screening estimates", margin, pageHeight - 3);
+  }
   return doc;
 }
 

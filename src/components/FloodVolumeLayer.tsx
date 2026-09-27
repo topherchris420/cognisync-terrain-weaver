@@ -143,7 +143,7 @@ export function FloodVolumeLayer({
         .setHTML(
           `<div class="p-2 text-xs font-mono bg-card text-foreground rounded shadow-md border border-border min-w-[180px]">
             <div class="font-bold text-primary mb-1 border-b border-border pb-1 uppercase tracking-wider">Standing water</div>
-            <div class="flex justify-between"><span class="text-muted-foreground">Modeled depth</span><span class="font-bold">${depth.toFixed(2)} m</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Accumulation / cell area</span><span class="font-bold">${depth.toFixed(2)} m</span></div>
             <div class="flex justify-between"><span class="text-muted-foreground">Risk band</span><span class="font-bold">${level}</span></div>
           </div>`
         )

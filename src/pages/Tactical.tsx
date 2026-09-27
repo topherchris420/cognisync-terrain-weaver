@@ -1,72 +1,38 @@
-import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppNav } from "@/components/AppNav";
-import { TacticalCOP } from "@/components/tactical/TacticalCOP";
-import { useSearchParams } from "react-router-dom";
-import type { FlowPath, RiskZone } from "@/lib/simulation-types";
 
+/** Retired demo route: never turn arbitrary coordinates into invented hazards. */
 export default function TacticalPage() {
-  const [searchParams] = useSearchParams();
-  
-  // Center coordinates from query params or default Manhattan
-  const lat = parseFloat(searchParams.get("lat") || "40.7128");
-  const lng = parseFloat(searchParams.get("lng") || "-74.006");
-  const label = searchParams.get("label") || "Manhattan Catchment Sector (EOC Grid)";
-
-  // Mock flow paths & risk zones if navigated from simulation
-  const [flowPaths, setFlowPaths] = useState<FlowPath[]>([]);
-  const [riskZones, setRiskZones] = useState<RiskZone[]>([]);
-
-  useEffect(() => {
-    // Generate realistic hydrodynamic flow lines around current center
-    const simFlows: FlowPath[] = [
-      {
-        points: [
-          [lng - 0.004, lat + 0.003],
-          [lng - 0.002, lat + 0.001],
-          [lng + 0.001, lat - 0.002],
-          [lng + 0.004, lat - 0.004],
-        ],
-        volume_m3: 680,
-        velocity_mps: 2.1,
-      },
-      {
-        points: [
-          [lng - 0.008, lat - 0.002],
-          [lng - 0.005, lat - 0.004],
-          [lng - 0.001, lat - 0.005],
-        ],
-        volume_m3: 390,
-        velocity_mps: 1.4,
-      },
-    ];
-
-    const simZones: RiskZone[] = [
-      {
-        polygon: [
-          [lng - 0.003, lat - 0.003],
-          [lng + 0.003, lat - 0.003],
-          [lng + 0.002, lat - 0.006],
-          [lng - 0.004, lat - 0.005],
-        ],
-        level: "severe",
-        affected_area_km2: 0.28,
-      },
-    ];
-
-    setFlowPaths(simFlows);
-    setRiskZones(simZones);
-  }, [lat, lng]);
-
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="atlas-app min-h-screen bg-background">
       <AppNav />
-      <main id="main" className="flex-1">
-        <TacticalCOP
-          initialCenter={[lng, lat]}
-          flowPaths={flowPaths}
-          riskZones={riskZones}
-          locationLabel={label}
-        />
+      <main id="main" className="mx-auto max-w-2xl px-6 py-16 space-y-6">
+        <p className="font-mono text-xs uppercase tracking-widest text-primary">
+          Mannahatta / model boundaries
+        </p>
+        <h1 className="text-3xl font-semibold">
+          Start with a study, not an emergency map.
+        </h1>
+        <p>
+          The former Tactical demonstration generated synthetic flow paths,
+          hazard zones and operational telemetry. It has been retired from the
+          public workflow.
+        </p>
+        <p className="text-muted-foreground">
+          No completed simulation is loaded here. Coordinates in a link are not
+          evidence of flooding, safe routes or available supplies. Mannahatta
+          provides screening experiments, not an emergency operating picture.
+        </p>
+        <Link
+          className="inline-flex min-h-11 items-center border border-primary px-5 text-primary"
+          to="/"
+        >
+          Open the resilience workstation
+        </Link>
+        <p className="text-sm text-muted-foreground">
+          Choose a place, inspect its inputs, then run a design storm. Any
+          fallback terrain is labeled illustrative.
+        </p>
       </main>
     </div>
   );

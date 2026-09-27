@@ -96,6 +96,10 @@ function deepLink(r: AnalysisRecord): string {
 function recordProperties(r: AnalysisRecord) {
   const bbox = parseBBox(r.bbox);
   return {
+    data_status: r.status,
+    provenance: r.status === "example" ? "illustrative" : "inferred-land-cover; derived-score",
+    model: "absorption-weights-2026-07",
+    limitations: "Screening index; not validated against observed flooding. Geometry is the study extent, not a flood boundary.",
     id: r.id,
     name: r.name,
     location: r.location_label ?? "",
@@ -177,6 +181,10 @@ export function analysesToCSV(rows: AnalysisRecord[]): string {
     "area_km2",
     "analyzed_at",
     "deep_link",
+    "data_status",
+    "provenance",
+    "model",
+    "limitations",
   ] as const;
   const lines = [columns.join(",")];
   for (const r of rows) {

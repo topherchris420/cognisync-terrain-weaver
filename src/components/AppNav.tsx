@@ -7,8 +7,7 @@ import { NavOpticsControls } from "./tactical/NavOpticsControls";
 
 const links = [
   { to: "/", label: "Map", icon: MapIcon, end: true },
-  { to: "/tactical", label: "Tactical COP", icon: Radio },
-  { to: "/dashboard", label: "Dashboard", icon: LineChart },
+  { to: "/dashboard", label: "Study index", icon: LineChart },
 ];
 
 // Routes are lazy-loaded (Analyze alone pulls ~800 kB of MapLibre), so start
@@ -43,7 +42,7 @@ export function AppNav() {
 
           <div className="hidden md:flex items-center gap-2">
             <span className="signal-dot" aria-hidden />
-            <span className="hud-label">Live · Urban Resilience Intelligence</span>
+            <span className="hud-label">Counterfactual urban resilience</span>
           </div>
         </div>
 

@@ -54,7 +54,9 @@ export function unlockCatalyst(): void {
   } catch {
     /* private mode — the unlock still holds for this session */
   }
-  window.dispatchEvent(new CustomEvent(CATALYST_UNLOCK_EVENT, { detail: true }));
+  window.dispatchEvent(
+    new CustomEvent(CATALYST_UNLOCK_EVENT, { detail: true }),
+  );
 }
 
 export function relockCatalyst(): void {
@@ -63,7 +65,9 @@ export function relockCatalyst(): void {
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new CustomEvent(CATALYST_UNLOCK_EVENT, { detail: false }));
+  window.dispatchEvent(
+    new CustomEvent(CATALYST_UNLOCK_EVENT, { detail: false }),
+  );
 }
 
 /** The two lines the unlock reveals, in order. */
@@ -99,7 +103,7 @@ export const EPOCHS: Record<Epoch, EpochMeta> = {
     question: "What was",
     provenance: "reconstructed",
     provenanceNote:
-      "A single island-wide benchmark estimated from the Mannahatta Project's description of pre-city ecology, scored with the live model. No per-block historical geometry exists in this app, and none is drawn.",
+      "A single island-wide benchmark estimated from the Mannahatta Project's description of pre-city ecology, scored with the live model. Where available, the separate Welikia layer uses reconstructed block bounding boxes; neither source is a historical measurement.",
   },
   "2026": {
     id: "2026",
@@ -121,130 +125,151 @@ export const EPOCHS: Record<Epoch, EpochMeta> = {
 
 /* ------------------------------------------------- counterfactual solving */
 
-/** Score gained per dollar spent, per unit of converted source area. */
-function efficiency(key: InterventionKey): number {
-  const def = INTERVENTIONS[key];
-  const lift = def.targetWeight - ABSORPTION_WEIGHTS[def.source as Exclude<LandCoverKey, "water">];
-  return lift / def.unitCostUSD;
-}
-
-/** Share of the LAND (water excluded) held by an absorbing class. */
-function landShare(cover: LandCover, key: LandCoverKey): number {
-  const land =
-    (Number(cover.vegetation) || 0) +
-    (Number(cover.soil) || 0) +
-    (Number(cover.buildings) || 0) +
-    (Number(cover.pavement) || 0);
-  if (land <= 0) return 0;
-  return (Number(cover[key]) || 0) / land;
-}
-
+/** A bounded, continuous planning solution, not surveyed spatial eligibility. */
 export interface SolveResult {
   scenario: Scenario;
-  /** Score the solved scenario actually reaches, via `projectScore`. */
   achievedScore: number;
   baseScore: number;
   target: number;
-  /** True when the target is met or exceeded within the intervention space. */
   reachable: boolean;
-  /** Ceiling of the intervention space for this cover: everything converted. */
   ceilingScore: number;
-  /** Interventions the solver actually used, cheapest-first. */
+  budgetCeilingScore: number;
+  costUSD: number | null;
+  remainingGap: number;
+  bindingConstraint: "none" | "surface" | "budget";
   used: InterventionKey[];
 }
 
 /**
- * Minimum-cost route to a target absorption score.
- *
- * Greedy on score-gained-per-dollar. Because each intervention's contribution
- * is linear and independent (Δ = share × fraction × Δweight), and each unit of
- * a source class can be spent only once, greedy on cost-effectiveness is
- * optimal here — this is a fractional knapsack, not a search.
- *
- * The answer is verified through `projectScore`, the same function the
- * Scenario Studio uses, so the solver can never disagree with the sliders.
+ * Minimum cost on each source's upper concave cost/retention envelope.
+ * A later segment replaces an earlier option (e.g. trees with bioswales).
+ * Sorting incremental slopes then solves the separable continuous allocation.
+ * Naive option-by-option knapsack is wrong: alternatives compete for pavement.
  */
-export function solveForTarget(cover: LandCover, target: number, areaM2?: number, maxBudgetUSD?: number): SolveResult {
-  const baseScore = projectScore(cover, EMPTY_SCENARIO);
-  const ceiling = { ...EMPTY_SCENARIO } as Scenario;
-  // Ceiling: spend each source class entirely on its most effective option.
-  const bestBySource = new Map<LandCoverKey, InterventionKey>();
-  for (const key of INTERVENTION_ORDER) {
-    const src = INTERVENTIONS[key].source;
-    const incumbent = bestBySource.get(src);
-    const lift = (k: InterventionKey) =>
-      INTERVENTIONS[k].targetWeight -
-      ABSORPTION_WEIGHTS[INTERVENTIONS[k].source as Exclude<LandCoverKey, "water">];
-    if (!incumbent || lift(key) > lift(incumbent)) bestBySource.set(src, key);
-  }
-  for (const key of bestBySource.values()) ceiling[key] = 1;
-  const ceilingScore = projectScore(cover, ceiling);
-
-  const scenario: Scenario = { ...EMPTY_SCENARIO };
-  const used: InterventionKey[] = [];
-  const capacity = new Map<LandCoverKey, number>();
-  let spentBudget = 0;
-
-  let needed = target - baseScore;
-  // If target is already met but budget is specified and we want to maximize score, we could change the loop condition.
-  // But standard "reduce flood risk under $X" implies finding a solution that meets target and costs < $X.
-  // Or, if target is not reachable, get as close as possible within budget.
-  if (needed > 0 || maxBudgetUSD) {
-    const order = [...INTERVENTION_ORDER].sort(
-      (a, b) => efficiency(b) - efficiency(a)
+export function solveForTarget(
+  cover: LandCover,
+  target: number,
+  areaM2?: number,
+  maxBudgetUSD?: number,
+): SolveResult {
+  if (!Number.isFinite(target) || target < 0 || target > 100)
+    throw new Error("Target must be between 0 and 100.");
+  const values = Object.values(cover);
+  if (
+    values.some((v) => !Number.isFinite(v) || v < 0) ||
+    values.reduce((a, b) => a + b, 0) <= 0
+  )
+    throw new Error("Land cover must be finite, nonnegative and nonempty.");
+  const hasArea = areaM2 !== undefined && Number.isFinite(areaM2) && areaM2 > 0;
+  if (
+    maxBudgetUSD !== undefined &&
+    (!Number.isFinite(maxBudgetUSD) || maxBudgetUSD < 0 || !hasArea)
+  )
+    throw new Error(
+      "A budget requires a known positive area and a finite nonnegative amount.",
     );
-    for (const key of order) {
-      if (needed <= 0) break;
-      const def = INTERVENTIONS[key];
-      const share = landShare(cover, def.source);
-      if (share <= 0) continue;
-      const spent = capacity.get(def.source) ?? 0;
-      const room = Math.max(0, 1 - spent);
-      if (room <= 0) continue;
-
-      const lift =
-        def.targetWeight -
-        ABSORPTION_WEIGHTS[def.source as Exclude<LandCoverKey, "water">];
-      if (lift <= 0) continue;
-
-      const gainPerFraction = share * lift * 100;
-      let fractionNeeded = needed > 0 ? needed / gainPerFraction : 0;
-      
-      // If we are just maximizing score within budget, we need as much fraction as possible
-      if (needed <= 0 && maxBudgetUSD) fractionNeeded = room;
-
-      let fraction = Math.min(room, fractionNeeded);
-      
-      // Budget constraint
-      const costPerFraction = (areaM2 || 0) * siteCoverShares(cover)[def.source] * def.unitCostUSD;
-      if (maxBudgetUSD && costPerFraction > 0) {
-         const affordableFraction = Math.max(0, maxBudgetUSD - spentBudget) / costPerFraction;
-         fraction = Math.min(fraction, affordableFraction);
+  const physical = siteCoverShares(cover);
+  const landFraction = 1 - physical.water;
+  const rawBase =
+    landFraction > 0
+      ? ((["vegetation", "soil", "buildings", "pavement"] as const).reduce(
+          (sum, k) => sum + physical[k] * ABSORPTION_WEIGHTS[k],
+          0,
+        ) /
+          landFraction) *
+        100
+      : 0;
+  type Point = { key: InterventionKey | null; cost: number; lift: number };
+  type Segment = { from: Point; to: Point; gain: number; cost: number };
+  const segments: Segment[] = [];
+  for (const source of ["pavement", "buildings"] as const) {
+    if (physical[source] <= 0 || landFraction <= 0) continue;
+    const points: Point[] = [
+      { key: null, cost: 0, lift: 0 },
+      ...INTERVENTION_ORDER.filter(
+        (k) => INTERVENTIONS[k].source === source,
+      ).map((key) => ({
+        key,
+        cost: INTERVENTIONS[key].unitCostUSD,
+        lift: INTERVENTIONS[key].targetWeight - ABSORPTION_WEIGHTS[source],
+      })),
+    ].sort((a, b) => a.cost - b.cost || b.lift - a.lift);
+    const hull: Point[] = [];
+    for (const point of points) {
+      if (hull.length && point.lift <= hull[hull.length - 1].lift) continue;
+      while (hull.length >= 2) {
+        const a = hull[hull.length - 2],
+          b = hull[hull.length - 1];
+        if (
+          (b.lift - a.lift) / (b.cost - a.cost) >
+          (point.lift - b.lift) / (point.cost - b.cost)
+        )
+          break;
+        hull.pop();
       }
-
-      if (fraction <= 0) continue;
-
-      scenario[key] = fraction;
-      capacity.set(def.source, spent + fraction);
-      used.push(key);
-      needed -= fraction * gainPerFraction;
-      spentBudget += fraction * costPerFraction;
-      
-      if (maxBudgetUSD && spentBudget >= maxBudgetUSD - 0.01) break;
+      hull.push(point);
+    }
+    for (let i = 1; i < hull.length; i++) {
+      const from = hull[i - 1],
+        to = hull[i];
+      segments.push({
+        from,
+        to,
+        gain: (physical[source] / landFraction) * (to.lift - from.lift) * 100,
+        cost:
+          (hasArea ? areaM2! : 1) * physical[source] * (to.cost - from.cost),
+      });
     }
   }
-
-  const achievedScore = projectScore(cover, scenario);
+  segments.sort((a, b) => b.gain / b.cost - a.gain / a.cost);
+  const allocate = (needed: number, budget: number) => {
+    const scenario = { ...EMPTY_SCENARIO };
+    let spent = 0;
+    for (const segment of segments) {
+      const fraction = Math.max(
+        0,
+        Math.min(1, needed / segment.gain, (budget - spent) / segment.cost),
+      );
+      if (fraction <= 0) break;
+      if (segment.from.key)
+        scenario[segment.from.key] = Math.max(
+          0,
+          scenario[segment.from.key] - fraction,
+        );
+      scenario[segment.to.key!] += fraction;
+      needed -= fraction * segment.gain;
+      spent += fraction * segment.cost;
+    }
+    return { scenario, spent };
+  };
+  const ceilingScore = projectScore(
+    cover,
+    allocate(Infinity, Infinity).scenario,
+  );
+  const budget = maxBudgetUSD ?? Infinity;
+  const budgetCeilingScore = projectScore(
+    cover,
+    allocate(Infinity, budget).scenario,
+  );
+  const solved = allocate(Math.max(0, target - rawBase), budget);
+  const achievedScore = projectScore(cover, solved.scenario);
+  const reachable = achievedScore >= target - 0.05;
   return {
-    scenario,
+    scenario: solved.scenario,
     achievedScore,
-    baseScore,
+    baseScore: projectScore(cover, EMPTY_SCENARIO),
     target,
-    // Rounding at one decimal can leave the solver a hair short of an exact
-    // target; treat that as met rather than reporting a false failure.
-    reachable: achievedScore >= target - 0.05,
+    reachable,
     ceilingScore,
-    used,
+    budgetCeilingScore,
+    costUSD: hasArea ? solved.spent : null,
+    remainingGap: Math.max(0, Math.round((target - achievedScore) * 10) / 10),
+    bindingConstraint: reachable
+      ? "none"
+      : target > ceilingScore + 0.05
+        ? "surface"
+        : "budget",
+    used: INTERVENTION_ORDER.filter((k) => solved.scenario[k] > 1e-10),
   };
 }
 
@@ -277,7 +302,7 @@ export const VERDICT_COPY: Record<Verdict, { label: string; tone: string }> = {
 export function evaluateVerdict(
   achieved: number,
   target: number,
-  margin = 1.5
+  margin = 1.5,
 ): Verdict {
   if (achieved >= target + margin) return "supported";
   if (achieved <= target - margin) return "not_supported";
@@ -320,7 +345,7 @@ export function projectFuture(
   cover: LandCover,
   scenario: Scenario,
   areaM2: number,
-  assumptions?: ScenarioAssumptions
+  assumptions?: ScenarioAssumptions,
 ): FutureState {
   const impact = assessScenario(cover, scenario, areaM2, assumptions);
   const next: LandCover = { ...cover };
@@ -347,7 +372,7 @@ export function projectFuture(
   const landKeys = ["vegetation", "soil", "buildings", "pavement"] as const;
   const runoffFraction = landKeys.reduce(
     (sum, key) => sum + physicalShares[key] * (1 - ABSORPTION_WEIGHTS[key]),
-    0
+    0,
   );
   const runoffBeforeM3 = (area * rainMm * runoffFraction) / 1000;
 

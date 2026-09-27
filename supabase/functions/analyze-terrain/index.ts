@@ -10,6 +10,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
+import { validateLandCover } from "../_shared/land-cover.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -253,7 +255,12 @@ Return STRICT JSON only, no prose, no code fence:
       return jsonError(502, "AI returned unparseable classification.", classifyRaw);
     }
 
-    const cover = normalizeCover(parsed);
+    let cover: LandCover;
+    try {
+      cover = normalizeCover(validateLandCover(parsed));
+    } catch (error) {
+      return jsonError(502, "AI returned invalid land-cover percentages.", error instanceof Error ? error.message : "Invalid composition");
+    }
     const aiNotes = typeof parsed.notes === "string" ? parsed.notes : null;
     const score = computeAbsorption(cover);
     const risk = classifyFloodRisk(score);
