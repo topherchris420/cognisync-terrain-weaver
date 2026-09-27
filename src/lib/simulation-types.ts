@@ -51,6 +51,8 @@ export interface SimulationResponse {
     model?: string;
     surface_id?: "now" | "possible";
     land_cover_c?: number;
+    storm_hash?: string;
+    surface_hash?: string;
   };
 }
 

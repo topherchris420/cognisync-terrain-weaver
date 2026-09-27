@@ -300,7 +300,7 @@ export function routeWatershed(
     input.durationMinutes
   );
   const peakDischargeM3s = hydrographPeakM3s(hydrograph);
-  const warnings = [...elevation.warnings];
+  const warnings = [...elevation.warnings, "D8 accumulation is a routing index, not standing flood depth. Cell-area equivalents and relative severity ranks are uncalibrated; the hydrograph shape is prescribed, not a discharge forecast."];
   if (elevation.status === "illustrative") {
     warnings.push(
       "Optimization claims are disabled while the terrain surface is illustrative."
@@ -321,6 +321,8 @@ export function routeWatershed(
     elevation_hash: elevation.hash,
     model: LOCAL_HYDROLOGY_MODEL,
     surface_id: input.surfaceId,
+    storm_hash: input.stormHash,
+    surface_hash: input.surfaceHash,
     land_cover_c: compositeC,
   };
 

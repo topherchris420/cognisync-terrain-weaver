@@ -1,3 +1,4 @@
+import { validateLandCover } from "../../../../supabase/functions/_shared/land-cover";
 import { defineTool, ToolError } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -14,7 +15,7 @@ export default defineTool({
   name: "create_analysis",
   title: "Create terrain scan",
   description:
-    "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are computed server-side unless explicitly overridden.",
+    "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are always computed deterministically; authoritative scores cannot be overridden.",
   inputSchema: {
     name: z.string().trim().min(1).describe("Human-readable name for the scan."),
     center_lat: z.number().min(-90).max(90).describe("Latitude of the scan centre."),
@@ -43,6 +44,7 @@ export default defineTool({
       water: input.water,
       soil: input.soil,
     };
+    validateLandCover(land_cover);
     const absorption_score = computeAbsorptionScore(land_cover);
     const flood_risk = classifyFloodRisk(absorption_score);
 

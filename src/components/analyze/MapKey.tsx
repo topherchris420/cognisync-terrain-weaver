@@ -37,11 +37,11 @@ export function MapKey({ place, showFlow, showPonding, rainfallMm }: MapKeyProps
           )}
           {showPonding && (
             <div className="atlas-key-depth">
-              <span>Where water ponds</span>
+              <span>Relative routing accumulation</span>
               <span className="atlas-key-ramp" style={{ backgroundImage: ramp }} aria-hidden="true" />
               <span className="atlas-key-ticks" aria-hidden="true">
-                <span>shallow</span>
-                <span>deep · tap a pool for depth</span>
+                <span>low</span>
+                <span>high accumulation · not flood depth</span>
               </span>
             </div>
           )}

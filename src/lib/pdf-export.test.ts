@@ -28,6 +28,12 @@ function textOf(doc: ReturnType<typeof generatePDFReport>): string {
 }
 
 describe("PDF export", () => {
+  it("keeps example status even when the report is renamed", () => {
+    const text = textOf(generatePDFReport({ ...record, name: "My study", status: "example" }));
+    expect(text).toContain("ILLUSTRATIVE EXAMPLE");
+    expect(text).toContain("absorption-weights-2026-07");
+  });
+
   it("generates without throwing", () => {
     expect(() => generatePDFReport(record)).not.toThrow();
   });

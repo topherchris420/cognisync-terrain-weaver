@@ -14,6 +14,8 @@ const isApple = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navig
 export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, onExample }: AnalysisLaunchPanelProps) {
   return (
     <section aria-labelledby="analysis-launch-title" className="atlas-launch">
+      <p className="mb-3 text-sm font-medium">The land remembers.</p>
+      <p className="mb-4 text-xs text-muted-foreground">What was. What is. What could be. Inspect the ground, run a storm, then test a different design.</p>
       <div className="atlas-target">
         <MapPin size={16} aria-hidden="true" />
         <div className="min-w-0 flex-1">

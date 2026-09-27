@@ -98,12 +98,12 @@ export function CatalystFuturePanel({
   }, []);
 
   const solve = () => {
-    const result = solveForTarget(cover, target, areaM2, budget === "" ? undefined : budget);
+    const result = solveForTarget(cover, target, areaM2, budget === "" || areaM2 <= 0 ? undefined : budget);
     setScenario(result.scenario);
     setSimulated(null);
   };
 
-  const solvePreview = useMemo(() => solveForTarget(cover, target, areaM2, budget === "" ? undefined : budget), [cover, target, areaM2, budget]);
+  const solvePreview = useMemo(() => solveForTarget(cover, target, areaM2, budget === "" || areaM2 <= 0 ? undefined : budget), [cover, target, areaM2, budget]);
   const verdict = simulated
     ? evaluateVerdict(simulated.impact.projectedScore, target)
     : null;
@@ -160,10 +160,11 @@ export function CatalystFuturePanel({
             type="number"
             min={0}
             placeholder="Unlimited"
+            disabled={areaM2 <= 0}
             value={budget}
             onChange={(e) => {
               const v = e.target.value === "" ? "" : Number(e.target.value);
-              setBudget(v);
+              setBudget(v === "" ? "" : Math.max(0, Number.isFinite(v) ? v : 0));
               setSimulated(null);
             }}
             className="h-8 w-24 font-mono text-xs"
@@ -183,8 +184,8 @@ export function CatalystFuturePanel({
       {!solvePreview.reachable && (
         <p className="catalyst-body mt-2 text-[11px] leading-relaxed text-warning">
           {budget !== "" && solvePreview.achievedScore < target
-            ? `Target ${target} is unreachable with a $${formatCompactUSD(budget)} budget.`
-            : `Converting every eligible surface reaches ${solvePreview.ceilingScore.toFixed(1)}. A score of ${target} is unattainable here.`}
+            ? `Target ${target} is unreachable with a ${formatCompactUSD(budget)} budget.`
+            : `Converting all classified source surfaces reaches ${solvePreview.ceilingScore.toFixed(1)}. A score of ${target} is unattainable here.`}
         </p>
       )}
 

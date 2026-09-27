@@ -119,6 +119,7 @@ function riskZonesToGeoJSON(zones: RiskZone[]): FeatureCollection {
         level: zone.level,
         affected_area_km2: zone.affected_area_km2,
         depth_m: zone.flood_depth_m ?? LEVEL_DEPTH_M[zone.level] ?? 0.1,
+        has_depth: Number.isFinite(zone.flood_depth_m),
       },
       geometry: {
         type: "Polygon",
@@ -345,17 +346,17 @@ export const RiskHeatmap = forwardRef<RiskHeatmapHandle, RiskHeatmapProps>(funct
       const depth = Number(props.depth_m || 0);
       // The engine caps standing depth at 4 m; a capped cell is "at least" that.
       const depthText =
-        depth >= 4 ? "4 m or more" : depth >= 1 ? `${depth.toFixed(2)} m` : `${Math.round(depth * 100)} cm`;
+        !props.has_depth ? "Unavailable" : depth >= 4 ? "4 m display cap" : depth >= 1 ? `${depth.toFixed(2)} m` : `${Math.round(depth * 100)} cm`;
 
       const html = `
         <div class="atlas-popup">
-          <div class="atlas-popup-title"><span class="atlas-popup-swatch" style="background:${depthColor(depth)}"></span>Ponding cell</div>
+          <div class="atlas-popup-title"><span class="atlas-popup-swatch" style="background:${depthColor(depth)}"></span>Routing accumulation cell</div>
           <dl>
-            <div><dt>Modeled depth</dt><dd>${depthText}</dd></div>
+            <div><dt>Accumulation / cell area</dt><dd>${depthText}</dd></div>
             <div><dt>Cell area</dt><dd>${Math.round(areaM2).toLocaleString()} m²</dd></div>
             <div><dt>Accumulation</dt><dd>${LEVEL_LABEL[level] ?? "Moderate"}</dd></div>
           </dl>
-          <p>Water gathered here from every cell that drains into it. No sewer capacity is modeled.</p>
+          <p>Routing accumulation includes upstream contributions. This is not standing flood depth. No sewer capacity is modeled.</p>
         </div>
       `;
 

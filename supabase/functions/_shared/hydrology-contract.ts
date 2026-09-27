@@ -10,6 +10,9 @@ export const RESOLUTION_GRID = {
 export type SimulationResolution = keyof typeof RESOLUTION_GRID;
 export type ScientificStatus =
   | "observed"
+  | "inferred"
+  | "reconstructed"
+  | "illustrative"
   | "derived"
   | "modeled"
   | "projected"
@@ -187,7 +190,7 @@ function validateProvenance(
       throw new Error(`${label}[${index}].confidence is invalid.`);
     }
     if (
-      !["observed", "derived", "modeled", "projected", "speculative"].includes(
+      !["observed", "inferred", "reconstructed", "illustrative", "derived", "modeled", "projected", "speculative"].includes(
         String(candidate.status)
       )
     ) {

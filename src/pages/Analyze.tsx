@@ -1,3 +1,5 @@
+import { validateLandCover } from "../../supabase/functions/_shared/land-cover";
+import { computeAbsorptionScore, classifyFloodRisk } from "@/lib/absorption";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,8 @@ import { EraCompare } from "@/components/historical/EraCompare";
 import { DEFAULT_ERA_ID, getEra } from "@/lib/historical/eras";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { StormComparison } from "@/components/StormComparison";
+import { EvidencePanel } from "@/components/analyze/EvidencePanel";
+import { PlanningEnvelope } from "@/components/analyze/PlanningEnvelope";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
@@ -76,6 +80,7 @@ import {
   type BBox,
 } from "@/lib/geo";
 import { boundsToSimBBox, estimateRunoffVolumeM3 } from "@/lib/simulation";
+import { buildExperimentExport } from "@/lib/experiment-export";
 import { generatePDFReport } from "@/lib/pdf-export";
 import { toast } from "sonner";
 import { TacticalHUD } from "@/components/tactical/TacticalHUD";
@@ -508,7 +513,10 @@ export default function Analyze() {
       }
 
       const analysis = (data as { analysis: AnalysisRecord }).analysis;
-      setResult(analysis);
+      const landCover = validateLandCover(analysis?.land_cover);
+      if (!parseBBox(analysis.bbox) || !analysis.id || !analysis.created_at) throw new Error("Analysis response lacks study identity.");
+      const score = computeAbsorptionScore(landCover);
+      setResult({ ...analysis, land_cover: landCover, absorption_score: score, flood_risk: classifyFloodRisk(score) });
       workflow.advance("ANALYZED");
       toast.success("Surface permeability analysis complete.");
     } catch (e) {
@@ -556,12 +564,12 @@ export default function Analyze() {
       const size = LOCAL_GRID[stormDefinition.resolution];
       const nowSurface = buildRealitySurface({
         id: "now",
-        baselineLayerHash: "landcover:classified",
+        baselineLayerHash: stableHash({ bbox: extent, cover: result.land_cover, status: result.status }),
         bbox: extent,
         rows: size,
         cols: size,
         features: [],
-        provenance: SURFACE_PROVENANCE,
+        provenance: SURFACE_PROVENANCE.map(source => ({ ...source, accessedAt: result.created_at, title: isExample ? "Illustrative example land cover" : "Inferred satellite land cover", status: isExample ? "illustrative" as const : "inferred" as const })),
         warnings: [],
       });
 
@@ -581,12 +589,12 @@ export default function Analyze() {
       if (isRerun) {
         const possibleSurface = buildRealitySurface({
           id: "possible",
-          baselineLayerHash: "landcover:classified",
+          baselineLayerHash: stableHash({ bbox: extent, cover: result.land_cover, status: result.status }),
           bbox: extent,
           rows: size,
           cols: size,
           features: interventionFeatures,
-          provenance: SURFACE_PROVENANCE,
+          provenance: SURFACE_PROVENANCE.map(source => ({ ...source, accessedAt: result.created_at, title: isExample ? "Illustrative example land cover" : "Inferred satellite land cover", status: isExample ? "illustrative" as const : "inferred" as const })),
           warnings: [],
         });
         const possibleRun = await runLocalStorm({
@@ -663,6 +671,17 @@ export default function Analyze() {
       "application/geo+json"
     );
     toast.success("GeoJSON boundary exported.");
+  };
+
+  const handleExportExperiment = () => {
+    if (!result) return;
+    try {
+      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult });
+      downloadTextFile(exportFilename(name || "mannahatta-experiment", "json"), JSON.stringify(evidence, null, 2), "application/json");
+      toast.success("Experiment evidence exported.");
+    } catch {
+      toast.error("The experiment identities are incomplete or incompatible. Rerun the storm before exporting.");
+    }
   };
 
   const handleExportCSV = () => {
@@ -1093,6 +1112,8 @@ export default function Analyze() {
                     <LandCoverBreakdown cover={result.land_cover} />
                   </section>
 
+                  <EvidencePanel analysis={result} image={capturedTile ?? result.image_data_url} />
+
                   <Historical1609Panel
                     state={welikia1609}
                     presentScore={Number(result.absorption_score)}
@@ -1333,6 +1354,7 @@ export default function Analyze() {
                   <section className="atlas-section atlas-section--lead" aria-labelledby="mitigation-title">
                     <h3 id="mitigation-title" className="atlas-section-title mb-2">Give the water somewhere to go</h3>
 
+                    <PlanningEnvelope cover={result.land_cover} areaM2={recordAreaM2(result)} />
                     <ScenarioStudio
                       cover={result.land_cover}
                       bbox={result.bbox}
@@ -1455,6 +1477,11 @@ export default function Analyze() {
                     </p>
 
                     <div className="atlas-exports mt-5">
+                      <button type="button" onClick={handleExportExperiment}>
+                        <FileJson className="h-4 w-4" aria-hidden="true" />
+                        <span><strong>Experiment evidence (JSON)</strong><small>Inputs, drawings, coefficients, storm identity and routed outputs</small></span>
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </button>
                       <button type="button" onClick={handleExportPDF}>
                         <FileText className="h-4 w-4" aria-hidden="true" />
                         <span>

@@ -1,3 +1,4 @@
+import { validateLandCover } from "../../../../supabase/functions/_shared/land-cover";
 import { defineTool, ToolError } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -51,6 +52,7 @@ export default defineTool({
     }
     if (given === 5) {
       const land_cover = cover as Record<keyof typeof cover, number>;
+      validateLandCover(land_cover);
       const score = computeAbsorptionScore(land_cover);
       patch.land_cover = land_cover;
       patch.absorption_score = score;

@@ -3,6 +3,9 @@ import type { FlowPath, ImpactPoint, RiskZone } from "@/lib/simulation-types";
 
 export type ScientificStatus =
   | "observed"
+  | "inferred"
+  | "reconstructed"
+  | "illustrative"
   | "derived"
   | "modeled"
   | "projected"
