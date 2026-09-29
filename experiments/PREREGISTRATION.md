@@ -93,3 +93,29 @@ public feed. Metrics: per-class range and standard deviation, score range,
 bulk-runoff range at 50 mm, share of values that are multiples of 5.
 Imagery bytes were not archived, so provider/imagery identity cannot be
 verified; this is stated as a limitation, not assumed away.
+
+## Addendum 1 — 2026-09-29, after the development run, before any holdout read
+
+The holdout 311 file was downloaded with the others but has not been read by
+any analysis. Recorded before any change below is made:
+
+1. **Power.** The development analysis (R4) found 38 deduplicated street-flooding
+   reports in 17 of 48 areas; the interval on the AUC difference spans about
+   ±0.1. The seeded sample is extended from 40 to **200** tiles by continuing
+   the same `mulberry32(20260929)` order with the same acceptance rule.
+   Tiles 41–200 carry Terrarium elevation only; 3DEP comparisons stay on the
+   original 48 areas. Development results are reported for the extended sample.
+2. **Revision under consideration.** Synthetic verification (R1) shows D8 stops
+   water in single-cell pits and on flats, and R2 shows a median 81% of routed
+   water ending in interior pits at high resolution. The candidate revision is
+   depression filling (priority-flood with a small gradient across filled
+   flats) before D8. It is adopted or rejected on the **analytic** criterion
+   alone: it must deliver ≥ 99% of water to the expected outlets on the pit
+   and flat cases without degrading any other R1 case. The 311 development
+   result is reported for both variants but does not decide adoption.
+3. **Holdout.** The holdout is evaluated once, on the model as frozen after
+   item 2. Primary: the frozen app model. Secondary, for transparency: the
+   unconditioned D8 of the original engine.
+4. **Exclusion (C1/C2).** Rows whose `location_label` is `probe` are excluded:
+   the single such row stores 100% water for an extent that NLCD shows as
+   mostly land, and was evidently written by a manual test, not the classifier.
