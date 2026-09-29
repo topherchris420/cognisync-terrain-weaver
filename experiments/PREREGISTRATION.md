@@ -140,3 +140,18 @@ any analysis. Recorded before any change below is made:
 4. **Secondary holdout predictor, declared now:** static ponded depth from the
    frozen app model, compared with the same low-elevation baseline. The
    primary holdout test remains routed accumulation from the frozen app model.
+
+## Addendum 3 — 2026-09-29, before any holdout read
+
+Examining the intervention experiment on the example extent showed 41% of
+runoff "ponded", which led to a data-quality check of the Terrarium fixtures:
+154 cells lie more than 20 m below their neighbours, down to −14,017 m, all
+along shorelines where Terrarium blends bathymetry. Under fill-and-spill such
+a cell becomes a bottomless reservoir. This was found from the elevation
+data and the example, not from any 311 result.
+
+Boundary condition added to the app model before the holdout: **cells at or
+below 0 m are receiving tidal water.** Water reaching them leaves the land
+system, exactly as at the extent boundary. The development analysis is re-run
+with this model; the holdout is still evaluated once, on the model as frozen
+after this addendum.
