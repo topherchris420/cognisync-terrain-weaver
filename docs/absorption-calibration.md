@@ -134,5 +134,13 @@ The weights live in three places and a test fails if they drift:
 `src/lib/absorption.test.ts` parses the latter two and asserts they agree with
 the first. Change one, and the suite tells you about the other two.
 
-Existing scans were backfilled by
-`supabase/migrations/20260714120000_recalibrate_absorption_score.sql`.
+Existing scans were meant to be backfilled by
+`supabase/migrations/20260714120000_recalibrate_absorption_score.sql`. A
+2026-09-29 audit of the live feed found 24 of 61 rows still carrying
+pre-recalibration scores (for example Bois de Boulogne stored as 89.7, not
+74.7), so the migration evidently did not reach them. The app and MCP tools
+now recompute every score from land cover on read and report a disagreeing
+stored value alongside it. See `experiments/classification/C3-stored-score-integrity`.
+
+The weights have since been compared with the NRCS curve-number method, and
+the classifier with NLCD 2021 and with repeated runs; see `experiments/`.

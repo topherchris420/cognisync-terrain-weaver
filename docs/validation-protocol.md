@@ -4,9 +4,9 @@
 
 | Input | Provider / transformation | Resolution and coverage | Time / license / fallback |
 |---|---|---|---|
-| Live cover | Captured map image → AI five-class percentages | Whole captured extent, not a classified pixel raster | Scan timestamp retained; source capture date/resolution not established by the classifier; retain imagery-provider attribution |
+| Live cover | Captured map image → AI five-class percentages | Whole captured extent, not a classified pixel raster | Scan timestamp retained; source capture date/resolution not established by the classifier; retain imagery-provider attribution. Compared with NLCD 2021 and with repeat runs in `experiments/classification` |
 | Example cover | Repository teaching fixture | Fixed Lower Manhattan extent | Explicit illustrative status; not saved as a live scan |
-| Elevation | Mapzen Terrarium tiles → sampled grid | Source-dependent; sampled to selected local grid | Hash and observed/illustrative status retained; synthetic slope fallback; source license must be verified for a redistributed tile archive |
+| Elevation | Mapzen Terrarium tiles → sampled grid | Source-dependent; sampled to selected local grid | Hash and observed/illustrative status retained; synthetic slope fallback; source license must be verified for a redistributed tile archive. Contains bathymetry and artefacts to −14 km along NYC shorelines; cells ≤ 0 m are treated as receiving water. Compared with USGS 3DEP in `experiments/routing/R3` |
 | 1609 blocks | Welikia reconstruction → bounding boxes and five-class mapping | NYC block-index coverage; bounding boxes are not exact habitat boundaries | Source URL, accessedAt and transformation stored in index; no inferred coverage outside it |
 | Island benchmark | Application estimate informed by Mannahatta/Welikia | One reference composition, not per-site | 79.1 derived by shared weights; not a WCS-published five-class measurement |
 | Coefficients | Representative fixed weights documented in calibration | Screening land classes, no local soil/drainage calibration | July 2026 coefficient identity; historical calibration is not event validation |
@@ -20,7 +20,7 @@ USGS provides event-based streamflow, high-water marks and temporary sensor reco
 
 [NYC 311 reporting](https://www.nyc.gov/site/311reporting/faq/faq.page) provides location-based service-request information. Reports are complaints, not measured depth, and location validation/availability affects geographic totals. Treat complaint association as a separate exploratory question, not physical validation.
 
-These sources were identified for a future study; no outcome dataset was downloaded, scored or used to tune this change.
+The 311 route has now been taken, as an exploratory association and not as physical validation: see [PREREGISTRATION](../experiments/PREREGISTRATION.md) and results R4 (development) and R5 (holdout) in [experiments](../experiments/INDEX.md). The USGS event archives remain unused; the storms tested were pluvial, and no high-water marks were matched.
 
 ## Predeclare the question
 
@@ -30,6 +30,11 @@ These sources were identified for a future study; no outcome dataset was downloa
 4. Compare against simple baselines (impervious fraction and elevation-only accumulation). Report effect sizes, coverage, sensitivity to matching choices and failures; never select only persuasive maps.
 5. Do not evaluate RMSE of modeled flood depth or peak discharge: this implementation does not solve either quantity physically. Such validation requires a suitable hydraulic model and observations with matching datums and timing.
 
-## Why no empirical accuracy claim is made
+## What the first contact established, and what it did not
 
-The repository has no event-matched archive of rainfall, antecedent conditions, drainage capacity, source imagery, independent cover labels and observed outcomes. The 18-site documentation contains score summaries, not all raw classification fixtures. Synthetic regression cases cannot recover those missing observations. Acquisition, licensing, alignment and preregistration remain required before a credible validation result exists.
+Steps 1–4 above have now been carried out once, on committed fixtures, with the protocol committed before outcomes were read:
+
+- **Step 1** (classification against an independent map): pervious share differs from NLCD 2021 by 6.7 pp on average across 16 frames; repeat runs of one frame span 29 pp. Aggregate classes only; no pixel-level confusion matrix is defensible from these data.
+- **Steps 2–4** (association with observed wet locations, holdout, baselines): on the holdout storm, routed accumulation did not beat the low-elevation baseline (AUC 0.50 vs 0.62).
+
+This is not an accuracy claim for the score, the water budget or any depth. The repository still has no event-matched archive of antecedent conditions, drainage capacity, source imagery or measured runoff, and 311 reports are not measurements. Step 5 stands: RMSE of flood depth or peak discharge would need a hydraulic model and matching observations.
