@@ -107,7 +107,9 @@ import { buildRealitySurface } from "@/lib/counterfactual/modifiers";
 import { requiredEligibilityLayer } from "@/lib/counterfactual/eligibility";
 import {
   LOCAL_GRID,
+  cachedElevation,
   runLocalStorm,
+  type SimExtent,
 } from "@/lib/hydrology";
 import type { InterventionFeature } from "@/lib/counterfactual/types";
 
@@ -242,6 +244,8 @@ export default function Analyze() {
   const [simResult, setSimResult] = useState<SimulationResponse | null>(null);
   const [futureSimResult, setFutureSimResult] = useState<SimulationResponse | null>(null);
   const [nowSeal, setNowSeal] = useState<StormSeal | null>(null);
+  // The extent the current storm was routed on; exported so the pair can be replayed.
+  const [stormExtent, setStormExtent] = useState<SimExtent | null>(null);
   const [possibleSeal, setPossibleSeal] = useState<StormSeal | null>(null);
 
   // Layer visibility toggles
@@ -451,6 +455,7 @@ export default function Analyze() {
     setScenarioExport(null);
     setActiveTab("overview");
     setSimResult(null);
+    setStormExtent(null);
     setFutureSimResult(null);
     setCatalystFuture(null);
     setNowSeal(null);
@@ -613,6 +618,7 @@ export default function Analyze() {
         const areaM2 = bboxAreaKm2(bounds) * 1e6;
         const future = projectFuture(result.land_cover, scenario, areaM2);
         setSimResult(nowRun);
+        setStormExtent(extent);
         setSimWarnings([...nowRun.warnings, ...possibleRun.warnings]);
         setNowSeal(seal);
         setPossibleSeal(seal);
@@ -627,6 +633,7 @@ export default function Analyze() {
         );
       } else {
         setSimResult(nowRun);
+        setStormExtent(extent);
         setSimWarnings(nowRun.warnings);
         setNowSeal(seal);
         workflow.advance("STORM_COMPLETE");
@@ -676,7 +683,9 @@ export default function Analyze() {
   const handleExportExperiment = () => {
     if (!result) return;
     try {
-      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult });
+      const size = nowSeal ? LOCAL_GRID[nowSeal.storm.resolution] : 0;
+      const elevation = stormExtent && size ? cachedElevation(stormExtent, size, size) : null;
+      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult, extent: stormExtent, elevation });
       downloadTextFile(exportFilename(name || "mannahatta-experiment", "json"), JSON.stringify(evidence, null, 2), "application/json");
       toast.success("Experiment evidence exported.");
     } catch {

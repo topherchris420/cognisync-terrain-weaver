@@ -211,3 +211,8 @@ export function rememberElevation(grid: ElevationGrid, bbox: SimExtent): void {
 export function clearElevationCache(): void {
   demCache.clear();
 }
+
+/** The grid a storm was routed on, if it is still cached; used to embed it in evidence exports. */
+export function cachedElevation(bbox: SimExtent, rows: number, cols: number): ElevationGrid | null {
+  return demCache.get(cacheKey(bbox, rows, cols)) ?? null;
+}
