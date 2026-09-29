@@ -15,24 +15,21 @@ import type {
   Map as MapLibreMap,
   StyleImageInterface,
 } from "maplibre-gl";
-import { ABSORPTION_WEIGHTS } from "@/lib/absorption";
 import { parseBBox } from "@/lib/geo";
 import {
-  INTERVENTIONS,
   INTERVENTION_COLORS,
-  type InterventionKey,
   type Scenario,
 } from "@/lib/scenario";
 import type { SpatialContextResult } from "@/lib/spatial-data/types";
 import type { LandCover } from "@/lib/types";
 import { evaluateEligibility } from "@/lib/counterfactual/eligibility";
+import { interventionParameters } from "@/lib/counterfactual/intervention-parameters";
 import { stableHash } from "@/lib/counterfactual/hashing";
 import { deriveScenarioFromFeatures } from "@/lib/counterfactual/projected-metrics";
 import { setMapDrawing } from "@/lib/map-drawing";
 import type {
   EligibilityResult,
   InterventionFeature,
-  InterventionParameters,
   InterventionType,
 } from "@/lib/counterfactual/types";
 
@@ -148,31 +145,6 @@ function isPolygonGeometry(
   );
 }
 
-function parametersFor(type: InterventionType): InterventionParameters {
-  if (type === "wetland") {
-    return {
-      retentionFractionDelta: 0,
-      storageDeltaMm: 0,
-      roughnessDelta: 0,
-      calibrationProvenance: [],
-    };
-  }
-  const definition = INTERVENTIONS[type as InterventionKey];
-  return {
-    retentionFractionDelta: Math.min(
-      1,
-      Math.max(
-        0,
-        definition.targetWeight -
-          ABSORPTION_WEIGHTS[definition.source]
-      )
-    ),
-    storageDeltaMm: 0,
-    roughnessDelta: 0,
-    calibrationProvenance: [],
-  };
-}
-
 function featureId(
   draft: GeoJSON.Feature<PolygonGeometry, Record<string, unknown>>
 ): string {
@@ -223,7 +195,7 @@ function interventionFromDraft(
     type,
     geometry: draft.geometry,
     areaM2: eligibility.validAreaM2,
-    parameters: parametersFor(type),
+    parameters: interventionParameters(type),
     eligibility,
     provenance: eligibility.provenance,
   };

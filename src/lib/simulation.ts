@@ -1,4 +1,5 @@
 import type { LandCoverKey } from "@/lib/types";
+import { ABSORPTION_WEIGHTS } from "@/lib/absorption";
 import type { BBox } from "@/lib/geo";
 import { bboxAreaKm2 } from "@/lib/geo";
 import type { SimulationRequest } from "@/lib/simulation-types";
@@ -13,16 +14,21 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Runoff coefficient per land-cover class: the fraction of incident rain that
- * becomes surface runoff (`C` in the Rational Method, `Q = CiA`). These are the
- * complements of the absorption weights in `absorption.ts` — pavement and roofs
- * shed almost everything, vegetation and soil absorb most of it.
+ * becomes surface runoff (`C` in the Rational Method, `Q = CiA`). Derived from
+ * the registered retention weights so the routing engine and the score/bulk
+ * budget cannot disagree (hydrology/H1 found they did: vegetation 0.10 vs
+ * 0.20, and open water credited as a 50% sponge).
+ *
+ * Open water has C = 1: rain falling on the harbour is not retained by land;
+ * it goes straight to the receiving water. With this, routed retained volume
+ * equals the bulk land budget's retained volume for the same extent.
  */
 export const RUNOFF_COEFFICIENT: Record<LandCoverKey, number> = {
-  vegetation: 0.1, // high infiltration
-  soil: 0.15,
-  water: 0.5, // open water passes rain straight through to the receiving body
-  buildings: 0.95, // roofs — effectively impervious
-  pavement: 0.9, // asphalt and concrete
+  vegetation: 1 - ABSORPTION_WEIGHTS.vegetation,
+  soil: 1 - ABSORPTION_WEIGHTS.soil,
+  buildings: 1 - ABSORPTION_WEIGHTS.buildings,
+  pavement: 1 - ABSORPTION_WEIGHTS.pavement,
+  water: 1,
 };
 
 /**

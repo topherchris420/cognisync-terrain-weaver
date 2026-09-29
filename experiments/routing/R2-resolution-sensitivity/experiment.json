@@ -1,0 +1,49 @@
+{
+  "spec": {
+    "id": "routing/R2-resolution-sensitivity",
+    "domain": "routing",
+    "title": "Does routing change with grid resolution?",
+    "question": "On the same observed terrain, how similar are routed flow-concentration patterns at the app's low (36), medium (72) and high (120) resolutions, and how much water never leaves the extent?",
+    "hypothesis": null,
+    "tier": "repeated-measurement",
+    "inputs": [
+      "dem/midtown-dense.json",
+      "dem/central-park-south.json",
+      "dem/lower-manhattan-example.json",
+      "dem/jackson-heights.json",
+      "dem/washington-heights.json",
+      "dem/canarsie.json",
+      "dem/long-island-city.json",
+      "dem/forest-hills-gardens.json"
+    ],
+    "conditions": {
+      "dem": "Terrarium",
+      "forcing": "35 mm runoff (50 mm storm, C 0.7)",
+      "metric": "log specific catchment area, compared at 36×36 cell centres"
+    },
+    "split": "None: descriptive sensitivity.",
+    "metrics": [
+      "Spearman correlation of log specific catchment area",
+      "top-10% hotspot overlap (Jaccard)",
+      "share of water that never leaves the extent (interior sinks, or depression storage)"
+    ],
+    "limitations": [
+      "Resolution changes both the DEM sampling and the D8 path geometry; they cannot be separated here."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "dem/ (8 files)",
+      "contentHash": "fnv1a64:c7c3972dafefc99e",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

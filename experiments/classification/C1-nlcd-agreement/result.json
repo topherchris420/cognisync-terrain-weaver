@@ -1,0 +1,240 @@
+{
+  "resultHash": "fnv1a64:0d7086ab3b58414b",
+  "result": {
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Across 16 distinct US frames, the classifier's pervious share differs from NLCD by 6.7 pp on average (bias 3.1 pp) and its impervious share by 8.9 pp (bias -5.4 pp). 3 of 16 classified scores fall inside the reference score interval."
+    },
+    "findings": {
+      "frames": 16,
+      "classifications": 45,
+      "perviousBiasPP": 3.13,
+      "perviousMaePP": 6.68,
+      "imperviousBiasPP": -5.36,
+      "imperviousMaePP": 8.91,
+      "waterBiasPP": 2.23,
+      "waterMaePP": 3.17,
+      "scoresInsideReferenceInterval": 3,
+      "scoreBiasVsReferenceMidpoint": 3.25,
+      "largestPerviousResidualPP": 19.1
+    },
+    "observations": [
+      "Largest pervious residual: Portland, OR, classified 54% versus NLCD 34.9%.",
+      "Systematic pattern: the classifier reports more pervious land (vegetation + soil) than NLCD, which would make scores and retention look better than the reference implies.",
+      "Water: classifier bias 2.2 pp. Impervious: bias -5.4 pp. A negative impervious bias means the classifier reports less building-plus-pavement than NLCD.",
+      "Classified scores sit on average 3.3 points above the midpoint of the reference score interval.",
+      "NLCD imperviousness is itself modelled from 30 m Landsat imagery; residuals of a few points may lie within the reference's own error."
+    ],
+    "tables": [
+      {
+        "title": "Per frame: classified mean vs NLCD reference (% of frame)",
+        "columns": [
+          "frame",
+          "runs",
+          "water cls",
+          "water ref",
+          "imperv cls",
+          "imperv ref",
+          "perv cls",
+          "perv ref",
+          "score",
+          "ref score interval"
+        ],
+        "rows": [
+          [
+            "nyc",
+            1,
+            0,
+            0,
+            90,
+            87.7,
+            10,
+            12.3,
+            16.8,
+            "17.4–20.3"
+          ],
+          [
+            "Manhattan, NY",
+            1,
+            30,
+            15.5,
+            60,
+            73.2,
+            10,
+            11.3,
+            20,
+            "18–21.1"
+          ],
+          [
+            "Phoenix, AZ",
+            1,
+            0,
+            0,
+            65,
+            76.2,
+            35,
+            23.8,
+            33.2,
+            "24.3–28.2"
+          ],
+          [
+            "Central Park, NYC",
+            1,
+            10,
+            7.6,
+            50,
+            54.7,
+            40,
+            37.8,
+            41,
+            "34.5–39.8"
+          ],
+          [
+            "Portland, OR",
+            1,
+            0,
+            0,
+            46,
+            65.1,
+            54,
+            34.9,
+            48.3,
+            "31–35.7"
+          ],
+          [
+            "Midtown Manhattan, NY",
+            1,
+            0,
+            0,
+            95,
+            88.6,
+            5,
+            11.4,
+            14,
+            "16.9–19.8"
+          ],
+          [
+            "Gilbert, AZ",
+            1,
+            2,
+            0,
+            50,
+            48,
+            48,
+            52,
+            44,
+            "41.2–47.3"
+          ],
+          [
+            "Katy, TX",
+            1,
+            1,
+            0.1,
+            40,
+            51.1,
+            59,
+            48.8,
+            51.8,
+            "39.3–45.2"
+          ],
+          [
+            "Sky Harbor, Phoenix",
+            1,
+            0,
+            0,
+            87.5,
+            82.6,
+            12.5,
+            17.4,
+            19.1,
+            "20.4–23.8"
+          ],
+          [
+            "(untitled 40.758, -73.985)",
+            24,
+            23.4,
+            31,
+            62.6,
+            59.3,
+            13.9,
+            9.7,
+            22.8,
+            "18.4–21.5"
+          ],
+          [
+            "(untitled 40.758, -73.985)",
+            5,
+            20,
+            17.2,
+            65,
+            71,
+            15,
+            11.8,
+            23.4,
+            "18.5–21.7"
+          ],
+          [
+            "(untitled 40.758, -73.985)",
+            2,
+            0,
+            0,
+            77.5,
+            89.6,
+            22.5,
+            10.4,
+            25.7,
+            "16.2–19.1"
+          ],
+          [
+            "(untitled 40.758, -73.985)",
+            1,
+            10,
+            1.1,
+            65,
+            85.1,
+            25,
+            13.8,
+            29.7,
+            "18.4–21.5"
+          ],
+          [
+            "(untitled 40.758, -73.985)",
+            2,
+            11,
+            2.9,
+            77.5,
+            85.7,
+            11.5,
+            11.5,
+            19.4,
+            "17.1–20"
+          ],
+          [
+            "Washington, District of Columbia, United States",
+            1,
+            12.5,
+            8.9,
+            55,
+            63.5,
+            32.5,
+            27.6,
+            36.3,
+            "28.2–32.6"
+          ],
+          [
+            "Arlington County, Virginia, United States",
+            1,
+            0,
+            0,
+            60,
+            50.5,
+            40,
+            49.5,
+            38,
+            "39.7–45.7"
+          ]
+        ]
+      }
+    ]
+  }
+}

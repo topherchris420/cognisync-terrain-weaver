@@ -29,6 +29,8 @@ Live imagery, historical rasters and elevation require their external services. 
 | **Present — what is** | Captured imagery, inferred five-class land cover and deterministically derived score | A surveyed surface map, measured infiltration or validated flood probability |
 | **Possible — what could be** | Interventions evaluated with the same coefficients and, for routed pairs, the same storm and terrain | A forecast, construction approval or prediction of political adoption |
 
+Beneath all three sits a fourth question: **how do we know?** Overview lists every component — reconstruction, classification, score, coefficients, elevation, routing, interventions — with the kind of number it produces and how far it has been tested, generated from the committed [experiments](experiments/INDEX.md) rather than written by hand.
+
 Mannahatta's historical frame concerns land inhabited and shaped by the Lenape. An ecology reconstruction is not an account of empty or untouched land. The written five-class benchmark is this application's estimate informed by the Mannahatta/Welikia descriptions, **not a five-class dataset published by WCS**. The reconstructed block index is a different source and must retain its own transformation notes.
 
 ## What would have to change?
@@ -42,17 +44,19 @@ Catalyst is available in Mitigation as an inspectable planning envelope. Enter a
 
 The solver uses the upper cost/retention envelope for each source surface. It can replace a cheaper intervention with a more effective one: trees and bioswales compete for the same pavement. A simple greedy list of whole intervention types cannot solve that problem correctly. A $0 budget means no spending.
 
+Each recommended intervention opens into its assumption chain: source surface, eligibility, area, retention change and unit cost with their registry basis, modeled effect, cost and limitation. The panel also says whether the target still holds when land cover is off by the measured classification error; plans sized exactly to a target usually do not ([I3](experiments/interventions/I3-classification-uncertainty/REPORT.md)).
+
 This is a **continuous aggregate allocation**, not parcel engineering. It assumes all classified source area is available. The spatial editor applies a separate eligibility contract; green roofs and permeable pavement remain unavailable in the current main workstation because their mapped eligibility layers are not loaded. Trees and bioswales carry explicit feasibility caveats. An aggregate proposal does not silently place polygons or become a routed result.
 
 Installation assumptions are USD/m²: trees **45**, bioswales **65**, permeable pavement **150**, green roofs **180**. Source year, local geography and inflation basis are not documented. Maintenance, replacement, permitting and land acquisition are excluded. Annual retention and monetized benefit are scenario assumptions, not audited returns. Cost rankings are conditional on these rates.
 
 ## What if the classification is wrong?
 
-The land-cover classifier is a substantial uncertainty source. The [18-site calibration record](docs/absorption-calibration.md) documents suspiciously rounded outputs and frame-size effects.
+The land-cover classifier is the largest measured uncertainty source. Its outputs are coarse: 82% of stored class values are multiples of 5. They are unstable: one frame classified 24 times received 15 different compositions, with water anywhere from 0 to 45% and pervious share spanning 29 percentage points ([C2](experiments/classification/C2-repeat-stability/REPORT.md)). Against the independent USGS NLCD 2021 map, pervious share differs by 6.7 points on average across 16 frames ([C1](experiments/classification/C1-nlcd-agreement/REPORT.md)).
 
-Overview now offers a bounded experiment: transfer a chosen number of percentage points between vegetation and pavement, preserving the other classes and total area. It reports the resulting scores and 50 mm bulk runoff. Transfers stop when a source class runs out. It leaves the stored analysis untouched.
+Overview offers a bounded experiment: transfer percentage points between vegetation and pavement, preserving the other classes and total area, and see the pavement, score and 50 mm bulk-runoff range. The default range is **benchmark-derived (±7 pp)**; the repeat-run range (±15 pp) or a chosen what-if are alternatives. Transfers stop when a source class runs out. It leaves the stored analysis untouched.
 
-This is **sensitivity analysis, not a statistical confidence interval**. It does not quantify every source of error. The shared input contract rejects incomplete, negative, non-finite or materially unbalanced compositions before accepting classifier/MCP percentages. Scores are computed by code, not accepted from a model narrative.
+This is **sensitivity analysis, not a statistical confidence interval**. It does not quantify every source of error, and NLCD has its own. The shared input contract rejects incomplete, negative, non-finite or materially unbalanced compositions before accepting classifier/MCP percentages. Scores are computed by code, not accepted from a model narrative.
 
 ## Two water models, explicit limits
 
@@ -76,17 +80,21 @@ Fixed coefficients yield linear responses: this model **cannot identify saturati
 
 ### Terrain routing
 
-The browser loads Terrarium elevation onto a finite grid, computes D8 steepest-downhill routing, and applies intervention modifiers only to affected cells. A synthetic slope is used and labeled if elevation is unavailable. NOW and POSSIBLE share rainfall, duration, resolution and elevation identity; edited futures invalidate the previous comparison. Surface identities include study bounds and classified cover.
+The browser loads Terrarium elevation onto a finite grid and routes water with D8 over static **fill-and-spill** (routing v2): closed depressions hold up to their volume and spill the rest, and cells at or below 0 m are treated as receiving tidal water. The original D8 stranded a median 81% of routed water in single-cell pits and in Terrarium artefacts as deep as −14 km; the analytic pit and flat cases now pass ([R1](experiments/routing/R1-synthetic-terrains/REPORT.md), [R2](experiments/routing/R2-resolution-sensitivity/REPORT.md)). Intervention modifiers are weighted by the share of each cell a drawing covers, so credited area no longer depends on resolution. A synthetic slope is used and labeled if elevation is unavailable. NOW and POSSIBLE share rainfall, duration, resolution and elevation identity; edited futures invalidate the previous comparison. Surface identities include study bounds and classified cover.
 
-The engine conserves rain across retained/infiltrated, stored and runoff terms. It constructs a volume-scaled triangular hydrograph. **The hydrograph shape is prescribed, not calibrated discharge.** Accumulation divided by cell area is an equivalent routing metric, not hydraulically solved standing-water depth. Display severity is relative within a run, so colored zones must not be read as official hazard categories.
+**Routed zones did not locate reported flooding.** On a preregistered held-out storm (29 September 2023, 145 NYC street-flooding reports across 68 of 208 study areas), routed accumulation ranked reported locations no better than chance (AUC 0.50), while simply ranking low ground did better (0.62) ([R5](experiments/routing/R5-311-association-holdout/REPORT.md)). Flow directions also change with the elevation source for about two thirds of cells ([R3](experiments/routing/R3-dem-source-sensitivity/REPORT.md)). Read the map as where this model sends water, not where flooding is likely. The app says so beside every routed result.
 
-No calibrated sewers, storm surge, antecedent moisture or surveyed soil profiles are present. The lumped land-only budget and spatial routing have different area assumptions, particularly at waterfronts; their totals are not interchangeable.
+The engine conserves rain across retained/infiltrated, stored and runoff terms; runoff is further split into water ponded in depressions and water leaving the extent. It constructs a volume-scaled triangular hydrograph. **The hydrograph shape is prescribed, not calibrated discharge.** Accumulation divided by cell area is an equivalent routing metric, not hydraulically solved standing-water depth. Display severity is relative within a run, so colored zones must not be read as official hazard categories.
+
+No calibrated sewers, storm surge, antecedent moisture or surveyed soil profiles are present. Both water models now draw on one coefficient set: routing retains exactly what the land budget retains, and rain on open water counts as runoff to the receiving water, not retention ([H1](experiments/hydrology/H1-cross-model-consistency/REPORT.md)). Their totals differ only because routing covers the whole extent, water included.
+
+Against the NRCS curve-number method, the fixed coefficients cannot reproduce how runoff grows with storm depth; bare soil and roofs trip their review wires ([H2](experiments/hydrology/H2-curve-number-benchmark/REPORT.md), [tripwires](experiments/TRIPWIRES.md)).
 
 ## AI proposes; deterministic code decides
 
 AI classifies imagery and proposes explanatory recommendations. Code calculates scores, allocations, budgets, eligibility, routing and comparison identities.
 
-MCP currently exposes scan read/write operations and deterministic land-cover scoring. Authenticated writes use the signed-in user's access rules. They validate complete percentage compositions and recompute scores. They do **not** yet provide a full storm-planning benchmark, a complete action audit trail, or an autonomous planning loop. User- or agent-supplied cover is not independent observational evidence.
+MCP currently exposes scan read/write operations and deterministic land-cover scoring. Authenticated writes use the signed-in user's access rules. They validate complete percentage compositions and recompute scores; scan reads also return scores recomputed from land cover, with any stale stored value alongside. They do **not** yet provide a full storm-planning benchmark, a complete action audit trail, or an autonomous planning loop. User- or agent-supplied cover is not independent observational evidence.
 
 The old `/tactical` operating-picture demonstration generated synthetic hazards around arbitrary coordinates. It is retired from public navigation; existing links now explain the limitation and return to the actual workstation. Its internal demo components remain in the repository for traceable future work.
 
@@ -96,9 +104,9 @@ The old `/tactical` operating-picture demonstration generated synthetic hazards 
 |---|---|---|
 | CSV / GeoJSON | Study identity, extent, cover, score, model label, example/provenance status and caveat | Geometry is the study boundary, not a flood extent |
 | PDF | Analysis summary, explicit provenance labels on every page, optional aggregate scenario | Does not contain the routed storm pair |
-| Experiment JSON | Classified cover, extent, intervention geometry, coefficients/cost assumptions, sealed storm, routed outputs when present, evidence hash | Does not embed imagery or DEM samples; not a complete replay archive |
+| Experiment JSON (v2) | Question, every key value with its evidence status, model/assumption versions and code commit, cover, extent, drawings, registry, sealed storm, **elevation grid**, routed outputs, the controlled-variable check, validation evidence, evidence hash | Does not embed imagery, so the classification itself cannot be replayed |
 
-The evidence hash identifies the exported content using the existing deterministic hash utility. It is not a cryptographic signature. The current share action reopens a **map view**, not an entire experiment. Import/replay and compact scenario-sharing remain future work.
+`npm run replay -- study.json` verifies the evidence hash, storm seal and elevation identity, re-routes NOW and POSSIBLE and compares every volume; a tampered file fails. A NOW/POSSIBLE pair is only exported as a comparison if storm, extent, resolution, land cover, terrain and model are identical and only the drawn surface differs. The evidence hash is not a cryptographic signature. The share action still reopens a **map view**; in-app import remains future work.
 
 ## Architecture
 
@@ -110,7 +118,9 @@ The evidence hash identifies the exported content using the existing determinist
 | Spatial constraints and identity | `src/lib/counterfactual/` |
 | Local terrain routing | `src/lib/hydrology/` |
 | Historical reconstruction | `src/lib/historical/`, `public/data/welikia-1609-blocks.json` |
-| Evidence and reports | `experiment-export.ts`, `geo.ts`, `pdf-export.ts` |
+| Evidence and reports | `experiment-export.ts`, `experiment-replay.ts`, `geo.ts`, `pdf-export.ts` |
+| Validation harness | `src/lib/validation/`, `experiments/`, `scripts/experiment.ts` |
+| Evidence status, ledger, assumption registry | `src/lib/evidence/`, `src/lib/assumptions/registry.ts` |
 | AI classification and persistence | Supabase `analyze-terrain`; shared `land-cover.ts` contract |
 | Agent interfaces | `src/lib/mcp/`; generated Supabase MCP bundle |
 
@@ -136,13 +146,43 @@ npm run lint
 npm run build
 ```
 
-Tests cover coefficient synchronization, water balance, geometry constraints, paired identities, async staleness, cost allocation, classification contracts, sensitivity, provenance and exports. Passing tests establishes implementation consistency, **not empirical flood validation**.
+Tests cover coefficient synchronization, water balance, geometry constraints, paired identities, async staleness, cost allocation, classification contracts, sensitivity, provenance, exports and replay. Passing tests establishes implementation consistency, **not empirical flood validation**. That is what the experiments are for:
+
+```bash
+npm run validate        # re-run every experiment on frozen fixtures; fails if a committed result changed
+npm run experiment      # re-run and rewrite reports
+```
 
 See [implementation evidence and remaining gaps](docs/counterfactual-instrument.md), [source ledger and validation protocol](docs/validation-protocol.md), [calibration](docs/absorption-calibration.md), and [prior delivery evidence](docs/elevation-delivery.md).
 
+## How we test the model
+
+Thirteen experiments compare the model with analytic answers, with itself, with independent reference data and with reported outcomes. They run on frozen fixtures in CI, and every report states its question, inputs, result and limitations. Full list: [experiments/INDEX.md](experiments/INDEX.md). One example, end to end:
+
+| Step | Routed hotspots against reported street flooding |
+|---|---|
+| **Model question** | Do cells the routing engine ranks high in accumulation coincide with where people report street flooding, more than simply low ground does? |
+| **Reference data** | NYC 311 "Street Flooding (SJ)" reports for three storms; USGS/Terrarium elevation; NLCD 2021 cover; NOAA Central Park rainfall. 208 study areas, 200 of them seeded random tiles |
+| **Declared in advance** | Metric (AUC), baseline (low elevation), matching rule, development storms (Henri, Ida 2021) and a holdout storm (29 Sep 2023), all [preregistered](experiments/PREREGISTRATION.md) and committed before any location was read |
+| **Result** | Holdout: routed accumulation AUC 0.50 [0.45, 0.56]; low elevation 0.62 [0.56, 0.69] |
+| **Error** | −0.12 [−0.19, −0.06] against the baseline (95% cluster bootstrap over areas) |
+| **What changed** | Along the way, other experiments exposed real routing defects (pits, flats, a water "sponge", layers labelled as depth), which were fixed and re-measured. None of it made hotspots predictive, and nothing was tuned on the holdout. The result is shown beside every routed map, and the tripwire `routing.hotspots_indicate_flooding` is tripped |
+
+Other results, briefly:
+
+| Component | Compared with | Found |
+|---|---|---|
+| Classification | NLCD 2021; 24 repeats of one frame | 6.7 pp mean pervious disagreement; 29 pp run-to-run spread |
+| Stored scores | the current scorer | 24 of 61 live rows stale (up to 15 points); now recomputed on read |
+| Two water models | each other | 24.8 pp disagreement → 0 after unifying coefficients |
+| Coefficients | NRCS curve numbers | no depth dependence; soil and roof wires tripped |
+| Interventions | the model's own uncertainty | a 1,500 m² bioswale cuts routed runoff 0.18%, not 8%; target-sized plans do not survive classification error |
+
+Negative results stay in the record. [REVISIONS](experiments/REVISIONS.md) lists every change measurement caused and everything it did not fix.
+
 ## Scientific boundary
 
-The score has **not been validated against observed flooding**. Historical reconstruction is not direct measurement. Conceptual eligibility is not a site survey. Screening hydrology is not a flood forecast. These boundaries belong to the instrument, not its fine print.
+The score has **not been validated against observed flooding**. Routed accumulation was tested against reported street flooding on a held-out storm and **did not beat a low-elevation baseline**. Historical reconstruction is not direct measurement. Conceptual eligibility is not a site survey. Screening hydrology is not a flood forecast. These boundaries belong to the instrument, not its fine print.
 
 *It is an argument about physics, not a forecast about politics.*
 

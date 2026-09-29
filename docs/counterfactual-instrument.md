@@ -22,6 +22,6 @@ The dev server starts at 127.0.0.1:43147. Browser acceptance is blocked in this 
 
 ## Remaining product work
 
-A spatial DIFFERENCE layer, complete deterministic replay/import, a general AI planning tool protocol, benchmark action logging, lifecycle cost sourcing and independent event validation remain unimplemented. The historical source enum retains its legacy `observed` value internally for compatibility, while the user-facing panel correctly says reconstructed. Some older dashboard and report band labels still use risk language; interpret them as score categories, not measured hazard probabilities.
+A spatial DIFFERENCE layer, in-app import, a general AI planning tool protocol, benchmark action logging and lifecycle cost sourcing remain unimplemented. Routed pairs can now be replayed and verified from an export (`npm run replay`), and a first preregistered event validation has been run; it did not support the routed hotspots (see `experiments/`). The historical source enum retains its legacy `observed` value internally for compatibility, while the user-facing panel correctly says reconstructed. Some older dashboard and report band labels still use risk language; interpret them as score categories, not measured hazard probabilities.
 
 The README figure is a calculated synthetic fixture diagram, not a geographic map or current UI screenshot. Replacing it with captured, provenance-labeled desktop/mobile demonstrations remains part of browser acceptance.

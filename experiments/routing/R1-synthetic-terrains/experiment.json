@@ -1,0 +1,32 @@
+{
+  "spec": {
+    "id": "routing/R1-synthetic-terrains",
+    "domain": "routing",
+    "title": "D8 routing on terrains with known answers",
+    "question": "On synthetic terrains whose drainage is known analytically, does D8 route water in the right direction, conserve it, and deliver it to the right outlets?",
+    "hypothesis": "On every case, D8 directions lie within 45° of the analytic downslope direction, and at least 99% of water reaches the analytically expected outlets.",
+    "tier": "synthetic-verification",
+    "inputs": [],
+    "conditions": {
+      "grid": "25×25",
+      "generation": "1 unit per cell, cell area 1",
+      "variants": "original D8 (v1); plain fill (rejected); fill-and-spill (v2, shipped)"
+    },
+    "split": "None: analytic verification.",
+    "metrics": [
+      "mean and maximum angular deviation from analytic downslope (degrees)",
+      "share of water reaching expected outlets",
+      "share of cells that are interior sinks"
+    ],
+    "limitations": [
+      "Synthetic surfaces verify the algorithm, not its fidelity to any real street network."
+    ]
+  },
+  "inputs": [],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

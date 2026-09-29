@@ -1,0 +1,48 @@
+{
+  "spec": {
+    "id": "interventions/I1-bioswale-1500m2",
+    "domain": "interventions",
+    "title": "Hypothesis: a 1,500 m² bioswale cuts routed runoff by 8%",
+    "question": "Does a 1,500 m² bioswale on the Lower Manhattan example extent reduce routed runoff under the sealed 50 mm storm by at least 8%?",
+    "hypothesis": "Converting 1,500 m² of eligible pavement to bioswale on the example extent reduces modeled routed runoff under the sealed 50 mm, 60-minute storm by at least 8%.",
+    "tier": "internal-consistency",
+    "inputs": [
+      "dem/lower-manhattan-example.json"
+    ],
+    "conditions": {
+      "extent": "lower-manhattan-example",
+      "rainfallMm": 50,
+      "durationMin": 60,
+      "resolution": "medium (72×72)",
+      "cover": "illustrative example",
+      "interventionAreaM2": 1500
+    },
+    "split": "None: a model experiment. Support here is support within the model, not evidence of a real-world outcome.",
+    "metrics": [
+      "routed runoff reduction (%)",
+      "outflow reduction (%)",
+      "controlled-variable check",
+      "area needed to reach the threshold"
+    ],
+    "limitations": [
+      "Illustrative land cover; eligibility is assumed, not evaluated against mapped pavement.",
+      "The bioswale retention value is a scenario assumption with no recorded source (see the assumption registry).",
+      "The model credits only rain landing on the swale; real swales also capture run-on from a contributing area, and fail once full."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "dem/lower-manhattan-example.json",
+      "contentHash": "fnv1a64:d08e7b3ff8c9a0b8",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

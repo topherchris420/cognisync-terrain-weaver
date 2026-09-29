@@ -44,6 +44,10 @@ export interface SimulationResponse {
     infiltrated_volume_m3?: number;
     rainfall_volume_m3?: number;
     stored_volume_m3?: number;
+    /** Runoff held in surface depressions at event end (routing v2+). */
+    ponded_volume_m3?: number;
+    /** Runoff leaving the extent (routing v2+). */
+    outflow_volume_m3?: number;
     peak_discharge_m3s?: number;
     hydrograph?: Array<{ tMin: number; qM3s: number; rainMm: number }>;
     elevation_status?: "observed" | "illustrative";
@@ -53,6 +57,12 @@ export interface SimulationResponse {
     land_cover_c?: number;
     storm_hash?: string;
     surface_hash?: string;
+    /** Identities of every controlled variable (routing v2+); see counterfactual/controlled.ts. */
+    rainfall_mm?: number;
+    duration_min?: number;
+    extent_hash?: string;
+    land_cover_hash?: string;
+    modifier_hash?: string;
   };
 }
 

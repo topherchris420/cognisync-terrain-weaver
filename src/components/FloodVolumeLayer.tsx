@@ -50,7 +50,8 @@ function layerExists(map: MLMap, id: string): boolean {
 }
 
 /**
- * Standing water for the pitched view. Columns use the modeled depth,
+ * Routed accumulation for the pitched view. Columns use accumulation divided
+ * by cell area — a routing index in metres-equivalent, not standing water —
  * scaled with the terrain exaggeration so they stay readable on the mesh.
  * The flat risk heatmap remains the 2D reading of the same cells.
  */
@@ -142,9 +143,10 @@ export function FloodVolumeLayer({
         .setLngLat(event.lngLat)
         .setHTML(
           `<div class="p-2 text-xs font-mono bg-card text-foreground rounded shadow-md border border-border min-w-[180px]">
-            <div class="font-bold text-primary mb-1 border-b border-border pb-1 uppercase tracking-wider">Standing water</div>
-            <div class="flex justify-between"><span class="text-muted-foreground">Accumulation / cell area</span><span class="font-bold">${depth.toFixed(2)} m</span></div>
-            <div class="flex justify-between"><span class="text-muted-foreground">Risk band</span><span class="font-bold">${level}</span></div>
+            <div class="font-bold text-primary mb-1 border-b border-border pb-1 uppercase tracking-wider">Routed accumulation</div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Accumulation / cell area</span><span class="font-bold">${depth.toFixed(2)} m-eq.</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">Relative rank in this run</span><span class="font-bold">${level}</span></div>
+            <div class="text-muted-foreground mt-1">Not flood depth. Did not match reported flooding on a held-out storm.</div>
           </div>`
         )
         .addTo(map);

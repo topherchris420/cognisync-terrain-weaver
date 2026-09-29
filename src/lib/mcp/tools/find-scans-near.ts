@@ -1,5 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { withCurrentScore } from "@/lib/score-integrity";
 import { supabaseAnon } from "../supabase";
 
 const EARTH_KM_PER_DEG = 111.32;
@@ -24,7 +25,7 @@ export default defineTool({
     const { data, error } = await supabaseAnon()
       .from("analyses")
       .select(
-        "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,created_at",
+        "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,land_cover,created_at",
       )
       .gte("center_lat", lat - latPad)
       .lte("center_lat", lat + latPad)
@@ -34,6 +35,7 @@ export default defineTool({
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
 
     const scans = (data ?? [])
+      .map(withCurrentScore)
       .map((row) => {
         const dLat = (row.center_lat - lat) * EARTH_KM_PER_DEG;
         const dLng =

@@ -7,7 +7,11 @@ import type {
 } from "@/lib/simulation-types";
 import type { SurfaceModifierGrid, WaterBalance } from "@/lib/counterfactual/types";
 
-export const LOCAL_HYDROLOGY_MODEL = "mannahatta-d8-local-v1";
+/**
+ * v2 (2026-09-29): depression filling before D8 (routing/R1, R2; see
+ * experiments/REVISIONS.md). v1 results must never pair with v2 results.
+ */
+export const LOCAL_HYDROLOGY_MODEL = "mannahatta-d8-local-v2";
 
 export const LOCAL_GRID = {
   low: 36,

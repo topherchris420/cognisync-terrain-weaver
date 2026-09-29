@@ -110,6 +110,11 @@ export interface WaterBalance {
   storedM3: number;
   runoffM3: number;
   closureErrorM3: number;
+  /**
+   * Part of runoffM3 held in surface depressions at the end of the event
+   * (static fill-and-spill). Absent for results from routing model v1.
+   */
+  pondedM3?: number;
 }
 
 export interface RealitySimulation {

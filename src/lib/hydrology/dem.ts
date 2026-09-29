@@ -69,6 +69,8 @@ export function syntheticElevation(
   };
 }
 
+export type PngDecoder = (blob: Blob) => Promise<PixelBuffer | null>;
+
 async function decodePngBuffer(
   blob: Blob
 ): Promise<PixelBuffer | null> {
@@ -95,7 +97,8 @@ async function fetchTileBuffer(
   z: number,
   x: number,
   y: number,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  decode: PngDecoder
 ): Promise<PixelBuffer | null> {
   try {
     const response = await fetchImpl(tileUrl(z, x, y), {
@@ -103,7 +106,7 @@ async function fetchTileBuffer(
     });
     if (!response.ok) return null;
     const blob = await response.blob();
-    return decodePngBuffer(blob);
+    return decode(blob);
   } catch {
     return null;
   }
@@ -113,7 +116,9 @@ export async function loadElevationGrid(
   bbox: SimExtent,
   rows: number,
   cols: number,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  /** Injectable so offline experiment tooling samples exactly as the browser does. */
+  decode: PngDecoder = decodePngBuffer
 ): Promise<ElevationGrid> {
   const key = cacheKey(bbox, rows, cols);
   const cached = demCache.get(key);
@@ -131,7 +136,7 @@ export async function loadElevationGrid(
     const buffers = await Promise.all(
       tiles.map(async (tile) => ({
         ...tile,
-        buffer: await fetchTileBuffer(tile.z, tile.x, tile.y, fetchImpl),
+        buffer: await fetchTileBuffer(tile.z, tile.x, tile.y, fetchImpl, decode),
       }))
     );
     const lookup = new Map<string, PixelBuffer>();
@@ -205,4 +210,9 @@ export function rememberElevation(grid: ElevationGrid, bbox: SimExtent): void {
 
 export function clearElevationCache(): void {
   demCache.clear();
+}
+
+/** The grid a storm was routed on, if it is still cached; used to embed it in evidence exports. */
+export function cachedElevation(bbox: SimExtent, rows: number, cols: number): ElevationGrid | null {
+  return demCache.get(cacheKey(bbox, rows, cols)) ?? null;
 }

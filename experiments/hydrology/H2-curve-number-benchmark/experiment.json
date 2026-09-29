@@ -1,0 +1,34 @@
+{
+  "spec": {
+    "id": "hydrology/H2-curve-number-benchmark",
+    "domain": "hydrology",
+    "title": "Fixed coefficients against the NRCS curve-number method",
+    "question": "Across rainfall depths of 10–200 mm, does the fixed-coefficient runoff fraction for each surface fall inside the envelope an independent empirical method gives across soil groups A–D?",
+    "hypothesis": "For every class and depth, the fixed runoff coefficient lies within the TR-55 curve-number envelope (soil groups A–D).",
+    "tier": "reference-model",
+    "inputs": [],
+    "conditions": {
+      "depthsMm": "10,25,50,100,200",
+      "initialAbstraction": "0.2S",
+      "reference": "USDA NRCS TR-55 (1986) Table 2-2a"
+    },
+    "split": "None: comparison with a published model; no parameter was adjusted.",
+    "metrics": [
+      "runoff fraction by class and depth, model vs CN envelope",
+      "share of depths outside the envelope per class",
+      "composite runoff fraction for the example cover"
+    ],
+    "limitations": [
+      "The curve-number method is itself an empirical model fitted to observed watershed data; it is a reference model, not an observation of any site here.",
+      "Soil group, antecedent moisture and cover condition are unknown for scanned sites; the A–D envelope brackets them rather than identifying them.",
+      "TR-55 does not separate roofs from pavement; both use CN 98."
+    ]
+  },
+  "inputs": [],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

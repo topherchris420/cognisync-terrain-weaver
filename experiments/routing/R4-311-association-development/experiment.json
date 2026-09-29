@@ -1,0 +1,93 @@
+{
+  "spec": {
+    "id": "routing/R4-311-association-development",
+    "domain": "routing",
+    "title": "Development: routed accumulation and reported street flooding",
+    "question": "Do cells where people reported street flooding rank higher in routed flow accumulation than other cells of the same study area — and higher than simple low-elevation ranking?",
+    "hypothesis": "Pooled AUC of routed accumulation exceeds 0.5 and exceeds the low-elevation baseline, with the 95% cluster-bootstrap interval of the difference excluding zero.",
+    "tier": "independent-observation",
+    "inputs": [
+      "areas.json",
+      "dem/*.json",
+      "nlcd-2021.json",
+      "rain-central-park.json",
+      "311/2021-08-henri.json",
+      "311/2021-09-ida.json"
+    ],
+    "conditions": {
+      "events": "2021-08-henri,2021-09-ida",
+      "role": "development",
+      "descriptor": "Street Flooding (SJ)",
+      "matchingRadiusCells": 0,
+      "resolution": 72,
+      "dem": "terrarium",
+      "routing": "app model (v2 fill-and-spill); v1 D8 reported as secondary",
+      "forcing": "Central Park gauge event rainfall × NLCD-derived runoff coefficient per area"
+    },
+    "split": "Development events fixed in experiments/PREREGISTRATION.md; they informed diagnosis. The routing revision was adopted on the analytic R1 criterion, not on these results. The holdout is not read by this experiment.",
+    "metrics": [
+      "AUC (mean within-area mid-rank percentile of complaint cells)",
+      "low-elevation baseline AUC",
+      "paired difference with 95% cluster-bootstrap interval (areas resampled)",
+      "secondary: static ponded depth AUC"
+    ],
+    "limitations": [
+      "311 complaints are reports, not measurements; absence of a report is not a dry observation.",
+      "Reporting depends on population, traffic and awareness, which also correlate with terrain.",
+      "Complaint coordinates are geocoded addresses, typically tens of metres from the flooded spot; cells are about 14 m.",
+      "One rain gauge stands for the whole city; event rainfall varied strongly across boroughs.",
+      "No sewer network is modelled, while NYC street flooding is largely sewer-capacity driven.",
+      "Land cover is uniform within each area, so spatial patterns come from terrain; the classifier is not tested here."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "311/2021-08-henri.json",
+      "contentHash": "fnv1a64:7fab58e21bb7d95f",
+      "source": "NYC 311 Service Requests from 2010 to Present",
+      "retrievedAt": "2026-09-29T11:21:13.443Z",
+      "evidence": "reported"
+    },
+    {
+      "path": "311/2021-09-ida.json",
+      "contentHash": "fnv1a64:3d7392d08401fe09",
+      "source": "NYC 311 Service Requests from 2010 to Present",
+      "retrievedAt": "2026-09-29T11:21:13.443Z",
+      "evidence": "reported"
+    },
+    {
+      "path": "areas.json",
+      "contentHash": "fnv1a64:fb008d54481af661",
+      "source": "NYC Borough Boundaries (shoreline-clipped), NYC Department of City Planning",
+      "retrievedAt": "2026-09-29T11:35:00.265Z",
+      "evidence": "reference"
+    },
+    {
+      "path": "nlcd-2021.json",
+      "contentHash": "fnv1a64:cde64ea4e37e0145",
+      "source": "USGS National Land Cover Database 2021: land cover and percent developed imperviousness (CONUS)",
+      "retrievedAt": "2026-09-29T11:38:15.700Z",
+      "evidence": "reference"
+    },
+    {
+      "path": "rain-central-park.json",
+      "contentHash": "fnv1a64:937133145a412301",
+      "source": "NOAA NCEI Global Historical Climatology Network daily, Central Park (USW00094728)",
+      "retrievedAt": "2026-09-29T11:31:36.280Z",
+      "evidence": "measured"
+    },
+    {
+      "path": "dem/ (208 files)",
+      "contentHash": "fnv1a64:adbeacf2e0410a12",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

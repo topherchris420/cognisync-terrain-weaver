@@ -1,0 +1,86 @@
+{
+  "resultHash": "fnv1a64:ded845f61ea23ce2",
+  "result": {
+    "verdict": {
+      "status": "not-supported",
+      "statement": "4 of 4 plan/error combinations become inconclusive: with the pervious share off by the measured amount, the same built plan no longer reliably reach its target score. A plan sized exactly to a target inherits the classifier's error."
+    },
+    "findings": {
+      "benchmarkErrorPP": 7,
+      "repeatRunErrorPP": 15,
+      "combinations": 4,
+      "combinationsInconclusive": 4,
+      "exampleScoreMin": 21.6,
+      "exampleScoreMax": 32.4,
+      "exampleNowRunoffMinM3": 25079,
+      "exampleNowRunoffMaxM3": 29094,
+      "exampleAchievedMin": 31.6,
+      "exampleTarget": 37
+    },
+    "observations": [
+      "Measured error ranges: ±7 pp (NLCD mean absolute pervious error) and ±15 pp (half the repeat-run pervious range).",
+      "example (illustrative), ±7 pp: pavement 22–36%, score 21.6–32.4, NOW 50 mm runoff 25,079–29,094 m³; plan targets 37 and achieves 31.6–42.4 → Inconclusive within the tested uncertainty.",
+      "example (illustrative), ±15 pp: pavement 14–44%, score 15.4–38.6, NOW 50 mm runoff 22,784–31,389 m³; plan targets 37 and achieves 25.4–48.6 → Inconclusive within the tested uncertainty.",
+      "Lower Manhattan frame, mean of 24 classifications, ±7 pp: pavement 24.4–38.4%, score 16.8–29.2, NOW 50 mm runoff 22,860–26,875 m³; plan targets 33 and achieves 26.8–39.2 → Inconclusive within the tested uncertainty.",
+      "Lower Manhattan frame, mean of 24 classifications, ±15 pp: pavement 16.4–41%, score 14.5–36.3, NOW 50 mm runoff 20,565–27,623 m³; plan targets 33 and achieves 24.5–46.3 → Inconclusive within the tested uncertainty.",
+      "Design consequence: a target should be read as reached only if it is reached across the measured error range, not at the central estimate alone."
+    ],
+    "tables": [
+      {
+        "title": "Envelopes (central estimate in brackets)",
+        "columns": [
+          "cover",
+          "error range",
+          "score",
+          "NOW runoff m³",
+          "POSSIBLE runoff m³",
+          "achieved score",
+          "target",
+          "conclusion"
+        ],
+        "rows": [
+          [
+            "example (illustrative)",
+            "±7 pp (benchmark-derived)",
+            "21.6–32.4 (27)",
+            "25079–29094",
+            "21376–25391",
+            "31.6–42.4",
+            37,
+            "Inconclusive within the tested uncertainty"
+          ],
+          [
+            "example (illustrative)",
+            "±15 pp (repeat-run)",
+            "15.4–38.6 (27)",
+            "22784–31389",
+            "19081–27685",
+            "25.4–48.6",
+            37,
+            "Inconclusive within the tested uncertainty"
+          ],
+          [
+            "Lower Manhattan frame, mean of 24 classifications",
+            "±7 pp (benchmark-derived)",
+            "16.8–29.2 (23)",
+            "22860–26875",
+            "19630–23646",
+            "26.8–39.2",
+            33,
+            "Inconclusive within the tested uncertainty"
+          ],
+          [
+            "Lower Manhattan frame, mean of 24 classifications",
+            "±15 pp (repeat-run)",
+            "14.5–36.3 (23)",
+            "20565–27623",
+            "17336–24394",
+            "24.5–46.3",
+            33,
+            "Inconclusive within the tested uncertainty"
+          ]
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "classification/C1-nlcd-agreement": {
+    "title": "Classifier agreement with NLCD 2021",
+    "domain": "classification",
+    "tier": "reference-dataset",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Across 16 distinct US frames, the classifier's pervious share differs from NLCD by 6.7 pp on average (bias 3.1 pp) and its impervious share by 8.9 pp (bias -5.4 pp). 3 of 16 classified scores fall inside the reference score interval."
+    },
+    "findings": {
+      "frames": 16,
+      "classifications": 45,
+      "perviousBiasPP": 3.13,
+      "perviousMaePP": 6.68,
+      "imperviousBiasPP": -5.36,
+      "imperviousMaePP": 8.91,
+      "waterBiasPP": 2.23,
+      "waterMaePP": 3.17,
+      "scoresInsideReferenceInterval": 3,
+      "scoreBiasVsReferenceMidpoint": 3.25,
+      "largestPerviousResidualPP": 19.1
+    }
+  },
+  "classification/C2-repeat-stability": {
+    "title": "Classifier stability on an identical frame",
+    "domain": "classification",
+    "tier": "repeated-measurement",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "The same frame received 15 distinct compositions in 24 classifications. Water ranged 0–45 pp and the score 16.7–35.2. Run-to-run variation is of the same order as the ±5 pp sensitivity default, and larger for water."
+    },
+    "findings": {
+      "repeats": 24,
+      "distinctCompositions": 15,
+      "modalShare": 0.292,
+      "waterSdPP": 9.13,
+      "waterRangePP": 45,
+      "perviousSdPP": 5.47,
+      "perviousRangePP": 29.4,
+      "scoreSd": 3.46,
+      "scoreMin": 16.7,
+      "scoreMax": 35.2,
+      "runoff50mmMinM3": 136520,
+      "runoff50mmMaxM3": 225178,
+      "runoffRelativeSpan": 0.468,
+      "feedShareMultipleOf5": 0.817,
+      "feedValues": 300
+    }
+  },
+  "classification/C3-stored-score-integrity": {
+    "title": "Stored scores versus deterministic recomputation",
+    "domain": "classification",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "24 of 61 stored scores disagree with the current scorer by up to 15 points; 9 would change band. Stored scores cannot be trusted as current model output."
+    },
+    "findings": {
+      "rows": 61,
+      "mismatched": 24,
+      "maxAbsDifference": 15,
+      "bandChanges": 9,
+      "mismatchedMeanSigned": 3.75
+    }
+  },
+  "hydrology/H1-cross-model-consistency": {
+    "title": "Do the bulk budget and the routing engine agree on the same inputs?",
+    "domain": "hydrology",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "The two water models disagree on identical inputs: routed retention differs from bulk retention by up to 24.8 pp of frame rainfall, and the routed engine credits the same drawn intervention with 0.79–0.87× the bulk model's avoided runoff."
+    },
+    "findings": {
+      "compositions": 48,
+      "maxRetentionGapPP": 24.81,
+      "meanRetentionGapPP": 6.73,
+      "meanGapNoWaterPP": 0.25,
+      "meanGapWithWaterPP": 8.89,
+      "treesRoutedOverBulk": 0.87,
+      "bioswalesRoutedOverBulk": 0.786,
+      "rasterAreaRatio36": 1.74,
+      "rasterAreaRatio72": 0.87,
+      "rasterAreaRatio120": 0.939,
+      "routingVegetationC": 0.1,
+      "registeredVegetationC": 0.2
+    }
+  },
+  "hydrology/H2-curve-number-benchmark": {
+    "title": "Fixed coefficients against the NRCS curve-number method",
+    "domain": "hydrology",
+    "tier": "reference-model",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "The fixed coefficients leave the curve-number envelope for vegetation (40% of depths), soil (60% of depths), buildings (100% of depths), pavement (40% of depths). The linear model cannot reproduce the reference's depth dependence: it over-predicts pervious runoff in small storms and cannot show pervious surfaces saturating in large ones."
+    },
+    "findings": {
+      "vegetationShareOfDepthsOutsideEnvelope": 0.4,
+      "soilShareOfDepthsOutsideEnvelope": 0.6,
+      "pavementShareOfDepthsOutsideEnvelope": 0.4,
+      "buildingsShareOfDepthsOutsideEnvelope": 1,
+      "exampleCompositeMaeVsGroupB": 0.125,
+      "buildingsMaxAbsDeviation": 0.332,
+      "pavementMaxAbsDeviation": 0.312,
+      "exampleComposite10mmModel": 0.73,
+      "exampleComposite10mmGroupB": 0.433,
+      "exampleComposite200mmModel": 0.73,
+      "exampleComposite200mmGroupB": 0.852
+    }
+  },
+  "routing/R1-synthetic-terrains": {
+    "title": "D8 routing on terrains with known answers",
+    "domain": "routing",
+    "tier": "synthetic-verification",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "D8 failed 3 of 7 analytic cases: isolated-peak, flat, slope-with-pit. It conserves water in every case, but water that reaches a flat or a pit stops there instead of ponding and moving on."
+    },
+    "findings": {
+      "cases": 7,
+      "failedCases": 3,
+      "failedCaseIds": "isolated-peak,flat,slope-with-pit",
+      "minConservation": 1,
+      "flatDelivered": 0.154,
+      "pitDelivered": 0.933,
+      "ridgeWestShare": 0.52,
+      "maxDirectionErrorDeg": 90
+    }
+  },
+  "routing/R2-resolution-sensitivity": {
+    "title": "Does routing change with grid resolution?",
+    "domain": "routing",
+    "tier": "repeated-measurement",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Median rank correlation of flow concentration between low and high resolution is 0.46; median top-10% hotspot overlap is 0.19. At high resolution a median 81% of water ends in interior pits rather than leaving the extent."
+    },
+    "findings": {
+      "areas": 8,
+      "medianRho36v72": 0.514,
+      "medianRho36v120": 0.462,
+      "medianTopOverlap36v120": 0.187,
+      "medianTrappedShare36": 0.574,
+      "medianTrappedShare72": 0.729,
+      "medianTrappedShare120": 0.807
+    }
+  },
+  "routing/R3-dem-source-sensitivity": {
+    "title": "Does routing change with the elevation source?",
+    "domain": "routing",
+    "tier": "reference-dataset",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Across 48 areas, only a median 36% of cells keep the same D8 direction when the elevation source changes, although elevations differ by a median RMSE of 1.982 m. Flow concentration ranks correlate at median ρ 0.135."
+    },
+    "findings": {
+      "areas": 48,
+      "medianElevationRmseM": 1.982,
+      "medianMeanDifferenceM": -0.063,
+      "medianSameReceiverShare": 0.355,
+      "medianRho": 0.135,
+      "medianTopOverlap": 0.11,
+      "medianTrappedTerrarium": 0.816,
+      "medianTrappedThreeDep": 0.816
+    }
+  },
+  "routing/R4-311-association-development": {
+    "title": "Development: routed accumulation and reported street flooding",
+    "domain": "routing",
+    "tier": "independent-observation",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "Across 173 deduplicated street-flooding reports in 82 of 208 areas, routed accumulation AUC is 0.553 [0.496, 0.617] versus 0.642 [0.58, 0.699] for simple low elevation (difference -0.089 [-0.163, -0.002]). Routed accumulation does not locate reports better than the baseline."
+    },
+    "findings": {
+      "complaints": 173,
+      "areasWithComplaints": 82,
+      "aucAccumulation": 0.553,
+      "aucAccumulationLower": 0.496,
+      "aucAccumulationUpper": 0.617,
+      "aucLowElevation": 0.642,
+      "aucDifference": -0.089,
+      "aucDifferenceLower": -0.163,
+      "aucDifferenceUpper": -0.002,
+      "auc_street_catch_basin": 0.557,
+      "auc_1_cell_neighbourhood": 0.561,
+      "auc_3DEP_elevation": 0.554
+    }
+  }
+}

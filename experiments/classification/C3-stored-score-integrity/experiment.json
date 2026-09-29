@@ -1,0 +1,40 @@
+{
+  "spec": {
+    "id": "classification/C3-stored-score-integrity",
+    "domain": "classification",
+    "title": "Stored scores versus deterministic recomputation",
+    "question": "Does every stored score equal what the current deterministic scorer computes from the stored land cover?",
+    "hypothesis": "Every stored score equals computeAbsorptionScore(stored land cover) within 0.05 points.",
+    "tier": "internal-consistency",
+    "inputs": [
+      "scan-feed.json"
+    ],
+    "conditions": {
+      "tolerancePoints": 0.05
+    },
+    "split": "None: an audit of every row.",
+    "metrics": [
+      "rows whose stored score differs",
+      "largest absolute difference",
+      "rows whose score band would change"
+    ],
+    "limitations": [
+      "Checks storage against code, not either against nature."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "scan-feed.json",
+      "contentHash": "fnv1a64:e75d28ee477bca6c",
+      "source": "Mannahatta public scan feed (Supabase `analyses`, public read policy)",
+      "retrievedAt": "2026-09-29T11:20:59.643Z",
+      "evidence": "inferred"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.2"
+  }
+}

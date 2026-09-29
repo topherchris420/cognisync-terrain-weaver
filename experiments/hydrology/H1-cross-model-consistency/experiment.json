@@ -1,0 +1,52 @@
+{
+  "spec": {
+    "id": "hydrology/H1-cross-model-consistency",
+    "domain": "hydrology",
+    "title": "Do the bulk budget and the routing engine agree on the same inputs?",
+    "question": "For identical land cover, extent and rainfall, do the lumped land budget and the D8 routing engine retain the same water, and credit the same drawn intervention with the same avoided runoff?",
+    "hypothesis": "Without interventions, routed retained volume equals bulk retained volume (both apply the registered retention weights to the same land area), and a drawn intervention avoids the same runoff in both models within 5%.",
+    "tier": "internal-consistency",
+    "inputs": [
+      "scan-feed.json",
+      "dem/lower-manhattan-example.json"
+    ],
+    "conditions": {
+      "rainfallMm": 50,
+      "extent": "lower-manhattan-example",
+      "resolution": "medium (72×72)",
+      "interventionAreaM2": 1500
+    },
+    "split": "None: a consistency check across the model's own components.",
+    "metrics": [
+      "retained-volume gap as % of frame rainfall",
+      "routed ÷ bulk avoided runoff for the same drawing",
+      "rasterized ÷ drawn intervention area"
+    ],
+    "limitations": [
+      "Agreement between two parts of the instrument says nothing about agreement with nature.",
+      "Uses real classifier compositions from the feed as inputs only; their accuracy is tested elsewhere (classification/C1, C2)."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "dem/lower-manhattan-example.json",
+      "contentHash": "fnv1a64:d08e7b3ff8c9a0b8",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    },
+    {
+      "path": "scan-feed.json",
+      "contentHash": "fnv1a64:e75d28ee477bca6c",
+      "source": "Mannahatta public scan feed (Supabase `analyses`, public read policy)",
+      "retrievedAt": "2026-09-29T11:20:59.643Z",
+      "evidence": "inferred"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

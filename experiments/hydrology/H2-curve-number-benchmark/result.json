@@ -1,0 +1,246 @@
+{
+  "resultHash": "fnv1a64:2e533cfb244ccc5e",
+  "result": {
+    "verdict": {
+      "status": "not-supported",
+      "statement": "The fixed coefficients leave the curve-number envelope for vegetation (40% of depths), soil (60% of depths), buildings (100% of depths), pavement (40% of depths). The linear model cannot reproduce the reference's depth dependence: it over-predicts pervious runoff in small storms and cannot show pervious surfaces saturating in large ones."
+    },
+    "findings": {
+      "vegetationShareOfDepthsOutsideEnvelope": 0.4,
+      "soilShareOfDepthsOutsideEnvelope": 0.6,
+      "pavementShareOfDepthsOutsideEnvelope": 0.4,
+      "buildingsShareOfDepthsOutsideEnvelope": 1,
+      "exampleCompositeMaeVsGroupB": 0.125,
+      "buildingsMaxAbsDeviation": 0.332,
+      "pavementMaxAbsDeviation": 0.312,
+      "exampleComposite10mmModel": 0.73,
+      "exampleComposite10mmGroupB": 0.433,
+      "exampleComposite200mmModel": 0.73,
+      "exampleComposite200mmGroupB": 0.852
+    },
+    "observations": [
+      "vegetation: fixed runoff fraction 0.2; outside the curve-number envelope at 2 of 5 depths; largest excursion +0.2 (model sheds more than the reference).",
+      "soil: fixed runoff fraction 0.3; outside the curve-number envelope at 3 of 5 depths; largest excursion -0.355 (model sheds less than the reference).",
+      "buildings: fixed runoff fraction 0.9; outside the curve-number envelope at 5 of 5 depths; largest excursion +0.332 (model sheds more than the reference).",
+      "pavement: fixed runoff fraction 0.88; outside the curve-number envelope at 2 of 5 depths; largest excursion +0.312 (model sheds more than the reference).",
+      "Example composition: the model sheds 73% of 10 mm and 73% of 200 mm; the soil-group-B reference sheds 43% and 85%. The fixed model has no depth dependence at all.",
+      "Consequence: avoided-runoff estimates for interventions scale exactly linearly with depth in this model. Under the reference, the relative benefit of converting pavement to vegetation depends on storm depth and soil group, which the instrument cannot currently represent."
+    ],
+    "tables": [
+      {
+        "title": "Runoff fraction by surface and depth",
+        "columns": [
+          "class",
+          "depth mm",
+          "model",
+          "CN min (A–D)",
+          "CN max (A–D)",
+          "model is"
+        ],
+        "rows": [
+          [
+            "vegetation",
+            10,
+            0.2,
+            0,
+            0,
+            "above"
+          ],
+          [
+            "vegetation",
+            25,
+            0.2,
+            0,
+            0.08,
+            "above"
+          ],
+          [
+            "vegetation",
+            50,
+            0.2,
+            0,
+            0.276,
+            "inside"
+          ],
+          [
+            "vegetation",
+            100,
+            0.2,
+            0.01,
+            0.505,
+            "inside"
+          ],
+          [
+            "vegetation",
+            200,
+            0.2,
+            0.14,
+            0.699,
+            "inside"
+          ],
+          [
+            "soil",
+            10,
+            0.3,
+            0,
+            0.199,
+            "above"
+          ],
+          [
+            "soil",
+            25,
+            0.3,
+            0.045,
+            0.499,
+            "inside"
+          ],
+          [
+            "soil",
+            50,
+            0.3,
+            0.219,
+            0.694,
+            "inside"
+          ],
+          [
+            "soil",
+            100,
+            0.3,
+            0.448,
+            0.829,
+            "below"
+          ],
+          [
+            "soil",
+            200,
+            0.3,
+            0.655,
+            0.909,
+            "below"
+          ],
+          [
+            "buildings",
+            10,
+            0.9,
+            0.568,
+            0.568,
+            "above"
+          ],
+          [
+            "buildings",
+            25,
+            0.9,
+            0.788,
+            0.788,
+            "above"
+          ],
+          [
+            "buildings",
+            50,
+            0.9,
+            0.886,
+            0.886,
+            "above"
+          ],
+          [
+            "buildings",
+            100,
+            0.9,
+            0.94,
+            0.94,
+            "below"
+          ],
+          [
+            "buildings",
+            200,
+            0.9,
+            0.97,
+            0.97,
+            "below"
+          ],
+          [
+            "pavement",
+            10,
+            0.88,
+            0,
+            0.568,
+            "above"
+          ],
+          [
+            "pavement",
+            25,
+            0.88,
+            0.128,
+            0.788,
+            "above"
+          ],
+          [
+            "pavement",
+            50,
+            0.88,
+            0.342,
+            0.886,
+            "inside"
+          ],
+          [
+            "pavement",
+            100,
+            0.88,
+            0.567,
+            0.94,
+            "inside"
+          ],
+          [
+            "pavement",
+            200,
+            0.88,
+            0.744,
+            0.97,
+            "inside"
+          ]
+        ]
+      },
+      {
+        "title": "Example composition: runoff ÷ rainfall on land",
+        "columns": [
+          "depth mm",
+          "model",
+          "CN soil group B",
+          "CN envelope"
+        ],
+        "rows": [
+          [
+            10,
+            0.73,
+            0.433,
+            "0.432–0.439"
+          ],
+          [
+            25,
+            0.73,
+            0.607,
+            "0.602–0.633"
+          ],
+          [
+            50,
+            0.73,
+            0.695,
+            "0.682–0.754"
+          ],
+          [
+            100,
+            0.73,
+            0.778,
+            "0.733–0.848"
+          ],
+          [
+            200,
+            0.73,
+            0.852,
+            "0.789–0.912"
+          ]
+        ]
+      }
+    ]
+  }
+}

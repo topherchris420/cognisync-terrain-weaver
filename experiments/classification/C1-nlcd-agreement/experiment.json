@@ -1,0 +1,53 @@
+{
+  "spec": {
+    "id": "classification/C1-nlcd-agreement",
+    "domain": "classification",
+    "title": "Classifier agreement with NLCD 2021",
+    "question": "How far are stored classifier shares of water, impervious and pervious land from an independent 30 m national land-cover reference over the same frame?",
+    "hypothesis": null,
+    "tier": "reference-dataset",
+    "inputs": [
+      "scan-feed.json",
+      "nlcd-2021.json"
+    ],
+    "conditions": {
+      "reference": "NLCD 2021 land cover + percent impervious",
+      "cellCentreInFrame": true
+    },
+    "split": "None: too few distinct frames for a calibration/holdout split. Descriptive only; nothing was tuned.",
+    "metrics": [
+      "signed error (bias) per aggregate class (pp)",
+      "mean absolute error per aggregate class (pp)",
+      "whether the classified score lies inside the reference score interval"
+    ],
+    "limitations": [
+      "NLCD is a model-derived product with its own error, especially for fine urban pervious cover; this measures disagreement with a reference, not error against truth.",
+      "Epochs differ: NLCD 2021 versus scans in 2026.",
+      "Buildings and pavement are not separable in NLCD, so building/pavement confusion cannot be measured here.",
+      "Repeated classifications of one frame are averaged to one row per distinct frame so a single frame cannot dominate.",
+      "Rows labelled `probe` are excluded as manual test inserts (PREREGISTRATION.md, Addendum 1)."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "nlcd-2021.json",
+      "contentHash": "fnv1a64:cde64ea4e37e0145",
+      "source": "USGS National Land Cover Database 2021: land cover and percent developed imperviousness (CONUS)",
+      "retrievedAt": "2026-09-29T11:38:15.700Z",
+      "evidence": "reference"
+    },
+    {
+      "path": "scan-feed.json",
+      "contentHash": "fnv1a64:e75d28ee477bca6c",
+      "source": "Mannahatta public scan feed (Supabase `analyses`, public read policy)",
+      "retrievedAt": "2026-09-29T11:20:59.643Z",
+      "evidence": "inferred"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

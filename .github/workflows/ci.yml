@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Lint, typecheck, test, build
+    name: Lint, typecheck, test, reproduce experiments, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +32,11 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      # Re-runs every registered experiment on committed fixtures (no network)
+      # and fails if a committed result no longer matches what the code produces.
+      - name: Experiment results reproduce
+        run: npm run validate
 
       - name: Build
         run: npm run build

@@ -162,3 +162,21 @@ describe("canonical reality surface builder", () => {
     expect(first.surfaceHash).not.toBe(movedViewport.surfaceHash);
   });
 });
+
+describe("area-weighted rasterization (hydrology/H1)", () => {
+  it("credits a drawn polygon with its own area at every resolution", async () => {
+    const { squareIntervention } = await import("@/lib/validation/fixtures");
+    const extent = { west: -74.014, east: -74.004, south: 40.703, north: 40.712 };
+    const { bboxAreaKm2 } = await import("@/lib/geo");
+    const areaM2 = bboxAreaKm2([[extent.west, extent.south], [extent.east, extent.north]]) * 1e6;
+    const swale = squareIntervention("bioswales", extent, 1500);
+    const delta = swale.parameters.retentionFractionDelta;
+    for (const size of [36, 72, 120]) {
+      const grid = rasterizeSurfaceModifiers([swale], extent, size, size);
+      const credited = grid.cells.reduce((sum, cell) => sum + cell.retentionFractionDelta / delta, 0) * (areaM2 / (size * size));
+      // Before the area-weighted revision this was 174% / 87% / 94%.
+      expect(credited / swale.eligibility.validAreaM2).toBeGreaterThan(0.96);
+      expect(credited / swale.eligibility.validAreaM2).toBeLessThan(1.04);
+    }
+  });
+});

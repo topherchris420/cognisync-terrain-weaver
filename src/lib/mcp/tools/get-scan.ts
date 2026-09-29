@@ -1,6 +1,7 @@
 import { defineTool, ToolError } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseAnon } from "../supabase";
+import { withCurrentScore } from "@/lib/score-integrity";
 
 export default defineTool({
   name: "get_scan",
@@ -17,9 +18,11 @@ export default defineTool({
       .maybeSingle();
     if (error) throw new ToolError(error.message);
     if (!data) throw new ToolError(`No scan found with id ${id}`);
+    // Scores are recomputed from land cover; a stale stored score is reported alongside.
+    const scan = withCurrentScore(data);
     return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-      structuredContent: { scan: data },
+      content: [{ type: "text", text: JSON.stringify(scan, null, 2) }],
+      structuredContent: { scan },
     };
   },
 });

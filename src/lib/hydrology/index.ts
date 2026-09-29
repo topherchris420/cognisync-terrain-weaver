@@ -8,7 +8,7 @@ export type {
   SimExtent,
 } from "./types";
 export { decodeTerrarium, encodeTerrarium, chooseTileZoom, tilesForBBox } from "./terrarium";
-export { loadElevationGrid, syntheticElevation, clearElevationCache } from "./dem";
+export { loadElevationGrid, syntheticElevation, clearElevationCache, cachedElevation } from "./dem";
 export {
   designStormHydrograph,
   hydrographPeakM3s,
