@@ -119,3 +119,24 @@ any analysis. Recorded before any change below is made:
 4. **Exclusion (C1/C2).** Rows whose `location_label` is `probe` are excluded:
    the single such row stores 100% water for an extent that NLCD shows as
    mostly land, and was evidently written by a manual test, not the classifier.
+
+## Addendum 2 — 2026-09-29, before any holdout read
+
+1. **Plain depression filling is rejected** under the Addendum 1 rule: it
+   delivers the pit and flat cases but degrades the bowl case (a closed bowl
+   would spill everything to the boundary instead of holding it).
+2. **Second candidate: static fill-and-spill** (depressions store up to their
+   volume below the spill level; excess spills onward). Same adoption rule:
+   ≥ 99% of water to the expected place (outlets, or storage in the expected
+   depression) on the pit and flat cases, and no other R1 case degraded.
+3. **Forcing for 311 analyses.** Fill-and-spill makes routing depend on runoff
+   volume. Each event is forced with the Central Park gauge (NOAA GHCN
+   USW00094728) daily totals for the calendar days the window covers,
+   excluding an end date whose window closes at 00:00. Each area's runoff
+   coefficient comes from its NLCD 2021 composition (water → open water,
+   impervious → pavement, pervious → vegetation) through the app's registered
+   coefficients. One gauge stands for the whole city; this is stated as a
+   limitation, not corrected.
+4. **Secondary holdout predictor, declared now:** static ponded depth from the
+   frozen app model, compared with the same low-elevation baseline. The
+   primary holdout test remains routed accumulation from the frozen app model.
