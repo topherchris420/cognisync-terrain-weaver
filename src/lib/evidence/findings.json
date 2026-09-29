@@ -205,6 +205,34 @@
       "auc_3DEP_elevation_48_areas": 0.589
     }
   },
+  "routing/R5-311-association-holdout": {
+    "title": "Holdout: routed accumulation and reported street flooding",
+    "domain": "routing",
+    "tier": "independent-observation",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "Across 145 deduplicated street-flooding reports in 68 of 208 areas, routed accumulation AUC is 0.5 [0.452, 0.557] versus 0.624 [0.556, 0.692] for simple low elevation (difference -0.123 [-0.188, -0.059]). Routed accumulation does not locate reports better than the low-elevation baseline."
+    },
+    "findings": {
+      "complaints": 145,
+      "areasWithComplaints": 68,
+      "aucAccumulation": 0.5,
+      "aucAccumulationLower": 0.452,
+      "aucAccumulationUpper": 0.557,
+      "aucLowElevation": 0.624,
+      "aucDifference": -0.123,
+      "aucDifferenceLower": -0.188,
+      "aucDifferenceUpper": -0.059,
+      "aucPonding": 0.52,
+      "aucPondingDifference": -0.104,
+      "aucPondingDifferenceLower": -0.168,
+      "aucPondingDifferenceUpper": -0.041,
+      "aucAccumulationV1": 0.496,
+      "auc_street_catch_basin": 0.537,
+      "auc_1_cell_neighbourhood": 0.592,
+      "auc_3DEP_elevation_48_areas": 0.452
+    }
+  },
   "interventions/I1-bioswale-1500m2": {
     "title": "Hypothesis: a 1,500 m² bioswale cuts routed runoff by 8%",
     "domain": "interventions",

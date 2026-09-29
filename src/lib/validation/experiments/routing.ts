@@ -639,4 +639,6 @@ function associationExperiment(role: ValidationEvent["role"], id: string): Exper
 }
 
 export const complaintAssociationDevelopment = associationExperiment("development", "routing/R4-311-association-development");
+/** Registered only after the model was frozen at commit a534af4 (PREREGISTRATION.md). */
+export const complaintAssociationHoldout = associationExperiment("holdout", "routing/R5-311-association-holdout");
 export { associationExperiment };
