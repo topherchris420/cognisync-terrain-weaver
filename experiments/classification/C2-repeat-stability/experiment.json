@@ -1,0 +1,45 @@
+{
+  "spec": {
+    "id": "classification/C2-repeat-stability",
+    "domain": "classification",
+    "title": "Classifier stability on an identical frame",
+    "question": "When the same bounding box is classified repeatedly, how much do the five class shares, the score and the 50 mm runoff vary?",
+    "hypothesis": null,
+    "tier": "repeated-measurement",
+    "inputs": [
+      "scan-feed.json"
+    ],
+    "conditions": {
+      "minimumRepeats": 3,
+      "frameIdentityToleranceDeg": 0.000001,
+      "rainfallMm": 50
+    },
+    "split": "None: descriptive. The repeats are the whole sample.",
+    "metrics": [
+      "per-class mean, SD, min, max (pp)",
+      "score SD and range",
+      "50 mm bulk runoff range (m³)",
+      "share of class values that are multiples of 5"
+    ],
+    "limitations": [
+      "Imagery bytes, imagery provider (Esri or the Sentinel-2 fallback) and classifier model version were not stored, so the repeats may not share identical inputs.",
+      "One frame dominates the sample; stability may differ elsewhere.",
+      "Stability is not accuracy: a classifier can be consistently wrong."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "scan-feed.json",
+      "contentHash": "fnv1a64:e75d28ee477bca6c",
+      "source": "Mannahatta public scan feed (Supabase `analyses`, public read policy)",
+      "retrievedAt": "2026-09-29T11:20:59.643Z",
+      "evidence": "inferred"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

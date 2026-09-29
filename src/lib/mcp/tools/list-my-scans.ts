@@ -1,5 +1,6 @@
 import { defineTool, ToolError } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { withCurrentScore } from "@/lib/score-integrity";
 import { supabaseForUser } from "../supabase";
 
 export default defineTool({
@@ -12,14 +13,15 @@ export default defineTool({
     if (!ctx.isAuthenticated()) throw new ToolError("Sign in to list your scans.");
     const { data, error } = await supabaseForUser(ctx)
       .from("analyses")
-      .select("id,name,location_label,absorption_score,flood_risk,created_at")
+      .select("id,name,location_label,absorption_score,flood_risk,land_cover,created_at")
       .eq("user_id", ctx.getUserId())
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw new ToolError(error.message);
+    const scans = (data ?? []).map(withCurrentScore);
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { scans: data ?? [] },
+      content: [{ type: "text", text: JSON.stringify(scans, null, 2) }],
+      structuredContent: { scans },
     };
   },
 });

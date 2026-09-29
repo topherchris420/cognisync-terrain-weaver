@@ -1,0 +1,267 @@
+{
+  "classification/C1-nlcd-agreement": {
+    "title": "Classifier agreement with NLCD 2021",
+    "domain": "classification",
+    "tier": "reference-dataset",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Across 16 distinct US frames, the classifier's pervious share differs from NLCD by 6.7 pp on average (bias 3.1 pp) and its impervious share by 8.9 pp (bias -5.4 pp). 3 of 16 classified scores fall inside the reference score interval."
+    },
+    "findings": {
+      "frames": 16,
+      "classifications": 45,
+      "perviousBiasPP": 3.13,
+      "perviousMaePP": 6.68,
+      "imperviousBiasPP": -5.36,
+      "imperviousMaePP": 8.91,
+      "waterBiasPP": 2.23,
+      "waterMaePP": 3.17,
+      "scoresInsideReferenceInterval": 3,
+      "scoreBiasVsReferenceMidpoint": 3.25,
+      "largestPerviousResidualPP": 19.1
+    }
+  },
+  "classification/C2-repeat-stability": {
+    "title": "Classifier stability on an identical frame",
+    "domain": "classification",
+    "tier": "repeated-measurement",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "The same frame received 15 distinct compositions in 24 classifications. Water ranged 0–45 pp and the score 16.7–35.2. Run-to-run variation is of the same order as the ±5 pp sensitivity default, and larger for water."
+    },
+    "findings": {
+      "repeats": 24,
+      "distinctCompositions": 15,
+      "modalShare": 0.292,
+      "waterSdPP": 9.13,
+      "waterRangePP": 45,
+      "perviousSdPP": 5.47,
+      "perviousRangePP": 29.4,
+      "scoreSd": 3.46,
+      "scoreMin": 16.7,
+      "scoreMax": 35.2,
+      "runoff50mmMinM3": 136520,
+      "runoff50mmMaxM3": 225178,
+      "runoffRelativeSpan": 0.468,
+      "feedShareMultipleOf5": 0.817,
+      "feedValues": 300
+    }
+  },
+  "classification/C3-stored-score-integrity": {
+    "title": "Stored scores versus deterministic recomputation",
+    "domain": "classification",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "24 of 61 stored scores disagree with the current scorer by up to 15 points; 9 would change band. Stored scores cannot be trusted as current model output."
+    },
+    "findings": {
+      "rows": 61,
+      "mismatched": 24,
+      "maxAbsDifference": 15,
+      "bandChanges": 9,
+      "mismatchedMeanSigned": 3.75
+    }
+  },
+  "hydrology/H1-cross-model-consistency": {
+    "title": "Do the bulk budget and the routing engine agree on the same inputs?",
+    "domain": "hydrology",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "supported",
+      "statement": "Routed and bulk retention agree exactly on the same land, and both credit a drawn intervention within 5%."
+    },
+    "findings": {
+      "compositions": 48,
+      "maxRetentionGapPP": 0,
+      "meanRetentionGapPP": 0,
+      "meanGapNoWaterPP": 0,
+      "meanGapWithWaterPP": 0,
+      "treesRoutedOverBulk": 1,
+      "bioswalesRoutedOverBulk": 0.99,
+      "rasterAreaRatio36": 1,
+      "rasterAreaRatio72": 1,
+      "rasterAreaRatio120": 1,
+      "maxRasterAreaError": 0,
+      "routingVegetationC": 0.2,
+      "registeredVegetationC": 0.2
+    }
+  },
+  "hydrology/H2-curve-number-benchmark": {
+    "title": "Fixed coefficients against the NRCS curve-number method",
+    "domain": "hydrology",
+    "tier": "reference-model",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "The fixed coefficients leave the curve-number envelope for vegetation (40% of depths), soil (60% of depths), buildings (100% of depths), pavement (40% of depths). The linear model cannot reproduce the reference's depth dependence: it over-predicts pervious runoff in small storms and cannot show pervious surfaces saturating in large ones."
+    },
+    "findings": {
+      "vegetationShareOfDepthsOutsideEnvelope": 0.4,
+      "soilShareOfDepthsOutsideEnvelope": 0.6,
+      "pavementShareOfDepthsOutsideEnvelope": 0.4,
+      "buildingsShareOfDepthsOutsideEnvelope": 1,
+      "exampleCompositeMaeVsGroupB": 0.125,
+      "buildingsMaxAbsDeviation": 0.332,
+      "pavementMaxAbsDeviation": 0.312,
+      "exampleComposite10mmModel": 0.73,
+      "exampleComposite10mmGroupB": 0.433,
+      "exampleComposite200mmModel": 0.73,
+      "exampleComposite200mmGroupB": 0.852
+    }
+  },
+  "routing/R1-synthetic-terrains": {
+    "title": "D8 routing on terrains with known answers",
+    "domain": "routing",
+    "tier": "synthetic-verification",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "The shipped routing (fill-and-spill) fails 1 of 7 analytic cases (isolated-peak); the original D8 failed 3 (isolated-peak, flat, slope-with-pit). Fill-and-spill fixed the pit and flat cases; the remaining failure is boundary behaviour."
+    },
+    "findings": {
+      "cases": 7,
+      "failedCases": 1,
+      "failedCaseIds": "isolated-peak",
+      "failedCasesUnconditioned": 3,
+      "failedCasesFilled": 2,
+      "adoptionRuleFillAndSpill": true,
+      "adoptionRulePlainFill": false,
+      "plainFillDegradedCases": "bowl",
+      "fillAndSpillStrictlyDecreasedCases": "bowl",
+      "minConservation": 1,
+      "flatDelivered": 1,
+      "pitDelivered": 0.994,
+      "bowlDeliveredPlainFill": 0,
+      "ridgeWestShare": 0.52,
+      "maxDirectionErrorDeg": 90
+    }
+  },
+  "routing/R2-resolution-sensitivity": {
+    "title": "Does routing change with grid resolution?",
+    "domain": "routing",
+    "tier": "repeated-measurement",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Median rank correlation of flow concentration between low and high resolution is 0.45; median top-10% hotspot overlap 0.2. With fill-and-spill a median 11% of 50 mm design-storm runoff is held in depressions at high resolution; the original D8 stranded 81% in pits."
+    },
+    "findings": {
+      "areas": 8,
+      "medianRho36v72": 0.491,
+      "medianRho36v120": 0.455,
+      "medianTopOverlap36v120": 0.195,
+      "medianHeldShare36": 0.114,
+      "medianHeldShare72": 0.109,
+      "medianHeldShare120": 0.113,
+      "medianTrappedShareV1_120": 0.807
+    }
+  },
+  "routing/R3-dem-source-sensitivity": {
+    "title": "Does routing change with the elevation source?",
+    "domain": "routing",
+    "tier": "reference-dataset",
+    "verdict": {
+      "status": "descriptive",
+      "statement": "Across 48 areas, a median 36% of cells keep the same flow direction when the elevation source changes; elevations differ by a median RMSE of 1.982 m and flow-concentration ranks correlate at median ρ 0.111."
+    },
+    "findings": {
+      "areas": 48,
+      "medianElevationRmseM": 1.982,
+      "medianMeanDifferenceM": -0.063,
+      "medianSameReceiverShare": 0.356,
+      "medianRho": 0.111,
+      "medianTopOverlap": 0.106,
+      "medianHeldTerrarium": 0.126,
+      "medianHeldThreeDep": 0.125,
+      "terrariumAreasBelowMinus50m": 4,
+      "threeDepAreasBelowMinus50m": 0,
+      "terrariumLowestM": -14017.2,
+      "threeDepLowestM": -11.8
+    }
+  },
+  "routing/R4-311-association-development": {
+    "title": "Development: routed accumulation and reported street flooding",
+    "domain": "routing",
+    "tier": "independent-observation",
+    "verdict": {
+      "status": "inconclusive",
+      "statement": "Across 173 deduplicated street-flooding reports in 82 of 208 areas, routed accumulation AUC is 0.565 [0.506, 0.626] versus 0.642 [0.58, 0.699] for simple low elevation (difference -0.078 [-0.153, 0.006]). The evidence does not separate routed accumulation from the baseline."
+    },
+    "findings": {
+      "complaints": 173,
+      "areasWithComplaints": 82,
+      "aucAccumulation": 0.565,
+      "aucAccumulationLower": 0.506,
+      "aucAccumulationUpper": 0.626,
+      "aucLowElevation": 0.642,
+      "aucDifference": -0.078,
+      "aucDifferenceLower": -0.153,
+      "aucDifferenceUpper": 0.006,
+      "aucPonding": 0.538,
+      "aucPondingDifference": -0.104,
+      "aucPondingDifferenceLower": -0.153,
+      "aucPondingDifferenceUpper": -0.048,
+      "aucAccumulationV1": 0.553,
+      "auc_street_catch_basin": 0.567,
+      "auc_1_cell_neighbourhood": 0.585,
+      "auc_3DEP_elevation_48_areas": 0.589
+    }
+  },
+  "interventions/I1-bioswale-1500m2": {
+    "title": "Hypothesis: a 1,500 m² bioswale cuts routed runoff by 8%",
+    "domain": "interventions",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "Not supported by the model. The bioswale reduces routed runoff by 0.18% (57.8 of 32,148 m³), below the 8% threshold. Reaching 8% would take about 66,605 m² of bioswale, 27% of the extent's classified pavement."
+    },
+    "findings": {
+      "reductionPercent": 0.18,
+      "avoidedM3": 57.8,
+      "nowRunoffM3": 32148,
+      "outflowReductionPercent": 0.27,
+      "areaNeededForThresholdM2": 66605,
+      "shareOfPavementNeeded": 0.272,
+      "controlledComparisonValid": true,
+      "verdict": "not-supported-by-model"
+    }
+  },
+  "interventions/I2-plan-robustness": {
+    "title": "Does a planning conclusion survive plausible uncertainty?",
+    "domain": "interventions",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "Conclusion A (≥ 2% reduction) holds in 11 of 13 cases; it fails under: retention effectiveness −50%; pessimistic combination (veg −5, effectiveness −50%, costs +20%). Conclusion B (trees avoid more runoff per dollar) holds in 13 of 13."
+    },
+    "findings": {
+      "cases": 13,
+      "conclusionAHolds": 11,
+      "conclusionBHolds": 13,
+      "baselineTreesReductionPercent": 2.11,
+      "baselineSwalesReductionPercent": 2.37,
+      "baselineTreesM3PerThousandUSD": 0.756,
+      "baselineSwalesM3PerThousandUSD": 0.587,
+      "terrainSpreadPercentPoints": 0.011
+    }
+  },
+  "interventions/I3-classification-uncertainty": {
+    "title": "Does the planning conclusion survive measured classification error?",
+    "domain": "interventions",
+    "tier": "internal-consistency",
+    "verdict": {
+      "status": "not-supported",
+      "statement": "4 of 4 plan/error combinations become inconclusive: with the pervious share off by the measured amount, the same built plan no longer reliably reach its target score. A plan sized exactly to a target inherits the classifier's error."
+    },
+    "findings": {
+      "benchmarkErrorPP": 7,
+      "repeatRunErrorPP": 15,
+      "combinations": 4,
+      "combinationsInconclusive": 4,
+      "exampleScoreMin": 21.6,
+      "exampleScoreMax": 32.4,
+      "exampleNowRunoffMinM3": 25079,
+      "exampleNowRunoffMaxM3": 29094,
+      "exampleAchievedMin": 31.6,
+      "exampleTarget": 37
+    }
+  }
+}

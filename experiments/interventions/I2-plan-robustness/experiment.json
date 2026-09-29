@@ -1,0 +1,44 @@
+{
+  "spec": {
+    "id": "interventions/I2-plan-robustness",
+    "domain": "interventions",
+    "title": "Does a planning conclusion survive plausible uncertainty?",
+    "question": "For 20,000 m² of converted pavement on the example extent, do two conclusions survive bounded changes to classification, retention effectiveness, cost, rainfall, resolution and elevation source: (A) either option reduces routed runoff by at least 2%; (B) street trees avoid more runoff per installed dollar than bioswales?",
+    "hypothesis": "Both conclusions hold under every tested perturbation.",
+    "tier": "internal-consistency",
+    "inputs": [
+      "dem/lower-manhattan-example.json"
+    ],
+    "conditions": {
+      "extent": "lower-manhattan-example",
+      "baseline": "50 mm, medium resolution, Terrarium, registered coefficients and costs",
+      "combination": "one perturbation at a time, plus one explicitly labelled pessimistic combination"
+    },
+    "split": "None: bounded sensitivity analysis. No probability distribution is implied.",
+    "metrics": [
+      "runoff reduction (%) per option",
+      "avoided m³ per $1,000 installed",
+      "whether each conclusion holds"
+    ],
+    "limitations": [
+      "Perturbation sizes are chosen to be plausible, not estimated: ±5 pp cover (compare classification/C1 and C2), −50% effectiveness, +20% cost, 2× and 4× rainfall.",
+      "Perturbations are applied one at a time; their joint distribution is unknown, so no combined probability is reported.",
+      "The volume conclusion is a land-budget result: in this model terrain decides where water goes, not how much runs off."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "dem/lower-manhattan-example.json",
+      "contentHash": "fnv1a64:d08e7b3ff8c9a0b8",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

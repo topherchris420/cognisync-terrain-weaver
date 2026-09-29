@@ -1,0 +1,67 @@
+{
+  "resultHash": "fnv1a64:8b373f2eb03982d9",
+  "result": {
+    "verdict": {
+      "status": "not-supported",
+      "statement": "Not supported by the model. The bioswale reduces routed runoff by 0.18% (57.8 of 32,148 m³), below the 8% threshold. Reaching 8% would take about 66,605 m² of bioswale, 27% of the extent's classified pavement."
+    },
+    "findings": {
+      "reductionPercent": 0.18,
+      "avoidedM3": 57.8,
+      "nowRunoffM3": 32148,
+      "outflowReductionPercent": 0.27,
+      "areaNeededForThresholdM2": 66605,
+      "shareOfPavementNeeded": 0.272,
+      "controlledComparisonValid": true,
+      "verdict": "not-supported-by-model"
+    },
+    "observations": [
+      "Controlled comparison: 9 fixed variables identical (sealed storm identity, rainfall depth (mm), duration (min), study extent and grid, resolution (cells), initial land-cover composition, elevation surface, elevation status, routing model version); only the intervention surface differs.",
+      "This negative result is kept deliberately: a single street-scale bioswale is small against the runoff of a whole 0.85 km² extent, and a claim of district-scale benefit from it would be false within the model itself.",
+      "Support within the model is not evidence about a real bioswale. That would require monitored inflow/outflow data for installed practices."
+    ],
+    "tables": [
+      {
+        "title": "NOW / POSSIBLE under the same sealed storm",
+        "columns": [
+          "quantity",
+          "NOW",
+          "POSSIBLE",
+          "change"
+        ],
+        "rows": [
+          [
+            "rainfall m³",
+            42178,
+            42178,
+            0
+          ],
+          [
+            "retained m³",
+            10030,
+            10088,
+            57.8
+          ],
+          [
+            "runoff m³",
+            32148,
+            32090,
+            -57.8
+          ],
+          [
+            "ponded m³",
+            10706,
+            10706,
+            0
+          ],
+          [
+            "outflow m³",
+            21442,
+            21384,
+            -57.8
+          ]
+        ]
+      }
+    ]
+  }
+}

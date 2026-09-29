@@ -1,0 +1,103 @@
+{
+  "resultHash": "fnv1a64:9f7020619fccd887",
+  "result": {
+    "verdict": {
+      "status": "inconclusive",
+      "statement": "Across 173 deduplicated street-flooding reports in 82 of 208 areas, routed accumulation AUC is 0.565 [0.506, 0.626] versus 0.642 [0.58, 0.699] for simple low elevation (difference -0.078 [-0.153, 0.006]). The evidence does not separate routed accumulation from the baseline."
+    },
+    "findings": {
+      "complaints": 173,
+      "areasWithComplaints": 82,
+      "aucAccumulation": 0.565,
+      "aucAccumulationLower": 0.506,
+      "aucAccumulationUpper": 0.626,
+      "aucLowElevation": 0.642,
+      "aucDifference": -0.078,
+      "aucDifferenceLower": -0.153,
+      "aucDifferenceUpper": 0.006,
+      "aucPonding": 0.538,
+      "aucPondingDifference": -0.104,
+      "aucPondingDifferenceLower": -0.153,
+      "aucPondingDifferenceUpper": -0.048,
+      "aucAccumulationV1": 0.553,
+      "auc_street_catch_basin": 0.567,
+      "auc_1_cell_neighbourhood": 0.585,
+      "auc_3DEP_elevation_48_areas": 0.589
+    },
+    "observations": [
+      "Of 208 study areas, 82 contain at least one street-flooding report in the development window(s).",
+      "Original D8 (v1) accumulation AUC 0.553 [0.496, 0.617]; app v2 0.565 [0.506, 0.626].",
+      "Secondary (declared in Addendum 2): static ponded depth AUC 0.538 [0.511, 0.567], difference from low elevation -0.104 [-0.153, -0.048]. Most cells have zero ponding, so this AUC is dominated by ties.",
+      "Sensitivity (street + catch basin): accumulation AUC 0.567 [0.521, 0.616], low-elevation 0.612 [0.565, 0.658].",
+      "Sensitivity (1-cell neighbourhood): accumulation AUC 0.585 [0.537, 0.635], low-elevation 0.628 [0.566, 0.683].",
+      "Sensitivity (3DEP elevation (48 areas)): accumulation AUC 0.589 [0.444, 0.72], low-elevation 0.582 [0.481, 0.666]."
+    ],
+    "tables": [
+      {
+        "title": "AUC with 95% cluster-bootstrap intervals",
+        "columns": [
+          "variant",
+          "reports",
+          "areas with reports",
+          "accumulation AUC",
+          "low-elevation AUC",
+          "accumulation − low elevation",
+          "ponded depth AUC",
+          "ponded − low elevation"
+        ],
+        "rows": [
+          [
+            "primary (app v2)",
+            173,
+            82,
+            "0.565 [0.506, 0.626]",
+            "0.642 [0.58, 0.699]",
+            "-0.078 [-0.153, 0.006]",
+            "0.538 [0.511, 0.567]",
+            "-0.104 [-0.153, -0.048]"
+          ],
+          [
+            "original D8 (v1)",
+            173,
+            82,
+            "0.553 [0.496, 0.617]",
+            "0.642 [0.58, 0.699]",
+            "-0.089 [-0.163, -0.002]",
+            "—",
+            "—"
+          ],
+          [
+            "street + catch basin",
+            275,
+            119,
+            "0.567 [0.521, 0.616]",
+            "0.612 [0.565, 0.658]",
+            "-0.045 [-0.102, 0.017]",
+            "0.523 [0.502, 0.545]",
+            "-0.089 [-0.128, -0.047]"
+          ],
+          [
+            "1-cell neighbourhood",
+            173,
+            82,
+            "0.585 [0.537, 0.635]",
+            "0.628 [0.566, 0.683]",
+            "-0.043 [-0.102, 0.022]",
+            "0.551 [0.509, 0.595]",
+            "-0.076 [-0.13, -0.018]"
+          ],
+          [
+            "3DEP elevation (48 areas)",
+            38,
+            17,
+            "0.589 [0.444, 0.72]",
+            "0.582 [0.481, 0.666]",
+            "0.008 [-0.121, 0.125]",
+            "0.55 [0.484, 0.609]",
+            "-0.031 [-0.121, 0.059]"
+          ]
+        ]
+      }
+    ]
+  }
+}

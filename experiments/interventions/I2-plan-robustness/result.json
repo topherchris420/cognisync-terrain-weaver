@@ -1,0 +1,157 @@
+{
+  "resultHash": "fnv1a64:fe32e1feadcef120",
+  "result": {
+    "verdict": {
+      "status": "not-supported",
+      "statement": "Conclusion A (≥ 2% reduction) holds in 11 of 13 cases; it fails under: retention effectiveness −50%; pessimistic combination (veg −5, effectiveness −50%, costs +20%). Conclusion B (trees avoid more runoff per dollar) holds in 13 of 13."
+    },
+    "findings": {
+      "cases": 13,
+      "conclusionAHolds": 11,
+      "conclusionBHolds": 13,
+      "baselineTreesReductionPercent": 2.11,
+      "baselineSwalesReductionPercent": 2.37,
+      "baselineTreesM3PerThousandUSD": 0.756,
+      "baselineSwalesM3PerThousandUSD": 0.587,
+      "terrainSpreadPercentPoints": 0.011
+    },
+    "observations": [
+      "Runoff volume does not depend on terrain in this model; resolution and elevation source change only where water goes and how much ponds. Their small effect on reduction comes from how the drawing meets the grid.",
+      "The cost-effectiveness ranking rests entirely on two unsourced unit costs and one unsourced bioswale retention value. It is conditional on the registry, not a finding about the world.",
+      "Effectiveness was reduced for both options together, so it cannot flip their ranking; a result that depends on the bioswale value alone would need a separate test."
+    ],
+    "tables": [
+      {
+        "title": "20,000 m² converted from pavement: routed results",
+        "columns": [
+          "perturbation",
+          "trees reduction %",
+          "bioswales reduction %",
+          "trees m³ per $1k",
+          "bioswales m³ per $1k",
+          "A holds",
+          "B holds"
+        ],
+        "rows": [
+          [
+            "baseline",
+            2.11,
+            2.37,
+            0.756,
+            0.587,
+            "yes",
+            "yes"
+          ],
+          [
+            "vegetation −5 pp, pavement +5 pp",
+            2.02,
+            2.32,
+            0.756,
+            0.6,
+            "yes",
+            "yes"
+          ],
+          [
+            "vegetation +5 pp, pavement −5 pp",
+            2.21,
+            2.37,
+            0.756,
+            0.561,
+            "yes",
+            "yes"
+          ],
+          [
+            "retention effectiveness −50%",
+            1.06,
+            1.21,
+            0.378,
+            0.3,
+            "NO",
+            "yes"
+          ],
+          [
+            "all unit costs +20%",
+            2.11,
+            2.37,
+            0.63,
+            0.489,
+            "yes",
+            "yes"
+          ],
+          [
+            "tree cost +20% only",
+            2.11,
+            2.37,
+            0.63,
+            0.587,
+            "yes",
+            "yes"
+          ],
+          [
+            "bioswale cost −20% only",
+            2.11,
+            2.37,
+            0.756,
+            0.733,
+            "yes",
+            "yes"
+          ],
+          [
+            "rainfall 100 mm",
+            2.11,
+            2.37,
+            1.511,
+            1.173,
+            "yes",
+            "yes"
+          ],
+          [
+            "rainfall 200 mm",
+            2.11,
+            2.37,
+            3.022,
+            2.346,
+            "yes",
+            "yes"
+          ],
+          [
+            "low resolution (36)",
+            2.11,
+            2.38,
+            0.756,
+            0.589,
+            "yes",
+            "yes"
+          ],
+          [
+            "high resolution (120)",
+            2.11,
+            2.37,
+            0.756,
+            0.587,
+            "yes",
+            "yes"
+          ],
+          [
+            "USGS 3DEP elevation",
+            2.11,
+            2.37,
+            0.756,
+            0.587,
+            "yes",
+            "yes"
+          ],
+          [
+            "pessimistic combination (veg −5, effectiveness −50%, costs +20%)",
+            1.01,
+            1.16,
+            0.315,
+            0.25,
+            "NO",
+            "yes"
+          ]
+        ]
+      }
+    ]
+  }
+}

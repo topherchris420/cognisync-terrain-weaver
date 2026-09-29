@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { withCurrentScore } from "@/lib/score-integrity";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AppNav } from "@/components/AppNav";
@@ -72,7 +73,7 @@ async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
     .limit(50)
     .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(FEED_TIMEOUT_MS)]));
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as AnalysisRecord[];
+  return ((data ?? []) as unknown as AnalysisRecord[]).map(withCurrentScore);
 }
 
 export default function Dashboard() {

@@ -1,0 +1,408 @@
+{
+  "resultHash": "fnv1a64:b6ac94c75dbdb28d",
+  "result": {
+    "verdict": {
+      "status": "supported",
+      "statement": "Routed and bulk retention agree exactly on the same land, and both credit a drawn intervention within 5%."
+    },
+    "findings": {
+      "compositions": 48,
+      "maxRetentionGapPP": 0,
+      "meanRetentionGapPP": 0,
+      "meanGapNoWaterPP": 0,
+      "meanGapWithWaterPP": 0,
+      "treesRoutedOverBulk": 1,
+      "bioswalesRoutedOverBulk": 0.99,
+      "rasterAreaRatio36": 1,
+      "rasterAreaRatio72": 1,
+      "rasterAreaRatio120": 1,
+      "maxRasterAreaError": 0,
+      "routingVegetationC": 0.2,
+      "registeredVegetationC": 0.2
+    },
+    "observations": [
+      "Retention gap without open water: 0 pp; with open water in the frame: 0 pp of frame rainfall.",
+      "A 1,500 m² bioswale: routed avoided runoff 57.8 m³ vs bulk 58.4 m³. Street trees: 50.9 vs 50.9 m³.",
+      "Rasterization at 36/72/120 cells credits a 1,500 m² square with 100% / 100% / 100% of its drawn area (before the area-weighted revision: 174% / 87% / 94%; experiments/revisions/before-findings.json)."
+    ],
+    "tables": [
+      {
+        "title": "Retained volume at 50 mm on the example extent (m³)",
+        "columns": [
+          "composition",
+          "water %",
+          "bulk retained",
+          "routed retained",
+          "gap (pp of rainfall)"
+        ],
+        "rows": [
+          [
+            "example (illustrative)",
+            12,
+            10030,
+            10030,
+            0
+          ],
+          [
+            "1609 benchmark (reconstructed)",
+            2,
+            32688,
+            32688,
+            0
+          ],
+          [
+            "nyc",
+            0,
+            7086,
+            7086,
+            0
+          ],
+          [
+            "Manhattan, NY",
+            30,
+            5905,
+            5905,
+            0
+          ],
+          [
+            "Jakarta, ID",
+            2,
+            11008,
+            11008,
+            0
+          ],
+          [
+            "Copenhagen, DK",
+            8,
+            12063,
+            12063,
+            0
+          ],
+          [
+            "Lagos, NG",
+            15,
+            8014,
+            8014,
+            0
+          ],
+          [
+            "Phoenix, AZ",
+            0,
+            14003,
+            14003,
+            0
+          ],
+          [
+            "Central Park, NYC",
+            10,
+            15564,
+            15564,
+            0
+          ],
+          [
+            "Tiergarten, Berlin",
+            3,
+            20798,
+            20798,
+            0
+          ],
+          [
+            "Bois de Boulogne, Paris",
+            7,
+            29313,
+            29313,
+            0
+          ],
+          [
+            "Bishan Park, Singapore",
+            1,
+            17251,
+            17251,
+            0
+          ],
+          [
+            "Ørestad, Copenhagen",
+            1,
+            20161,
+            20161,
+            0
+          ],
+          [
+            "Portland, OR",
+            0,
+            20376,
+            20376,
+            0
+          ],
+          [
+            "Kreuzberg, Berlin",
+            3,
+            13750,
+            13750,
+            0
+          ],
+          [
+            "Eixample, Barcelona",
+            0,
+            5989,
+            5989,
+            0
+          ],
+          [
+            "Amsterdam Zuid, NL",
+            5,
+            12948,
+            12948,
+            0
+          ],
+          [
+            "Midtown Manhattan, NY",
+            0,
+            5905,
+            5905,
+            0
+          ],
+          [
+            "Shinjuku, Tokyo",
+            1,
+            10038,
+            10038,
+            0
+          ],
+          [
+            "Central, Hong Kong",
+            25,
+            12147,
+            12147,
+            0
+          ],
+          [
+            "Dharavi, Mumbai",
+            0,
+            14509,
+            14509,
+            0
+          ],
+          [
+            "Jakarta Pusat, ID",
+            0,
+            14551,
+            14551,
+            0
+          ],
+          [
+            "Gilbert, AZ",
+            2,
+            18179,
+            18179,
+            0
+          ],
+          [
+            "Katy, TX",
+            1,
+            21637,
+            21637,
+            0
+          ],
+          [
+            "Sky Harbor, Phoenix",
+            0,
+            8039,
+            8039,
+            0
+          ],
+          [
+            "Port of Rotterdam, NL",
+            45.5,
+            8861,
+            8861,
+            0
+          ],
+          [
+            "(untitled scan)",
+            25,
+            6158,
+            6158,
+            0
+          ],
+          [
+            "(untitled scan)",
+            20,
+            7887,
+            7887,
+            0
+          ],
+          [
+            "(untitled scan)",
+            30,
+            5947,
+            5947,
+            0
+          ],
+          [
+            "(untitled scan)",
+            30,
+            7381,
+            7381,
+            0
+          ],
+          [
+            "(untitled scan)",
+            20,
+            7596,
+            7596,
+            0
+          ],
+          [
+            "(untitled scan)",
+            45,
+            5272,
+            5272,
+            0
+          ],
+          [
+            "(untitled scan)",
+            33.3,
+            4701,
+            4701,
+            0
+          ],
+          [
+            "(untitled scan)",
+            0,
+            14846,
+            14846,
+            0
+          ],
+          [
+            "(untitled scan)",
+            20,
+            7845,
+            7845,
+            0
+          ],
+          [
+            "(untitled scan)",
+            35,
+            5694,
+            5694,
+            0
+          ],
+          [
+            "(untitled scan)",
+            25,
+            6200,
+            6200,
+            0
+          ],
+          [
+            "(untitled scan)",
+            15,
+            9574,
+            9574,
+            0
+          ],
+          [
+            "(untitled scan)",
+            9,
+            8815,
+            8815,
+            0
+          ],
+          [
+            "(untitled scan)",
+            20,
+            7723,
+            7723,
+            0
+          ],
+          [
+            "(untitled scan)",
+            30,
+            7301,
+            7301,
+            0
+          ],
+          [
+            "(untitled scan)",
+            0,
+            10207,
+            10207,
+            0
+          ],
+          [
+            "(untitled scan)",
+            0,
+            11472,
+            11472,
+            0
+          ],
+          [
+            "(untitled scan)",
+            10,
+            11261,
+            11261,
+            0
+          ],
+          [
+            "(untitled scan)",
+            12,
+            7718,
+            7718,
+            0
+          ],
+          [
+            "Manhattan, NY",
+            10,
+            6833,
+            6833,
+            0
+          ],
+          [
+            "Washington, District of Columbia, United States",
+            12.5,
+            13391,
+            13391,
+            0
+          ],
+          [
+            "Arlington County, Virginia, United States",
+            0,
+            16027,
+            16027,
+            0
+          ]
+        ]
+      },
+      {
+        "title": "Same 1,500 m² drawing in both models (50 mm)",
+        "columns": [
+          "intervention",
+          "drawn m²",
+          "rasterized m²",
+          "routed avoided m³",
+          "bulk avoided m³",
+          "routed ÷ bulk"
+        ],
+        "rows": [
+          [
+            "street_trees",
+            1497,
+            1497,
+            50.9,
+            50.9,
+            1
+          ],
+          [
+            "bioswales",
+            1497,
+            1497,
+            57.8,
+            58.4,
+            0.99
+          ]
+        ]
+      }
+    ]
+  }
+}

@@ -68,6 +68,7 @@ function supabaseForUser(ctx) {
 }
 
 // src/lib/mcp/tools/list-scans.ts
+import { withCurrentScore } from "npm:@/lib/score-integrity";
 var list_scans_default = defineTool({
   name: "list_scans",
   title: "List terrain scans",
@@ -78,15 +79,15 @@ var list_scans_default = defineTool({
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit, flood_risk }) => {
-    let query = supabaseAnon().from("analyses").select(
-      "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,created_at"
-    ).order("created_at", { ascending: false }).limit(limit ?? 10);
-    if (flood_risk) query = query.eq("flood_risk", flood_risk);
+    const query = supabaseAnon().from("analyses").select(
+      "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,land_cover,created_at"
+    ).order("created_at", { ascending: false }).limit(flood_risk ? 200 : limit ?? 10);
     const { data, error } = await query;
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const scans = (data ?? []).map(withCurrentScore).filter((scan) => !flood_risk || scan.flood_risk === flood_risk).slice(0, limit ?? 10);
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { scans: data ?? [] }
+      content: [{ type: "text", text: JSON.stringify(scans, null, 2) }],
+      structuredContent: { scans }
     };
   }
 });
@@ -94,6 +95,7 @@ var list_scans_default = defineTool({
 // src/lib/mcp/tools/get-scan.ts
 import { defineTool as defineTool2, ToolError } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z2 } from "npm:zod@^4";
+import { withCurrentScore as withCurrentScore2 } from "npm:@/lib/score-integrity";
 var get_scan_default = defineTool2({
   name: "get_scan",
   title: "Get terrain scan",
@@ -104,9 +106,10 @@ var get_scan_default = defineTool2({
     const { data, error } = await supabaseAnon().from("analyses").select("*").eq("id", id).maybeSingle();
     if (error) throw new ToolError(error.message);
     if (!data) throw new ToolError(`No scan found with id ${id}`);
+    const scan = withCurrentScore2(data);
     return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-      structuredContent: { scan: data }
+      content: [{ type: "text", text: JSON.stringify(scan, null, 2) }],
+      structuredContent: { scan }
     };
   }
 });
@@ -114,6 +117,7 @@ var get_scan_default = defineTool2({
 // src/lib/mcp/tools/find-scans-near.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z3 } from "npm:zod@^4";
+import { withCurrentScore as withCurrentScore3 } from "npm:@/lib/score-integrity";
 var EARTH_KM_PER_DEG = 111.32;
 var find_scans_near_default = defineTool3({
   name: "find_scans_near",
@@ -131,10 +135,10 @@ var find_scans_near_default = defineTool3({
     const latPad = radius / EARTH_KM_PER_DEG;
     const lngPad = radius / (EARTH_KM_PER_DEG * Math.max(Math.cos(lat * Math.PI / 180), 0.01));
     const { data, error } = await supabaseAnon().from("analyses").select(
-      "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,created_at"
+      "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,land_cover,created_at"
     ).gte("center_lat", lat - latPad).lte("center_lat", lat + latPad).gte("center_lng", lng - lngPad).lte("center_lng", lng + lngPad).limit(200);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    const scans = (data ?? []).map((row) => {
+    const scans = (data ?? []).map(withCurrentScore3).map((row) => {
       const dLat = (row.center_lat - lat) * EARTH_KM_PER_DEG;
       const dLng = (row.center_lng - lng) * EARTH_KM_PER_DEG * Math.cos(lat * Math.PI / 180);
       return { ...row, distance_km: Math.round(Math.hypot(dLat, dLng) * 100) / 100 };
@@ -363,6 +367,7 @@ var delete_analysis_default = defineTool7({
 // src/lib/mcp/tools/list-my-scans.ts
 import { defineTool as defineTool8, ToolError as ToolError5 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z8 } from "npm:zod@^4";
+import { withCurrentScore as withCurrentScore4 } from "npm:@/lib/score-integrity";
 var list_my_scans_default = defineTool8({
   name: "list_my_scans",
   title: "List my terrain scans",
@@ -371,11 +376,12 @@ var list_my_scans_default = defineTool8({
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit }, ctx) => {
     if (!ctx.isAuthenticated()) throw new ToolError5("Sign in to list your scans.");
-    const { data, error } = await supabaseForUser(ctx).from("analyses").select("id,name,location_label,absorption_score,flood_risk,created_at").eq("user_id", ctx.getUserId()).order("created_at", { ascending: false }).limit(limit);
+    const { data, error } = await supabaseForUser(ctx).from("analyses").select("id,name,location_label,absorption_score,flood_risk,land_cover,created_at").eq("user_id", ctx.getUserId()).order("created_at", { ascending: false }).limit(limit);
     if (error) throw new ToolError5(error.message);
+    const scans = (data ?? []).map(withCurrentScore4);
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { scans: data ?? [] }
+      content: [{ type: "text", text: JSON.stringify(scans, null, 2) }],
+      structuredContent: { scans }
     };
   }
 });

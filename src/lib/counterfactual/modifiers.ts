@@ -1,4 +1,4 @@
-import { bbox as geometryBbox, booleanPointInPolygon } from "@turf/turf";
+import { area as turfArea, bbox as geometryBbox, bboxPolygon, booleanPointInPolygon, feature as turfFeature, featureCollection, intersect } from "@turf/turf";
 import type {
   DataProvenance,
   InterventionFeature,
@@ -20,6 +20,7 @@ interface PreparedFeature {
   feature: InterventionFeature;
   geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon;
   bounds: [number, number, number, number];
+  vertices: [number, number][];
 }
 
 function clamp01(value: number): number {
@@ -48,10 +49,12 @@ function prepare(features: InterventionFeature[]): PreparedFeature[] {
   return features.flatMap((candidate) => {
     const geometry = candidate.eligibility.validGeometry;
     if (!candidate.eligibility.eligible || !geometry) return [];
+    const rings = geometry.type === "Polygon" ? geometry.coordinates : geometry.coordinates.flat();
     return [{
       feature: candidate,
       geometry,
       bounds: geometryBbox(geometry) as [number, number, number, number],
+      vertices: rings.flat() as [number, number][],
     }];
   });
 }
@@ -71,6 +74,26 @@ function contains(
   );
 }
 
+/**
+ * Each cell's modifier is weighted by the share of the cell the drawing
+ * covers, so a polygon covering 40% of a cell changes it by 40% of its
+ * effect. Without this, credited area depended on grid resolution
+ * (hydrology/H1: 174% / 87% / 94% of the drawn area at 36 / 72 / 120 cells).
+ * Coverage is exact (polygon ∩ cell) where one drawing touches a cell, and a
+ * 16 × 16 point lattice where overlapping drawings must not stack.
+ */
+export const MODIFIER_SUBSAMPLES = 16;
+
+function exactCoverage(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon, cell: [number, number, number, number]): number | null {
+  try {
+    const box = bboxPolygon(cell);
+    const overlap = intersect(featureCollection([turfFeature(geometry), box]));
+    return overlap ? Math.min(1, turfArea(overlap) / turfArea(box)) : 0;
+  } catch {
+    return null;
+  }
+}
+
 export function rasterizeSurfaceModifiers(
   features: InterventionFeature[],
   bbox: Bounds,
@@ -85,44 +108,87 @@ export function rasterizeSurfaceModifiers(
 
   const latitudeStep = (bbox.north - bbox.south) / rows;
   const longitudeStep = (bbox.east - bbox.west) / cols;
+  const n = MODIFIER_SUBSAMPLES;
+  const samples = n * n;
+  const west = Math.min(...prepared.map((p) => p.bounds[0]));
+  const south = Math.min(...prepared.map((p) => p.bounds[1]));
+  const east = Math.max(...prepared.map((p) => p.bounds[2]));
+  const north = Math.max(...prepared.map((p) => p.bounds[3]));
+  const rowStart = Math.max(0, Math.floor((bbox.north - north) / latitudeStep));
+  const rowEnd = Math.min(rows - 1, Math.floor((bbox.north - south) / latitudeStep));
+  const colStart = Math.max(0, Math.floor((west - bbox.west) / longitudeStep));
+  const colEnd = Math.min(cols - 1, Math.floor((east - bbox.west) / longitudeStep));
   const cells: SurfaceModifierCell[] = [];
 
-  for (let row = 0; row < rows; row += 1) {
-    const latitude = bbox.north - (row + 0.5) * latitudeStep;
-    for (let col = 0; col < cols; col += 1) {
-      const longitude = bbox.west + (col + 0.5) * longitudeStep;
-      let retentionFractionDelta = 0;
-      let storageDeltaMm = 0;
-      let roughnessDelta = 0;
+  // Cells holding a polygon vertex can never be classified from corners alone.
+  const vertexCells = prepared.map((p) => new Set(p.vertices.map(([x, y]) => `${Math.floor((bbox.north - y) / latitudeStep)}:${Math.floor((x - bbox.west) / longitudeStep)}`)));
+  const overlaps = (p: PreparedFeature, w: number, sth: number, e: number, nth: number) =>
+    p.bounds[0] <= e && p.bounds[2] >= w && p.bounds[1] <= nth && p.bounds[3] >= sth;
 
-      for (const candidate of prepared) {
-        if (!contains(candidate, longitude, latitude)) continue;
-        const parameters = candidate.feature.parameters;
-        retentionFractionDelta = Math.max(
-          retentionFractionDelta,
-          clamp01(parameters.retentionFractionDelta)
-        );
-        storageDeltaMm = Math.max(
-          storageDeltaMm,
-          Math.max(0, parameters.storageDeltaMm)
-        );
-        roughnessDelta = Math.max(
-          roughnessDelta,
-          Math.max(0, parameters.roughnessDelta)
-        );
+  // Corners are tested a millionth of a cell inside, so a drawing that
+  // coincides with the extent edge is not split by floating-point rounding.
+  const insetLat = latitudeStep * 1e-6;
+  const insetLon = longitudeStep * 1e-6;
+
+  for (let row = rowStart; row <= rowEnd; row += 1) {
+    const cellNorth = bbox.north - row * latitudeStep;
+    const cellSouth = cellNorth - latitudeStep;
+    for (let col = colStart; col <= colEnd; col += 1) {
+      const cellWest = bbox.west + col * longitudeStep;
+      const cellEast = cellWest + longitudeStep;
+      const touching = prepared.filter((p) => overlaps(p, cellWest, cellSouth, cellEast, cellNorth));
+      if (touching.length === 0) continue;
+      let retention = 0;
+      let storage = 0;
+      let roughness = 0;
+      const only = touching.length === 1 ? touching[0] : null;
+      let coverage: number | null = null;
+      const fullyInside =
+        only !== null &&
+        !vertexCells[prepared.indexOf(only)].has(`${row}:${col}`) &&
+        contains(only, cellWest + insetLon, cellSouth + insetLat) &&
+        contains(only, cellEast - insetLon, cellSouth + insetLat) &&
+        contains(only, cellEast - insetLon, cellNorth - insetLat) &&
+        contains(only, cellWest + insetLon, cellNorth - insetLat);
+      if (fullyInside) {
+        // A simple polygon edge cannot cross a cell without leaving a corner
+        // outside or a vertex inside it, so this cell is covered exactly.
+        retention = clamp01(only.feature.parameters.retentionFractionDelta) * samples;
+        storage = Math.max(0, only.feature.parameters.storageDeltaMm) * samples;
+        roughness = Math.max(0, only.feature.parameters.roughnessDelta) * samples;
+      } else if (only && (coverage = exactCoverage(only.geometry, [cellWest, cellSouth, cellEast, cellNorth])) !== null) {
+        retention = clamp01(only.feature.parameters.retentionFractionDelta) * coverage * samples;
+        storage = Math.max(0, only.feature.parameters.storageDeltaMm) * coverage * samples;
+        roughness = Math.max(0, only.feature.parameters.roughnessDelta) * coverage * samples;
+      } else {
+        for (let i = 0; i < n; i += 1) {
+          const latitude = cellNorth - ((i + 0.5) / n) * latitudeStep;
+          for (let j = 0; j < n; j += 1) {
+            const longitude = cellWest + ((j + 0.5) / n) * longitudeStep;
+            // Overlapping drawings never stack: each point takes the strongest.
+            let r = 0;
+            let st = 0;
+            let g = 0;
+            for (const candidate of touching) {
+              if (!contains(candidate, longitude, latitude)) continue;
+              const parameters = candidate.feature.parameters;
+              r = Math.max(r, clamp01(parameters.retentionFractionDelta));
+              st = Math.max(st, Math.max(0, parameters.storageDeltaMm));
+              g = Math.max(g, Math.max(0, parameters.roughnessDelta));
+            }
+            retention += r;
+            storage += st;
+            roughness += g;
+          }
+        }
       }
-
-      if (
-        retentionFractionDelta > 0 ||
-        storageDeltaMm > 0 ||
-        roughnessDelta > 0
-      ) {
+      if (retention > 0 || storage > 0 || roughness > 0) {
         cells.push({
           row,
           col,
-          retentionFractionDelta,
-          storageDeltaMm,
-          roughnessDelta,
+          retentionFractionDelta: retention / samples,
+          storageDeltaMm: storage / samples,
+          roughnessDelta: roughness / samples,
         });
       }
     }

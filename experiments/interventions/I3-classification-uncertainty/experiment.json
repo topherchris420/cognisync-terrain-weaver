@@ -1,0 +1,52 @@
+{
+  "spec": {
+    "id": "interventions/I3-classification-uncertainty",
+    "domain": "interventions",
+    "title": "Does the planning conclusion survive measured classification error?",
+    "question": "When the vegetation/pavement split is moved by the amount the classifier has actually been observed to err, do the score, the 50 mm runoff and a Catalyst plan's target-score conclusion change?",
+    "hypothesis": "A Catalyst least-cost plan for +10 score points still reaches its target when the pervious share is off by the benchmark-derived error.",
+    "tier": "internal-consistency",
+    "inputs": [
+      "scan-feed.json",
+      "nlcd-2021.json"
+    ],
+    "conditions": {
+      "covers": "illustrative example; mean of the 24-times-classified Lower Manhattan frame",
+      "rainfallMm": 50,
+      "plan": "solveForTarget(cover, base + 10)"
+    },
+    "split": "Error ranges come from classification/C1 and C2 on the same fixtures; nothing is tuned.",
+    "metrics": [
+      "pavement, score and runoff ranges",
+      "achieved score of the fixed built plan across the range",
+      "whether the target is still reached"
+    ],
+    "limitations": [
+      "The ranges are sensitivity ranges from measured behaviour, not confidence intervals.",
+      "Only the vegetation/pavement split is perturbed; water error (the largest in C2) is reported by C2 but not propagated here.",
+      "The built plan is held fixed in square metres; only the estimate of what surrounds it changes."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "nlcd-2021.json",
+      "contentHash": "fnv1a64:cde64ea4e37e0145",
+      "source": "USGS National Land Cover Database 2021: land cover and percent developed imperviousness (CONUS)",
+      "retrievedAt": "2026-09-29T11:38:15.700Z",
+      "evidence": "reference"
+    },
+    {
+      "path": "scan-feed.json",
+      "contentHash": "fnv1a64:e75d28ee477bca6c",
+      "source": "Mannahatta public scan feed (Supabase `analyses`, public read policy)",
+      "retrievedAt": "2026-09-29T11:20:59.643Z",
+      "evidence": "inferred"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

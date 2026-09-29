@@ -1,6 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseAnon } from "../supabase";
+import { withCurrentScore } from "@/lib/score-integrity";
 
 export default defineTool({
   name: "list_scans",
@@ -16,20 +17,24 @@ export default defineTool({
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit, flood_risk }) => {
-    let query = supabaseAnon()
+    const query = supabaseAnon()
       .from("analyses")
       .select(
-        "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,created_at",
+        "id,name,location_label,center_lat,center_lng,absorption_score,flood_risk,land_cover,created_at",
       )
       .order("created_at", { ascending: false })
-      .limit(limit ?? 10);
-    if (flood_risk) query = query.eq("flood_risk", flood_risk);
+      .limit(flood_risk ? 200 : (limit ?? 10));
 
     const { data, error } = await query;
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    // The stored band can be stale (classification/C3), so filter on the recomputed one.
+    const scans = (data ?? [])
+      .map(withCurrentScore)
+      .filter((scan) => !flood_risk || scan.flood_risk === flood_risk)
+      .slice(0, limit ?? 10);
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { scans: data ?? [] },
+      content: [{ type: "text", text: JSON.stringify(scans, null, 2) }],
+      structuredContent: { scans },
     };
   },
 });

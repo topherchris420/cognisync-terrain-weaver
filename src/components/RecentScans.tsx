@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { withCurrentScore } from "@/lib/score-integrity";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyFloodRisk, riskLabel } from "@/lib/absorption";
@@ -27,13 +28,13 @@ export function RecentScans() {
     (async () => {
       const { data, error } = await supabase
         .from("analyses")
-        .select("id,name,location_label,absorption_score")
+        .select("id,name,location_label,absorption_score,land_cover")
         .not("location_label", "is", null)
         .order("created_at", { ascending: false })
         .limit(5);
 
       if (cancelled) return;
-      setScans(error || !data ? [] : (data as unknown as Scan[]));
+      setScans(error || !data ? [] : (data as unknown as Scan[]).map(withCurrentScore));
     })();
     return () => {
       cancelled = true;

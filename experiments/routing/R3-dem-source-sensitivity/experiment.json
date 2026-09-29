@@ -1,0 +1,53 @@
+{
+  "spec": {
+    "id": "routing/R3-dem-source-sensitivity",
+    "domain": "routing",
+    "title": "Does routing change with the elevation source?",
+    "question": "On identical 72×72 grids, how similar are elevation, D8 directions and flow concentration from Terrarium tiles versus USGS 3DEP bare earth?",
+    "hypothesis": null,
+    "tier": "reference-dataset",
+    "inputs": [
+      "areas.json",
+      "dem/*.json"
+    ],
+    "conditions": {
+      "resolution": 72,
+      "areas": "8 named + first 40 seeded tiles (those with 3DEP)",
+      "forcing": "35 mm runoff (50 mm storm, C 0.7)"
+    },
+    "split": "None: descriptive sensitivity.",
+    "metrics": [
+      "elevation RMSE and mean difference (m)",
+      "share of cells with identical receiver",
+      "Spearman of log accumulation",
+      "top-10% hotspot overlap",
+      "depression-held share per source"
+    ],
+    "limitations": [
+      "Both sources derive partly from USGS elevation data; agreement is not independent confirmation.",
+      "3DEP is resampled by the server and Terrarium by the app; part of the difference is resampling."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "areas.json",
+      "contentHash": "fnv1a64:fb008d54481af661",
+      "source": "NYC Borough Boundaries (shoreline-clipped), NYC Department of City Planning",
+      "retrievedAt": "2026-09-29T11:35:00.265Z",
+      "evidence": "reference"
+    },
+    {
+      "path": "dem/ (208 files)",
+      "contentHash": "fnv1a64:adbeacf2e0410a12",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-09-29.1"
+  }
+}

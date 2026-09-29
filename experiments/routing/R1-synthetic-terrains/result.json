@@ -1,0 +1,107 @@
+{
+  "resultHash": "fnv1a64:ff5ad6eaaf2f8441",
+  "result": {
+    "verdict": {
+      "status": "not-supported",
+      "statement": "The shipped routing (fill-and-spill) fails 1 of 7 analytic cases (isolated-peak); the original D8 failed 3 (isolated-peak, flat, slope-with-pit). Fill-and-spill fixed the pit and flat cases; the remaining failure is boundary behaviour."
+    },
+    "findings": {
+      "cases": 7,
+      "failedCases": 1,
+      "failedCaseIds": "isolated-peak",
+      "failedCasesUnconditioned": 3,
+      "failedCasesFilled": 2,
+      "adoptionRuleFillAndSpill": true,
+      "adoptionRulePlainFill": false,
+      "plainFillDegradedCases": "bowl",
+      "fillAndSpillStrictlyDecreasedCases": "bowl",
+      "minConservation": 1,
+      "flatDelivered": 1,
+      "pitDelivered": 0.994,
+      "bowlDeliveredPlainFill": 0,
+      "ridgeWestShare": 0.52,
+      "maxDirectionErrorDeg": 90
+    },
+    "observations": [
+      "Conservation holds exactly for every case and variant (minimum 1): all water ends at a sink or in depression storage.",
+      "Preregistered adoption rule (pit and flat ≥ 99%, no other case degraded): plain filling fails — it degrades bowl; fill-and-spill passes when \"degraded\" means a case falling below the 99% pass mark.",
+      "The rule did not define \"degraded\". Under the strictest reading (any decrease at all) fill-and-spill fails: bowl fell by 0.6 pp, which is rain landing exactly on the spill-level divide cells, where the analytic answer is itself indeterminate. It was adopted under the threshold reading; this ambiguity is recorded rather than resolved silently.",
+      "Bowl: original D8 100%, plain fill 0% (it spills the whole bowl to the boundary), fill-and-spill 99.4% (only rain on the four pour points leaves).",
+      "Flat: original D8 delivers 15.4% because 84.6% of cells are sinks; fill-and-spill 100%.",
+      "Ridge: 52% of water goes west against an analytic 50%; D8 breaks the ridge-line tie deterministically toward the west.",
+      "D8 represents every flow direction as one of eight, so deviations up to about 27° on radially symmetric surfaces are inherent to the method.",
+      "Boundary behaviour (unfixed): a boundary cell cannot drain outward because the model knows nothing outside the extent. Where terrain slopes out of the extent, boundary cells pass water sideways along the edge (up to 90° from the true direction) and concentrate it at corners. Accumulation near the study boundary is unreliable."
+    ],
+    "tables": [
+      {
+        "title": "Share of water ending in the analytically expected place",
+        "columns": [
+          "case",
+          "expectation",
+          "original D8 (v1)",
+          "plain fill (rejected)",
+          "fill-and-spill (v2, shipped)",
+          "v2 max angle °"
+        ],
+        "rows": [
+          [
+            "uniform-slope",
+            "every cell drains due west to the western edge",
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            "bowl",
+            "all water converges on the central depression and stays there",
+            1,
+            0,
+            0.994,
+            26.6
+          ],
+          [
+            "ridge",
+            "two catchments of equal size, split along the ridge line",
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            "converging-valley",
+            "side slopes feed a central channel that exits at the southern edge",
+            1,
+            1,
+            1,
+            11.3
+          ],
+          [
+            "isolated-peak",
+            "water sheds radially away from the peak to every edge",
+            1,
+            1,
+            1,
+            90
+          ],
+          [
+            "flat",
+            "no preferred direction; physically, water ponds evenly or leaves by the edges",
+            0.154,
+            1,
+            1,
+            null
+          ],
+          [
+            "slope-with-pit",
+            "a one-cell depression holds its 5 units, overflows, and the rest reaches the western edge",
+            0.933,
+            1,
+            0.994,
+            0
+          ]
+        ]
+      }
+    ]
+  }
+}

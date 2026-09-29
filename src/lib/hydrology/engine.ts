@@ -7,6 +7,7 @@ import type {
 import type { SurfaceModifierCell, SurfaceModifierGrid } from "@/lib/counterfactual/types";
 import { runoffCoefficient } from "@/lib/simulation";
 import { bboxAreaKm2, type BBox } from "@/lib/geo";
+import { stableHash } from "@/lib/counterfactual/hashing";
 import type {
   LocalStormInput,
   LocalStormResult,
@@ -15,6 +16,7 @@ import type {
 import { LOCAL_GRID, LOCAL_HYDROLOGY_MODEL } from "./types";
 import { loadElevationGrid } from "./dem";
 import { designStormHydrograph, hydrographPeakM3s } from "./hydrograph";
+import { fillAndSpill } from "./conditioning";
 
 type Receiver = [number, number];
 
@@ -32,7 +34,8 @@ function modifierLookup(
   return new Map((cells ?? []).map((cell) => [`${cell.row}:${cell.col}`, cell]));
 }
 
-function receiverFor(elevation: number[][], row: number, col: number): Receiver {
+/** D8 steepest-descent receiver; a cell with no strictly lower neighbour is its own receiver (a sink). */
+export function receiverFor(elevation: number[][], row: number, col: number): Receiver {
   const rows = elevation.length;
   const cols = elevation[0].length;
   const current = elevation[row][col];
@@ -127,6 +130,49 @@ function sameModifierExtent(
   );
 }
 
+/**
+ * Accumulate generated runoff down D8 receivers, highest cell first. Pure and
+ * exported so validation experiments inspect the same grid the engine routes.
+ * Water reaching a sink (an edge outlet or an interior pit) stops there.
+ */
+export function routeAccumulation(
+  elevation: number[][],
+  generated: number[][]
+): { receivers: Receiver[][]; accumulation: number[][] } {
+  const rows = elevation.length;
+  const cols = elevation[0]?.length ?? 0;
+  const receivers: Receiver[][] = Array.from({ length: rows }, (_, row) =>
+    Array.from({ length: cols }, (_, col) => receiverFor(elevation, row, col))
+  );
+  const accumulation = generated.map((row) => [...row]);
+  const orderedCells = Array.from({ length: rows * cols }, (_, index) => ({
+    row: Math.floor(index / cols),
+    col: index % cols,
+  })).sort((left, right) => {
+    const elevationDifference =
+      elevation[right.row][right.col] - elevation[left.row][left.col];
+    if (elevationDifference !== 0) return elevationDifference;
+    if (left.row !== right.row) return left.row - right.row;
+    return left.col - right.col;
+  });
+  for (const cell of orderedCells) {
+    const [nextRow, nextCol] = receivers[cell.row][cell.col];
+    if (nextRow !== cell.row || nextCol !== cell.col) {
+      accumulation[nextRow][nextCol] += accumulation[cell.row][cell.col];
+    }
+  }
+  return { receivers, accumulation };
+}
+
+/**
+ * The routing the app performs (v2): static fill-and-spill over D8.
+ * `generated` is runoff volume per cell (m³); depression capacity uses the
+ * same cell area, so storage and flow are in one unit.
+ */
+export function routeTerrain(elevation: number[][], generated: number[][], cellAreaM2: number) {
+  return fillAndSpill(elevation, generated, cellAreaM2);
+}
+
 export function routeWatershed(
   input: LocalStormInput & { elevation: NonNullable<LocalStormInput["elevation"]> }
 ): LocalStormResult {
@@ -189,30 +235,8 @@ export function routeWatershed(
     }
   }
 
-  const receivers: Receiver[][] = Array.from({ length: rows }, (_, row) =>
-    Array.from({ length: cols }, (_, col) =>
-      receiverFor(elevation.values, row, col)
-    )
-  );
-  const accumulation = generatedRunoff.map((row) => [...row]);
-  const orderedCells = Array.from({ length: cells }, (_, index) => ({
-    row: Math.floor(index / cols),
-    col: index % cols,
-  })).sort((left, right) => {
-    const elevationDifference =
-      elevation.values[right.row][right.col] -
-      elevation.values[left.row][left.col];
-    if (elevationDifference !== 0) return elevationDifference;
-    if (left.row !== right.row) return left.row - right.row;
-    return left.col - right.col;
-  });
-
-  for (const cell of orderedCells) {
-    const [nextRow, nextCol] = receivers[cell.row][cell.col];
-    if (nextRow !== cell.row || nextCol !== cell.col) {
-      accumulation[nextRow][nextCol] += accumulation[cell.row][cell.col];
-    }
-  }
+  const routed = routeTerrain(elevation.values, generatedRunoff, cellAreaM2);
+  const { receivers, accumulation } = routed;
 
   const pathThreshold = rainfallPerCellM3 * 4;
   const rawPaths: FlowPath[] = [];
@@ -300,7 +324,7 @@ export function routeWatershed(
     input.durationMinutes
   );
   const peakDischargeM3s = hydrographPeakM3s(hydrograph);
-  const warnings = [...elevation.warnings, "D8 accumulation is a routing index, not standing flood depth. Cell-area equivalents and relative severity ranks are uncalibrated; the hydrograph shape is prescribed, not a discharge forecast."];
+  const warnings = [...elevation.warnings, "D8 accumulation is a routing index, not standing flood depth. Cell-area equivalents and relative severity ranks are uncalibrated; the hydrograph shape is prescribed, not a discharge forecast.", "Surface depressions fill and spill statically: ponded volume is end-of-event storage below each depression's spill level, with no timing, sewer inflow or pond infiltration."];
   if (elevation.status === "illustrative") {
     warnings.push(
       "Optimization claims are disabled while the terrain surface is illustrative."
@@ -312,6 +336,8 @@ export function routeWatershed(
     cells_analyzed: cells,
     computation_time_ms: Date.now() - start,
     runoff_volume_m3: runoffM3,
+    ponded_volume_m3: routed.pondedVolume,
+    outflow_volume_m3: routed.outflowVolume,
     infiltrated_volume_m3: infiltratedM3,
     rainfall_volume_m3: rainfallM3,
     stored_volume_m3: storedM3,
@@ -323,6 +349,11 @@ export function routeWatershed(
     surface_id: input.surfaceId,
     storm_hash: input.stormHash,
     surface_hash: input.surfaceHash,
+    rainfall_mm: input.rainfallDepthMm,
+    duration_min: input.durationMinutes,
+    extent_hash: stableHash({ bbox, rows, cols }),
+    land_cover_hash: stableHash(input.landCover),
+    modifier_hash: stableHash(input.modifiers?.cells ?? []),
     land_cover_c: compositeC,
   };
 
@@ -337,6 +368,7 @@ export function routeWatershed(
       storedM3,
       runoffM3,
       closureErrorM3,
+      pondedM3: routed.pondedVolume,
     },
     hydrograph,
     peakDischargeM3s,
