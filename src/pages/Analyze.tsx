@@ -23,6 +23,9 @@ import { RecommendationsList } from "@/components/RecommendationsList";
 import { StormComparison } from "@/components/StormComparison";
 import { EvidencePanel } from "@/components/analyze/EvidencePanel";
 import { PlanningEnvelope } from "@/components/analyze/PlanningEnvelope";
+import { HowDoWeKnow } from "@/components/analyze/HowDoWeKnow";
+import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
+import { controlledComparison } from "@/lib/counterfactual/controlled";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
@@ -956,7 +959,7 @@ export default function Analyze() {
             title={
               terrainEnabled
                 ? "Return to a flat overhead view"
-                : "Pitch the map to show relief, buildings, and flood depth"
+                : "Pitch the map to show relief, buildings, and routed accumulation"
             }
             aria-pressed={terrainEnabled}
             className={cn(
@@ -1122,6 +1125,7 @@ export default function Analyze() {
                   </section>
 
                   <EvidencePanel analysis={result} image={capturedTile ?? result.image_data_url} />
+                  <HowDoWeKnow />
 
                   <Historical1609Panel
                     state={welikia1609}
@@ -1315,9 +1319,13 @@ export default function Analyze() {
                           />
                         )}
 
-                        {simWarnings.length > 0 && (
-                          <p className="atlas-section-note mt-4">{simWarnings[0]}</p>
+                        {simWarnings.filter((warning) => warning !== ROUTED_ZONES_CAVEAT).length > 0 && (
+                          <p className="atlas-section-note mt-4">{simWarnings.filter((warning) => warning !== ROUTED_ZONES_CAVEAT)[0]}</p>
                         )}
+                        <p className="atlas-section-note mt-3" role="note">
+                          <strong className="text-foreground">How do we know? </strong>
+                          {ROUTED_ZONES_CAVEAT}
+                        </p>
                       </section>
 
                       <section className="atlas-section" aria-labelledby="layers-title">
@@ -1326,10 +1334,10 @@ export default function Analyze() {
                           <label className="atlas-toggle">
                             <span className="atlas-toggle-swatch atlas-toggle-swatch--pond" aria-hidden="true" />
                             <span className="flex-1">
-                              Ponding depth
-                              <small>Where routed water collects</small>
+                              Routed accumulation
+                              <small>Where this model sends water · not flood depth</small>
                             </span>
-                            <Switch checked={showRiskHeatmap} onCheckedChange={setShowRiskHeatmap} aria-label="Show ponding depth" />
+                            <Switch checked={showRiskHeatmap} onCheckedChange={setShowRiskHeatmap} aria-label="Show routed accumulation" />
                           </label>
                           <label className="atlas-toggle">
                             <span className="atlas-toggle-swatch atlas-toggle-swatch--flow" aria-hidden="true" />
@@ -1456,6 +1464,28 @@ export default function Analyze() {
                           </div>
                         </dl>
 
+                        {simResult && futureSimResult && (() => {
+                          const control = controlledComparison(simResult, futureSimResult);
+                          return (
+                            <details className="mt-4 text-xs">
+                              <summary className="cursor-pointer">
+                                {control.valid
+                                  ? `Controlled: ${control.fixed.length} conditions held fixed; only the drawn surface changed`
+                                  : "Not a controlled comparison — see what differs"}
+                              </summary>
+                              <ul className="mt-2 space-y-1 text-muted-foreground">
+                                {control.fixed.map((variable) => (
+                                  <li key={variable.id}>{variable.identical ? "✓" : "✗"} {variable.label}</li>
+                                ))}
+                                <li>{control.treatment.identical ? "✗" : "✓"} Intervention surface changed</li>
+                                {control.violations.map((violation) => (
+                                  <li key={violation} className="text-destructive">{violation}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          );
+                        })()}
+
                         <Button
                           onClick={() => workflow.advance("COMPARE")}
                           className="atlas-primary mt-6 w-full h-11 text-sm font-medium gap-2"
@@ -1488,7 +1518,7 @@ export default function Analyze() {
                     <div className="atlas-exports mt-5">
                       <button type="button" onClick={handleExportExperiment}>
                         <FileJson className="h-4 w-4" aria-hidden="true" />
-                        <span><strong>Experiment evidence (JSON)</strong><small>Inputs, drawings, coefficients, storm identity and routed outputs</small></span>
+                        <span><strong>Experiment evidence (JSON)</strong><small>Question, inputs with evidence status, drawings, assumptions, sealed storm, elevation grid and routed outputs — replayable</small></span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <button type="button" onClick={handleExportPDF}>
