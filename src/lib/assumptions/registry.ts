@@ -10,7 +10,7 @@
  *
  * Bump ASSUMPTION_REGISTRY_VERSION whenever a value, range or tripwire changes.
  */
-export const ASSUMPTION_REGISTRY_VERSION = "2026-09-29.1";
+export const ASSUMPTION_REGISTRY_VERSION = "2026-09-29.2";
 
 export type AssumptionBasis =
   /** Taken from a cited published range; the chosen point inside it is ours. */
@@ -62,6 +62,7 @@ const retention = (
   label: string,
   value: number,
   range: [number, number],
+  note = "",
 ): Assumption => ({
   id: `retention.${key}`,
   label: `${label} retention weight (1 − C)`,
@@ -77,16 +78,17 @@ const retention = (
   usedBy: ["src/lib/absorption.ts", "src/lib/paired-storm.ts", "src/lib/simulation.ts (routing, as 1 − weight)"],
   tripwire: {
     condition:
-      "Revisit if independent event observations for this surface class show retention outside the cited range in a consistent direction, or if the curve-number benchmark (hydrology/H2) shows the fixed value outside its soil-group envelope across most tested storm depths.",
+      "Revisit if the fixed runoff fraction falls outside the TR-55 curve-number envelope (soil groups A–D) at more than half of the tested storm depths (10–200 mm), or if independent event observations for this class disagree in a consistent direction.",
     basis:
-      "The cited range is the only external evidence currently held; no local event runoff data exist in this repository to set a tighter numeric trigger.",
+      `"More than half the depths" means the coefficient misrepresents the class over most of the range the app lets users explore; fewer excursions are expected from any depth-independent coefficient. No local event runoff observations are held, so the curve-number method is the only numeric reference.${note}`,
+    check: { experiment: "hydrology/H2-curve-number-benchmark", finding: `${key}ShareOfDepthsOutsideEnvelope`, comparison: ">", threshold: 0.5 },
   },
 });
 
 export const ASSUMPTIONS: Assumption[] = [
   retention("vegetation", "Vegetation", 0.8, [0.75, 0.95]),
   retention("soil", "Bare soil", 0.7, [0.6, 0.8]),
-  retention("buildings", "Roofs", 0.1, [0.05, 0.25]),
+  retention("buildings", "Roofs", 0.1, [0.05, 0.25], " For roofs TR-55 gives one value (CN 98), so the envelope has zero width and any deviation counts: this is the strictest wire in the registry."),
   retention("pavement", "Pavement", 0.12, [0.05, 0.3]),
   {
     id: "retention.water",
@@ -257,6 +259,62 @@ export const ASSUMPTIONS: Assumption[] = [
     tripwire: {
       condition: "Retire the flood-risk wording of bands unless bands are shown to separate observed flooding outcomes.",
       basis: "Qualitative: no outcome data support any numeric band yet.",
+    },
+  },
+  {
+    id: "classification.sensitivity_default_pp",
+    label: "Default vegetation ↔ pavement sensitivity range",
+    value: 7,
+    unit: "percentage points of the frame",
+    basis: "derived",
+    source: "classification/C1-nlcd-agreement: mean absolute pervious-share error against NLCD 2021, rounded",
+    sourceDate: "2026-09-29",
+    geography: "16 distinct US frames, mostly NYC",
+    range: null,
+    limitation:
+      "Was 5 pp by choice until C1 measured 6.7 pp. Disagreement with a 30 m reference, not error against truth; repeat-run spread on one frame (classification/C2) is larger still.",
+    usedBy: ["src/components/analyze/EvidencePanel.tsx", "src/lib/evidence/ledger.ts"],
+    tripwire: {
+      condition: "Revisit whenever the benchmark-derived pervious error moves more than 1 pp away from this default (the machine check covers upward drift).",
+      basis: "The default should track the measured error at the resolution users can set (whole percentage points).",
+      check: { experiment: "classification/C1-nlcd-agreement", finding: "perviousMaePP", comparison: ">", threshold: 8 },
+    },
+  },
+  {
+    id: "routing.receiving_water_max_elevation",
+    label: "Elevation at or below which a cell is receiving tidal water",
+    value: 0,
+    unit: "m above the DEM datum",
+    basis: "scenario-assumption",
+    source: null,
+    sourceDate: null,
+    geography: "Coastal NYC",
+    range: null,
+    limitation:
+      "Terrarium mixes bathymetry and contains artefacts down to −14 km along NYC shorelines (routing/R3). Land genuinely below 0 m, if any exists in an extent, would be treated as water.",
+    usedBy: ["src/lib/hydrology/conditioning.ts"],
+    tripwire: {
+      condition: "Revisit if a DEM with a verified vertical datum shows land below 0 m inside study areas, or when the app runs outside tidal coasts.",
+      basis: "Qualitative: no surveyed below-sea-level land is known in the tested areas.",
+    },
+  },
+  {
+    id: "routing.hotspots_indicate_flooding",
+    label: "Routed accumulation ranks indicate where surface flooding concentrates",
+    value: 1,
+    unit: "relied upon (1) or not (0)",
+    basis: "scenario-assumption",
+    source: null,
+    sourceDate: null,
+    geography: "NYC study areas",
+    range: null,
+    limitation:
+      "The colored zones on the storm map are accumulation ranks. On the preregistered holdout event they located reported street flooding no better than chance, while simple low elevation did better (routing/R5).",
+    usedBy: ["src/lib/hydrology/engine.ts (risk_zones, impact_points)", "src/components/FloodVolumeLayer.tsx"],
+    tripwire: {
+      condition: "Tripped when the preregistered holdout shows routed accumulation doing worse than the low-elevation baseline (upper 95% bound of the difference below zero).",
+      basis: "Preregistered in experiments/PREREGISTRATION.md: the baseline must be beaten for the ranks to carry information beyond terrain lowness.",
+      check: { experiment: "routing/R5-311-association-holdout", finding: "aucDifferenceUpper", comparison: "<", threshold: 0 },
     },
   },
   {

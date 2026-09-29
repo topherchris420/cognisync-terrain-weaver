@@ -5,6 +5,12 @@ A tripped wire does not change a coefficient automatically. It means the evidenc
 
 | assumption | value | basis | state | observed | trigger |
 |---|---|---|---|---|---|
+| `retention.buildings` | 0.1 fraction of rainfall retained | published-range | **tripped** | 1 | hydrology/H2-curve-number-benchmark · buildingsShareOfDepthsOutsideEnvelope > 0.5 |
+| `retention.soil` | 0.7 fraction of rainfall retained | published-range | **tripped** | 0.6 | hydrology/H2-curve-number-benchmark · soilShareOfDepthsOutsideEnvelope > 0.5 |
+| `routing.hotspots_indicate_flooding` | 1 relied upon (1) or not (0) | scenario-assumption | **tripped** | -0.059 | routing/R5-311-association-holdout · aucDifferenceUpper < 0 |
+| `classification.sensitivity_default_pp` | 7 percentage points of the frame | derived | **clear** | 6.68 | classification/C1-nlcd-agreement · perviousMaePP > 8 |
+| `retention.pavement` | 0.12 fraction of rainfall retained | published-range | **clear** | 0.4 | hydrology/H2-curve-number-benchmark · pavementShareOfDepthsOutsideEnvelope > 0.5 |
+| `retention.vegetation` | 0.8 fraction of rainfall retained | published-range | **clear** | 0.4 | hydrology/H2-curve-number-benchmark · vegetationShareOfDepthsOutsideEnvelope > 0.5 |
 | `cost.bioswales` | 65 USD per m² installed | scenario-assumption | **qualitative** | — | Revisit when any sourced local unit cost is available. The intervention robustness experiment (interventions/I2) reports whether least-cost rankings survive a +20% cost change. |
 | `cost.green_roofs` | 180 USD per m² installed | scenario-assumption | **qualitative** | — | Revisit when any sourced local unit cost is available. The intervention robustness experiment (interventions/I2) reports whether least-cost rankings survive a +20% cost change. |
 | `cost.permeable_pavement` | 150 USD per m² installed | scenario-assumption | **qualitative** | — | Revisit when any sourced local unit cost is available. The intervention robustness experiment (interventions/I2) reports whether least-cost rankings survive a +20% cost change. |
@@ -17,16 +23,19 @@ A tripped wire does not change a coefficient automatically. It means the evidenc
 | `intervention.green_roofs.retention` | 0.6 fraction of rainfall retained | scenario-assumption | **qualitative** | — | Revisit when a sourced value exists. |
 | `intervention.permeable_pavement.retention` | 0.75 fraction of rainfall retained | scenario-assumption | **qualitative** | — | Revisit when a sourced value exists. |
 | `intervention.street_trees.retention` | 0.8 fraction of rainfall retained | derived | **qualitative** | — | Revisit when monitored street-tree or depaving performance data for NYC become available. |
-| `retention.buildings` | 0.1 fraction of rainfall retained | published-range | **qualitative** | — | Revisit if independent event observations for this surface class show retention outside the cited range in a consistent direction, or if the curve-number benchmark (hydrology/H2) shows the fixed value outside its soil-group envelope across most tested storm depths. |
-| `retention.pavement` | 0.12 fraction of rainfall retained | published-range | **qualitative** | — | Revisit if independent event observations for this surface class show retention outside the cited range in a consistent direction, or if the curve-number benchmark (hydrology/H2) shows the fixed value outside its soil-group envelope across most tested storm depths. |
-| `retention.soil` | 0.7 fraction of rainfall retained | published-range | **qualitative** | — | Revisit if independent event observations for this surface class show retention outside the cited range in a consistent direction, or if the curve-number benchmark (hydrology/H2) shows the fixed value outside its soil-group envelope across most tested storm depths. |
-| `retention.vegetation` | 0.8 fraction of rainfall retained | published-range | **qualitative** | — | Revisit if independent event observations for this surface class show retention outside the cited range in a consistent direction, or if the curve-number benchmark (hydrology/H2) shows the fixed value outside its soil-group envelope across most tested storm depths. |
 | `retention.water` | 0 fraction of rainfall retained | derived | **qualitative** | — | Revisit only if the score's purpose changes from land retention to whole-frame water accounting. |
+| `routing.receiving_water_max_elevation` | 0 m above the DEM datum | scenario-assumption | **qualitative** | — | Revisit if a DEM with a verified vertical datum shows land below 0 m inside study areas, or when the app runs outside tidal coasts. |
 | `score.band.low` | 55 score points | derived | **qualitative** | — | Retire the flood-risk wording of bands unless bands are shown to separate observed flooding outcomes. |
 | `score.band.moderate` | 35 score points | derived | **qualitative** | — | Retire the flood-risk wording of bands unless bands are shown to separate observed flooding outcomes. |
 
 ## Why each threshold
 
+- `retention.buildings`: "More than half the depths" means the coefficient misrepresents the class over most of the range the app lets users explore; fewer excursions are expected from any depth-independent coefficient. No local event runoff observations are held, so the curve-number method is the only numeric reference. For roofs TR-55 gives one value (CN 98), so the envelope has zero width and any deviation counts: this is the strictest wire in the registry.
+- `retention.soil`: "More than half the depths" means the coefficient misrepresents the class over most of the range the app lets users explore; fewer excursions are expected from any depth-independent coefficient. No local event runoff observations are held, so the curve-number method is the only numeric reference.
+- `routing.hotspots_indicate_flooding`: Preregistered in experiments/PREREGISTRATION.md: the baseline must be beaten for the ranks to carry information beyond terrain lowness.
+- `classification.sensitivity_default_pp`: The default should track the measured error at the resolution users can set (whole percentage points).
+- `retention.pavement`: "More than half the depths" means the coefficient misrepresents the class over most of the range the app lets users explore; fewer excursions are expected from any depth-independent coefficient. No local event runoff observations are held, so the curve-number method is the only numeric reference.
+- `retention.vegetation`: "More than half the depths" means the coefficient misrepresents the class over most of the range the app lets users explore; fewer excursions are expected from any depth-independent coefficient. No local event runoff observations are held, so the curve-number method is the only numeric reference.
 - `cost.bioswales`: Scenario assumption with no evidence; precision beyond an order of magnitude is not claimed.
 - `cost.green_roofs`: Scenario assumption with no evidence; precision beyond an order of magnitude is not claimed.
 - `cost.permeable_pavement`: Scenario assumption with no evidence; precision beyond an order of magnitude is not claimed.
@@ -39,10 +48,7 @@ A tripped wire does not change a coefficient automatically. It means the evidenc
 - `intervention.green_roofs.retention`: Scenario assumption with no evidence.
 - `intervention.permeable_pavement.retention`: Scenario assumption with no evidence.
 - `intervention.street_trees.retention`: No local performance evidence is held.
-- `retention.buildings`: The cited range is the only external evidence currently held; no local event runoff data exist in this repository to set a tighter numeric trigger.
-- `retention.pavement`: The cited range is the only external evidence currently held; no local event runoff data exist in this repository to set a tighter numeric trigger.
-- `retention.soil`: The cited range is the only external evidence currently held; no local event runoff data exist in this repository to set a tighter numeric trigger.
-- `retention.vegetation`: The cited range is the only external evidence currently held; no local event runoff data exist in this repository to set a tighter numeric trigger.
 - `retention.water`: Structural modelling choice, not an empirical coefficient.
+- `routing.receiving_water_max_elevation`: Qualitative: no surveyed below-sea-level land is known in the tested areas.
 - `score.band.low`: Qualitative: no outcome data support any numeric band yet.
 - `score.band.moderate`: Qualitative: no outcome data support any numeric band yet.

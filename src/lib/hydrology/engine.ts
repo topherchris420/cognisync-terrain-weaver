@@ -17,6 +17,7 @@ import { LOCAL_GRID, LOCAL_HYDROLOGY_MODEL } from "./types";
 import { loadElevationGrid } from "./dem";
 import { designStormHydrograph, hydrographPeakM3s } from "./hydrograph";
 import { fillAndSpill } from "./conditioning";
+import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 
 type Receiver = [number, number];
 
@@ -324,7 +325,7 @@ export function routeWatershed(
     input.durationMinutes
   );
   const peakDischargeM3s = hydrographPeakM3s(hydrograph);
-  const warnings = [...elevation.warnings, "D8 accumulation is a routing index, not standing flood depth. Cell-area equivalents and relative severity ranks are uncalibrated; the hydrograph shape is prescribed, not a discharge forecast.", "Surface depressions fill and spill statically: ponded volume is end-of-event storage below each depression's spill level, with no timing, sewer inflow or pond infiltration."];
+  const warnings = [...elevation.warnings, "D8 accumulation is a routing index, not standing flood depth. Cell-area equivalents and relative severity ranks are uncalibrated; the hydrograph shape is prescribed, not a discharge forecast.", "Surface depressions fill and spill statically: ponded volume is end-of-event storage below each depression's spill level, with no timing, sewer inflow or pond infiltration.", ROUTED_ZONES_CAVEAT];
   if (elevation.status === "illustrative") {
     warnings.push(
       "Optimization claims are disabled while the terrain surface is illustrative."

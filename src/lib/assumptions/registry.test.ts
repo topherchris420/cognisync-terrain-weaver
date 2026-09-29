@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ABSORPTION_WEIGHTS, RISK_BANDS } from "@/lib/absorption";
 import { DEFAULT_ASSUMPTIONS, INTERVENTIONS, INTERVENTION_ORDER } from "@/lib/scenario";
 import { RUNOFF_COEFFICIENT } from "@/lib/simulation";
+import { RECEIVING_WATER_MAX_ELEVATION_M } from "@/lib/hydrology/conditioning";
 import { ASSUMPTIONS, assumption } from "./registry";
 
 describe("assumption registry mirrors every live constant", () => {
@@ -23,6 +24,10 @@ describe("assumption registry mirrors every live constant", () => {
       expect(assumption(`intervention.${key}.retention`).value).toBe(INTERVENTIONS[key].targetWeight);
       expect(assumption(`cost.${key}`).value).toBe(INTERVENTIONS[key].unitCostUSD);
     }
+  });
+
+  it("routing boundary condition", () => {
+    expect(assumption("routing.receiving_water_max_elevation").value).toBe(RECEIVING_WATER_MAX_ELEVATION_M);
   });
 
   it("economics defaults and score bands", () => {

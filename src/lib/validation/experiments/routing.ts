@@ -369,7 +369,8 @@ export const demSourceSensitivity: Experiment = {
     const rows = studyAreas(load).filter((area) => hasThreeDep(load, area.id)).map((area) => {
       const t = elevationFromFixture(load, area.id, "terrarium", 72);
       const d = elevationFromFixture(load, area.id, "3dep", 72);
-      const diffs = t.values.flat().map((v, i) => v - d.values.flat()[i]);
+      const dFlat = d.values.flat();
+      const diffs = t.values.flat().map((v, i) => v - dFlat[i]);
       const forcing = uniformRunoff(area.bbox, 72, DESIGN_RUNOFF_MM);
       const cellArea = cellAreaOf(area.bbox, 72);
       const rt = upslopeCells(t.values, "app", forcing, cellArea);

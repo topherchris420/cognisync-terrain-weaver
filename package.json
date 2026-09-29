@@ -8,9 +8,17 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "experiment": "vite-node scripts/experiment.ts",
+    "validate": "vite-node scripts/experiment.ts --check",
+    "validate:classification": "vite-node scripts/experiment.ts classification",
+    "validate:hydrology": "vite-node scripts/experiment.ts hydrology",
+    "validate:routing": "vite-node scripts/experiment.ts routing",
+    "validate:interventions": "vite-node scripts/experiment.ts interventions",
+    "replay": "vite-node scripts/replay.ts",
+    "data:fetch": "vite-node scripts/fetch-reference-data.ts",
     "preview": "vite preview"
   },
   "dependencies": {

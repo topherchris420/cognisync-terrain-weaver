@@ -87,6 +87,7 @@ const run: RunRecord = {
 };
 
 let failures = 0;
+const reproduced = new Map<string, ExperimentResult>();
 for (const experiment of selected) {
   const { spec } = experiment;
   const dir = resolve(OUT, spec.id);
@@ -100,6 +101,7 @@ for (const experiment of selected) {
   const committed = existsSync(committedPath) ? (JSON.parse(readFileSync(committedPath, "utf8")) as { resultHash: string }).resultHash : null;
   const status = committed === hash ? "unchanged" : committed ? "CHANGED" : "new";
   console.log(`${spec.id.padEnd(48)} ${result.verdict.status.padEnd(14)} ${status.padEnd(9)} ${Date.now() - started} ms`);
+  reproduced.set(spec.id, result);
   if (check) {
     if (committed !== hash) {
       failures += 1;
@@ -114,6 +116,14 @@ for (const experiment of selected) {
 }
 
 if (check) {
+  // The app displays findings.json; it must equal what the experiments produce.
+  const shipped = JSON.parse(readFileSync(resolve(ROOT, "src/lib/evidence/findings.json"), "utf8")) as Record<string, { findings: unknown; verdict: unknown }>;
+  for (const [id, result] of reproduced) {
+    if (JSON.stringify(shipped[id]?.findings) !== JSON.stringify(result.findings) || JSON.stringify(shipped[id]?.verdict) !== JSON.stringify(result.verdict)) {
+      failures += 1;
+      console.error(`src/lib/evidence/findings.json is stale for ${id}. Re-run \`npm run experiment\`.`);
+    }
+  }
   if (failures) {
     console.error(`${failures} experiment result(s) no longer reproduce.`);
     process.exit(1);
