@@ -26,7 +26,7 @@ const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
 const GEMINI_API_URL =
   Deno.env.get("GEMINI_API_URL") ??
   "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const LOVABLE_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-2.5-pro";
+const LOVABLE_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-3.8-flash";
 const LOVABLE_API_URL =
   Deno.env.get("AI_GATEWAY_URL") ??
   "https://ai.gateway.lovable.dev/v1/chat/completions";
