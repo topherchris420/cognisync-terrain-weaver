@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sdk_version": "0.26.3",
+  "sdk_version": "0.26.1",
   "path": "/functions/v1/mcp",
   "auth": {
     "type": "oauth",
@@ -125,7 +125,7 @@
       {
         "name": "score_land_cover",
         "title": "Score a land-cover mix",
-        "description": "Compute the Urban Absorption Score (0-100) and flood-risk band for a hypothetical land-cover mix. Percentages should roughly sum to 100.",
+        "description": "Compute the Urban Absorption Score (0-100) and flood-risk band for a hypothetical land-cover mix. Percentages should sum to 100 within 0.5 percentage points.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -202,7 +202,7 @@
       {
         "name": "create_analysis",
         "title": "Create terrain scan",
-        "description": "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are computed server-side unless explicitly overridden.",
+        "description": "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are always computed deterministically; authoritative scores cannot be overridden.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
