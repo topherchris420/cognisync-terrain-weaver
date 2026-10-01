@@ -1,6 +1,7 @@
 // Edge function: analyze-terrain
 // - Accepts a satellite JPEG (data URL) + map viewport metadata
-// - Uses Lovable AI (Gemini 2.5 Flash) to classify land cover
+// - Uses Gemini 3.8 Flash directly when GEMINI_API_KEY is configured
+//   (with the existing Lovable gateway retained as a backward-compatible fallback)
 // - Computes an Urban Absorption Score and generates adaptation recommendations
 // - Persists the result to the public.analyses table
 // - Returns the newly inserted row
@@ -19,9 +20,47 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Support dynamic model configuration via AI_MODEL secret/env with fallback to latest Gemini Vision
-const AI_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-2.5-pro";
-const AI_URL = Deno.env.get("AI_GATEWAY_URL") ?? "https://ai.gateway.lovable.dev/v1/chat/completions";
+// Prefer Google's Gemini API so the project can use the Gemini free tier directly.
+// Keep the Lovable gateway as a backward-compatible fallback for existing deployments.
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
+const GEMINI_API_URL =
+  Deno.env.get("GEMINI_API_URL") ??
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const LOVABLE_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-2.5-pro";
+const LOVABLE_API_URL =
+  Deno.env.get("AI_GATEWAY_URL") ??
+  "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+type AIProvider = {
+  name: "gemini" | "lovable";
+  apiKey: string;
+  model: string;
+  url: string;
+};
+
+function resolveAIProvider(): AIProvider | null {
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  if (geminiKey) {
+    return {
+      name: "gemini",
+      apiKey: geminiKey,
+      model: GEMINI_MODEL,
+      url: GEMINI_API_URL,
+    };
+  }
+
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableKey) {
+    return {
+      name: "lovable",
+      apiKey: lovableKey,
+      model: LOVABLE_MODEL,
+      url: LOVABLE_API_URL,
+    };
+  }
+
+  return null;
+}
 
 interface Body {
   name?: string;
@@ -87,19 +126,19 @@ function jsonError(status: number, message: string, extra?: unknown) {
   );
 }
 
-async function callAI(payload: unknown, apiKey: string) {
-  const res = await fetch(AI_URL, {
+async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
+  const res = await fetch(provider.url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, model: provider.model }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    console.error(`AI gateway ${res.status}:`, text);
+    console.error(`${provider.name} AI ${res.status}:`, text);
     throw new Response(
       JSON.stringify({
         error:
@@ -183,8 +222,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonError(405, "Method not allowed");
 
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) return jsonError(500, "LOVABLE_API_KEY is not configured.");
+  const aiProvider = resolveAIProvider();
+  if (!aiProvider) {
+    return jsonError(
+      500,
+      "AI provider is not configured. Set GEMINI_API_KEY (preferred) or LOVABLE_API_KEY.",
+    );
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceKey =
@@ -229,7 +273,6 @@ Return STRICT JSON only, no prose, no code fence:
 
     const classifyRaw = await callAI(
       {
-        model: AI_MODEL,
         messages: [
           {
             role: "user",
@@ -245,7 +288,7 @@ Return STRICT JSON only, no prose, no code fence:
         response_format: { type: "json_object" },
         temperature: 0.2,
       },
-      apiKey,
+      aiProvider,
     );
 
     const parsed = safeParseJson<Partial<LandCover> & { notes?: string }>(
@@ -285,12 +328,11 @@ Use category "green" for vegetation/bioswales, "blue" for water storage/drainage
 
     const recRaw = await callAI(
       {
-        model: AI_MODEL,
         messages: [{ role: "user", content: recPrompt }],
         response_format: { type: "json_object" },
         temperature: 0.5,
       },
-      apiKey,
+      aiProvider,
     );
 
     const recParsed = safeParseJson<{ recommendations?: unknown }>(recRaw);
