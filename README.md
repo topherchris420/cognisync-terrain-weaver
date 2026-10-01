@@ -137,7 +137,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open `http://127.0.0.1:43147`. Configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and, for MCP, `VITE_SUPABASE_PROJECT_ID` for your Supabase project. Browser configuration must contain only public keys; classifier/service secrets belong in Supabase edge-function secrets. The example skips the classifier request but the app still initializes its Supabase client. Deploying source changes to edge functions is a separate step from the frontend build.
+Open `http://127.0.0.1:43147`. Configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and, for MCP, `VITE_SUPABASE_PROJECT_ID` for your Supabase project. Browser configuration must contain only public keys; classifier/service secrets belong in Supabase edge-function secrets. For live AI classification, set `GEMINI_API_KEY` to use Google's Gemini API directly; the default model is `gemini-3.8-flash` and can be overridden with `GEMINI_MODEL`. Existing deployments can continue using `LOVABLE_API_KEY` as a fallback through the Lovable gateway. The example skips the classifier request but the app still initializes its Supabase client. Deploying source changes to edge functions is a separate step from the frontend build.
 
 ```bash
 npm test
