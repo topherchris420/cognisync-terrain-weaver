@@ -23,9 +23,13 @@ const corsHeaders = {
 // Prefer Google's Gemini API so the project can use the Gemini free tier directly.
 // Keep the Lovable gateway as a backward-compatible fallback for existing deployments.
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
-const GEMINI_API_URL =
-  Deno.env.get("GEMINI_API_URL") ??
-  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// Native generateContent API. The OpenAI-compatible route
+// (/v1beta/openai/chat/completions) returns spurious 503 "high demand" errors
+// when response_format JSON mode is used, while the native route with
+// responseMimeType works reliably on the same model.
+const GEMINI_API_BASE =
+  Deno.env.get("GEMINI_API_BASE") ??
+  "https://generativelanguage.googleapis.com/v1beta";
 const LOVABLE_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-3.8-flash";
 const LOVABLE_API_URL =
   Deno.env.get("AI_GATEWAY_URL") ??
