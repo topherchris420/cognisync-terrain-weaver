@@ -1,5 +1,5 @@
 {
-  "resultHash": "fnv1a64:8b373f2eb03982d9",
+  "resultHash": "fnv1a64:68c186166ffaf0b0",
   "result": {
     "verdict": {
       "status": "not-supported",
@@ -16,7 +16,7 @@
       "verdict": "not-supported-by-model"
     },
     "observations": [
-      "Controlled comparison: 9 fixed variables identical (sealed storm identity, rainfall depth (mm), duration (min), study extent and grid, resolution (cells), initial land-cover composition, elevation surface, elevation status, routing model version); only the intervention surface differs.",
+      "Controlled comparison: 10 fixed variables identical (sealed storm identity, rainfall depth (mm), duration (min), study extent and grid, resolution (cells), initial land-cover composition, elevation surface, elevation status, routing model version, urban substrate (version, manifest and tiles)); only the intervention surface differs.",
       "This negative result is kept deliberately: a single street-scale bioswale is small against the runoff of a whole 0.85 km² extent, and a claim of district-scale benefit from it would be false within the model itself.",
       "Support within the model is not evidence about a real bioswale. That would require monitored inflow/outflow data for installed practices."
     ],

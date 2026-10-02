@@ -5,6 +5,8 @@
 // - Computes an Urban Absorption Score and generates adaptation recommendations
 // - Persists the result to the public.analyses table
 // - Returns the newly inserted row
+// - diagnostic_only: classification only (synthetic diagnostic benchmark).
+//   Same prompt and normalisation; no recommendations, NOTHING persisted.
 //
 // Configured with verify_jwt = false so anonymous visitors can submit scans.
 // See security memory: this is an intentional public-demo posture.
@@ -69,11 +71,19 @@ function resolveAIProvider(): AIProvider | null {
 interface Body {
   name?: string;
   location_label?: string | null;
-  center_lat: number;
-  center_lng: number;
-  zoom: number;
+  center_lat?: number;
+  center_lng?: number;
+  zoom?: number;
   bbox?: unknown;
   image_data_url: string;
+  /**
+   * Synthetic diagnostic benchmark: classify the image and return the
+   * composition only. Requests omit center_lat/center_lng/zoom, so a
+   * deployment that predates this mode rejects them (400) before calling the
+   * model or writing anything, and benchmark images can never enter the
+   * public scan feed.
+   */
+  diagnostic_only?: boolean;
 }
 
 type LandCover = {
@@ -251,10 +261,12 @@ Deno.serve(async (req) => {
   if (!body?.image_data_url || !body.image_data_url.startsWith("data:image/")) {
     return jsonError(400, "Missing or invalid image_data_url.");
   }
+  const diagnostic = body.diagnostic_only === true;
   if (
-    typeof body.center_lat !== "number" ||
-    typeof body.center_lng !== "number" ||
-    typeof body.zoom !== "number"
+    !diagnostic &&
+    (typeof body.center_lat !== "number" ||
+      typeof body.center_lng !== "number" ||
+      typeof body.zoom !== "number")
   ) {
     return jsonError(400, "Missing center_lat, center_lng, or zoom.");
   }
@@ -309,6 +321,23 @@ Return STRICT JSON only, no prose, no code fence:
       return jsonError(502, "AI returned invalid land-cover percentages.", error instanceof Error ? error.message : "Invalid composition");
     }
     const aiNotes = typeof parsed.notes === "string" ? parsed.notes : null;
+
+    if (diagnostic) {
+      // Synthetic diagnostic benchmark: the composition only, never persisted.
+      return new Response(
+        JSON.stringify({
+          classification: {
+            land_cover: cover,
+            notes: aiNotes,
+            model: aiProvider.model,
+            provider: aiProvider.name,
+            diagnostic: true,
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const score = computeAbsorption(cover);
     const risk = classifyFloodRisk(score);
 
@@ -316,7 +345,7 @@ Return STRICT JSON only, no prose, no code fence:
     const recPrompt = `You are an urban climate-adaptation advisor.
 
 Given this site:
-- Location: ${body.location_label ?? `${body.center_lat.toFixed(4)}, ${body.center_lng.toFixed(4)}`}
+- Location: ${body.location_label ?? `${body.center_lat!.toFixed(4)}, ${body.center_lng!.toFixed(4)}`}
 - Land cover: pavement ${cover.pavement}%, buildings ${cover.buildings}%, vegetation ${cover.vegetation}%, water ${cover.water}%, soil ${cover.soil}%
 - Urban Absorption Score: ${score}/100
 - Flood risk band: ${risk}

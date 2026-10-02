@@ -18,6 +18,7 @@ import { loadElevationGrid } from "./dem";
 import { designStormHydrograph, hydrographPeakM3s } from "./hydrograph";
 import { fillAndSpill } from "./conditioning";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
+import { SUBSTRATE_NONE } from "@/lib/urban-substrate/identity";
 
 type Receiver = [number, number];
 
@@ -355,6 +356,7 @@ export function routeWatershed(
     extent_hash: stableHash({ bbox, rows, cols }),
     land_cover_hash: stableHash(input.landCover),
     modifier_hash: stableHash(input.modifiers?.cells ?? []),
+    substrate_hash: input.substrateHash ?? SUBSTRATE_NONE,
     land_cover_c: compositeC,
   };
 

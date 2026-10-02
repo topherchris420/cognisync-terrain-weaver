@@ -38,6 +38,14 @@ fixed are listed at the end and stay in the record.
 - **Validation.** R1 under both readings of the adoption rule (recorded in its report); unit tests for conservation, pits, bowls, spikes and determinism; R2–R5 re-run.
 - **Result.** Analytic failures 3 → 1 (the remaining one is boundary behaviour, unfixed). Water stranded in pits: 81% → a median 11% held in real depressions. **It did not make routed hotspots predictive**: see below.
 
+## 5. Urban substrate identity joins the controlled-variable contract
+
+- **Observation.** Experiments could not say which city state (buildings, streets, shoreline, reference land cover) a study was made with, so two runs could silently differ in it. Not a measured defect: a gap in what evidence records.
+- **Change.** A compiled, versioned urban substrate (`src/lib/urban-substrate/`, [docs](../docs/urban-substrate.md)). Every routed run now records `substrate_hash`, and `controlledComparison` requires it to be identical in NOW and POSSIBLE; runs made without a substrate record `substrate:none`. Experiment export v3 carries the substrate identity; replay reconstructs every recorded tile or fails.
+- **Effect on committed results.** [I1](interventions/I1-bioswale-1500m2/REPORT.md) lists the controlled variables in one observation, so its result hash changed from `fnv1a64:8b373f2eb03982d9` to `fnv1a64:68c186166ffaf0b0`. Verdict, findings and tables are identical; the only difference is that sentence, which now reads "10 fixed variables … urban substrate (version, manifest and tiles)" instead of "9 fixed variables …". Both I1 runs routed without a substrate (`substrate:none`). No other committed result changed.
+- **Validation.** [S1](substrate/S1-substrate-determinism/REPORT.md) (new): three compiles of frozen sources are byte-identical, validation reports zero errors, and a one-centimetre tamper fails replay on the named tile.
+- **Not changed.** D8 routing reads no substrate geometry; no hydrology number moved.
+
 ## What measurement did not fix
 
 - **Routed zones do not locate reported flooding.** On the preregistered holdout ([R5](routing/R5-311-association-holdout/REPORT.md)) routed accumulation scored AUC 0.50 against 0.62 for simply ranking low ground. The tripwire `routing.hotspots_indicate_flooding` is tripped. Response: the result is attached to every routed run's warnings and shown in the app's evidence ledger. The zones were not re-tuned on the holdout; any future routing change must be tested on a new event.

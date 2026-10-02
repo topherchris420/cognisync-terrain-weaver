@@ -4,6 +4,7 @@ import { DEFAULT_ASSUMPTIONS, INTERVENTIONS, INTERVENTION_ORDER } from "@/lib/sc
 import { RUNOFF_COEFFICIENT } from "@/lib/simulation";
 import { RECEIVING_WATER_MAX_ELEVATION_M } from "@/lib/hydrology/conditioning";
 import { ASSUMPTIONS, assumption } from "./registry";
+import findings from "@/lib/evidence/findings.json";
 
 describe("assumption registry mirrors every live constant", () => {
   it("retention weights", () => {
@@ -53,6 +54,13 @@ describe("assumption registry is honest about provenance", () => {
       expect(a.value, a.id).toBeGreaterThanOrEqual(a.range![0]);
       expect(a.value, a.id).toBeLessThanOrEqual(a.range![1]);
     }
+  });
+
+  it("derives the synthetic diagnostic tripwire from measured real-world disagreement, never from synthetic results", () => {
+    const measured = (findings as Record<string, { findings: Record<string, unknown> }>)["classification/C1-nlcd-agreement"].findings.perviousMaePP;
+    const wire = assumption("classification.synthetic_recovery_pp");
+    expect(wire.value).toBe(measured);
+    expect(wire.tripwire.check?.threshold).toBe(measured);
   });
 
   it("has unique ids", () => {

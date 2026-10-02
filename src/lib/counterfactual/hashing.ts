@@ -87,9 +87,18 @@ function fnv1a64(input: string): string {
 }
 
 /**
+ * Canonical JSON text: object keys sorted, -0 written as 0, and anything JSON
+ * cannot represent exactly (undefined, non-finite numbers, cycles, class
+ * instances) rejected. Equal values always produce byte-identical text.
+ */
+export function canonicalJson(value: unknown): string {
+  return canonicalize(value, new Set<object>());
+}
+
+/**
  * Deterministic identity key for counterfactual contracts.
  * This is not a security checksum.
  */
 export function stableHash(value: unknown): string {
-  return `fnv1a64:${fnv1a64(canonicalize(value, new Set<object>()))}`;
+  return `fnv1a64:${fnv1a64(canonicalJson(value))}`;
 }

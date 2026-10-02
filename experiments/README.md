@@ -12,10 +12,10 @@ reconsider.
 
 ```bash
 npm run experiment                    # run everything, rewrite reports
-npm run validate:routing              # one domain: classification | hydrology | routing | interventions
+npm run validate:routing              # one domain: classification | hydrology | routing | interventions | substrate
 npm run experiment -- routing/R1      # one experiment (any unique id fragment)
-npm run validate                      # CI: fail if any committed result no longer reproduces
-npm run replay -- study.json          # verify and re-run an exported NOW/POSSIBLE experiment
+npm run validate                      # CI: fail if any committed result or the published substrate no longer reproduces
+npm run replay -- study.json          # verify (substrate tiles included) and re-run an exported NOW/POSSIBLE experiment
 ```
 
 No network is needed: experiments read only `experiments/data/`.
@@ -48,8 +48,9 @@ A result is never described with a stronger word than its tier allows.
 | tier | compares the model with | example |
 |---|---|---|
 | synthetic-verification | analytic answers | R1 terrains |
+| synthetic-diagnostic | known ground truth in rendered scenes; says nothing about real imagery | C4 (no scenes frozen yet) |
 | internal-consistency | the instrument's own parts | H1, C3, I1–I3 |
-| repeated-measurement | itself, under repetition or resampling | C2, R2 |
+| repeated-measurement | itself, under repetition or resampling | C2, R2, S1 |
 | reference-model | an independent published model | H2 (NRCS curve numbers) |
 | reference-dataset | an independent map product with its own error | C1 (NLCD), R3 (3DEP) |
 | independent-observation | observations of outcomes it never used | R4, R5 (311 reports) |
@@ -71,7 +72,9 @@ npm run data:fetch -- nlcd                       # feed | areas | nlcd | dem | 3
 ```
 
 Existing fixtures are kept unless `--refresh` is passed, so re-fetching is a
-visible diff, never a silent change.
+visible diff, never a silent change. Substrate sources are fetched the same
+way with `npm run substrate:fetch`, then compiled with `npm run
+substrate:compile` (see [docs/urban-substrate.md](../docs/urban-substrate.md)).
 
 | fixture | source | evidence |
 |---|---|---|
@@ -81,6 +84,8 @@ visible diff, never a silent change.
 | `311/*.json` | NYC 311 street-flooding and catch-basin reports | reported |
 | `rain-central-park.json` | NOAA GHCN daily, Central Park | measured |
 | `areas.json` | named areas + seeded sample over NYC land | reference |
+| `substrate/nyc-lower-manhattan/*.json` | NYC Open Data (footprints, PLUTO, CSCL, hydrography, shoreline, parks, trees), NLCD 2021, Terrarium, frozen for the urban substrate | measured / reported / reference |
+| `synthetic/*.json` | rendered scenes with known composition and classifier predictions (empty until scenes are ingested) | synthetic |
 
 ## Calibration and validation
 

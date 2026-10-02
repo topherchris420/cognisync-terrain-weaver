@@ -6,6 +6,9 @@ import type { Experiment, ResultTable } from "../experiment";
 import { aggregateCover, COVER_KEYS, feedExtent, frameKey, isClassifierOutput, type FeedRow } from "../feed";
 import { mean, range, round, sd, shareOnMultiple, bias, mae } from "../metrics";
 import { nlcdReference, type NlcdGrid } from "../nlcd";
+import { evaluateSyntheticBenchmark, type BenchmarkPrediction } from "@/lib/perception/benchmark";
+import { COMPOSITION_KEYS, NOT_REAL_WORLD, SYNTHETIC_LABEL, type SyntheticScene } from "@/lib/perception/synthetic-scene";
+import { assumption } from "@/lib/assumptions/registry";
 
 const FEED = "scan-feed.json";
 const NLCD = "nlcd-2021.json";
@@ -269,6 +272,116 @@ export const referenceAgreement: Experiment = {
             round(r.classified.pervious, 1), round(r.ref.pervious, 1),
             round(r.score, 1), `${r.interval[0]}–${r.interval[1]}`,
           ]),
+        },
+      ],
+    };
+  },
+};
+
+/* ------------------------- C4 synthetic semantic agreement (diagnostic) */
+
+/**
+ * Registered as C4 because classification/C3 is the stored-score audit.
+ * SYNTHETIC DIAGNOSTIC BENCHMARK: agreement with known composition in
+ * rendered scenes. Never real-world classifier accuracy.
+ */
+const SCENES = "synthetic/scenes.json";
+const PREDICTIONS = "synthetic/predictions.json";
+
+export const syntheticSemanticAgreement: Experiment = {
+  spec: {
+    id: "classification/C4-synthetic-semantic-agreement",
+    domain: "classification",
+    title: "Synthetic diagnostic benchmark: does the classifier recover known composition?",
+    question: "When RGB scenes have known semantic composition, how closely does the AI classifier recover vegetation, pavement, buildings, bare soil and water?",
+    hypothesis: null,
+    tier: "synthetic-diagnostic",
+    inputs: [SCENES, PREDICTIONS],
+    conditions: {
+      label: SYNTHETIC_LABEL,
+      view: "nadir scenes only",
+      classifierInput: "RGB image only (no location, name or metadata)",
+      tripwireThresholdPP: assumption("classification.synthetic_recovery_pp").value,
+      tripwireThresholdSource: "classification/C1-nlcd-agreement perviousMaePP (measured on real frames), not chosen",
+    },
+    split: "None yet. The tripwire threshold is derived from measured real-world disagreement (C1), never from synthetic results. Any synthetic-specific threshold must be added to PREREGISTRATION before predictions are read.",
+    metrics: [
+      "mean absolute error by class (pp)",
+      "total composition error: mean half-L1 distance (pp)",
+      "pervious-share (vegetation + bare soil) mean absolute error and bias (pp)",
+      "estimated composition transfer between classes (trend, not a confusion matrix)",
+      "repeated-inference spread (mean per-class SD; largest range)",
+      "error by scene condition (lighting, weather, scene class)",
+    ],
+    limitations: [
+      NOT_REAL_WORLD,
+      "Rendered scenes differ from satellite imagery in texture, lighting, shadow, atmosphere and sensor; only nadir renders are scored because the classifier is built for overhead imagery.",
+      "Ground truth is the share of mapped pixels: sky, vehicles, people, signals and signage are excluded and their share reported; mapping terrain, park footpaths and bridge decks is a documented judgement whose share is reported.",
+      "The classifier returns class shares, not pixel labels, so the transfer table is an estimated trend, not a confusion matrix.",
+      "BoundlessNYC scenes with MetaHuman-derived pedestrians are refused for licence reasons (no testing of AI on them), which may bias scene selection.",
+    ],
+  },
+  run(load) {
+    const scenes = load<{ scenes: SyntheticScene[] }>(SCENES).data.scenes;
+    const predictions = load<{ predictions: BenchmarkPrediction[] }>(PREDICTIONS).data.predictions;
+    const result = evaluateSyntheticBenchmark(scenes, predictions);
+    const mae = (key: (typeof COMPOSITION_KEYS)[number]) => result.perClassMaePP?.[key] ?? null;
+    const findings = {
+      frozenScenes: scenes.length,
+      scoredScenes: result.scenes,
+      excludedScenes: result.excludedScenes.length,
+      predictions: result.predictions,
+      totalCompositionErrorPP: result.totalCompositionErrorPP,
+      perviousShareMaePP: result.perviousShareMaePP,
+      perviousShareBiasPP: result.perviousShareBiasPP,
+      vegetationMaePP: mae("vegetation"),
+      pavementMaePP: mae("pavement"),
+      buildingsMaePP: mae("buildings"),
+      bareSoilMaePP: mae("bareSoil"),
+      waterMaePP: mae("water"),
+      repeatSdPP: result.repeatSdPP,
+      maxRepeatRangePP: result.maxRepeatRangePP,
+    };
+    if (result.scenes === 0) {
+      return {
+        verdict: {
+          status: "inconclusive",
+          statement: `Not run: ${scenes.length} synthetic scenes and ${predictions.length} classifier predictions are frozen, so the ${SYNTHETIC_LABEL} has nothing to score. No agreement is claimed.`,
+        },
+        findings,
+        observations: [
+          "The scene contract, BoundlessNYC adapter, metrics and fail-safe classifier mode exist and are unit-tested; the frozen inputs are deliberately empty until scenes are rendered and ingested.",
+          `When scenes exist, the tripwire compares pervious-share error with the ${assumption("classification.synthetic_recovery_pp").value} pp the classifier disagrees with NLCD on real frames (C1). A tripped wire calls for investigating the classifier; it never changes a real-world claim by itself.`,
+          NOT_REAL_WORLD,
+        ],
+        tables: [],
+      };
+    }
+    return {
+      verdict: {
+        status: "descriptive",
+        statement: `${SYNTHETIC_LABEL}: across ${result.scenes} nadir scenes, the classifier's composition differs from known ground truth by ${result.totalCompositionErrorPP} pp (half-L1) and its pervious share by ${result.perviousShareMaePP} pp on average (bias ${result.perviousShareBiasPP} pp). ${NOT_REAL_WORLD}`,
+      },
+      findings,
+      observations: [
+        NOT_REAL_WORLD,
+        ...result.excludedScenes.map((e) => `Excluded ${e.sceneId}: ${e.reason}.`),
+      ],
+      tables: [
+        {
+          title: "Per-class error against known composition (pp)",
+          columns: ["class", "mean absolute error", "bias"],
+          rows: COMPOSITION_KEYS.map((k) => [k, result.perClassMaePP![k], result.perClassBiasPP![k]]),
+        },
+        {
+          title: "Estimated composition transfer, from (row) → to (column), pp — a trend, not a confusion matrix",
+          columns: ["from", ...COMPOSITION_KEYS],
+          rows: COMPOSITION_KEYS.map((from) => [from, ...COMPOSITION_KEYS.map((to) => result.estimatedTransferPP![from][to])]),
+        },
+        {
+          title: "Error by scene condition",
+          columns: ["condition", "value", "scenes", "total error pp", "pervious MAE pp"],
+          rows: result.byCondition.map((c) => [c.condition, c.value, c.scenes, c.totalCompositionErrorPP, c.perviousShareMaePP]),
         },
       ],
     };

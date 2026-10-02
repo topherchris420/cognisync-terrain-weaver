@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "mannahatta-substrate/1",
+  "substrates": [
+    {
+      "label": "nyc-lower-manhattan-2026-10",
+      "title": "Lower Manhattan and the Brooklyn waterfront, compiled from NYC public records",
+      "path": "nyc-lower-manhattan-2026-10",
+      "manifestHash": "sha256:c37b1a1ff534862fb5e441ffcac9bade0477f78a0af46d2608adf8b9f6e40c62",
+      "bounds": [
+        -74.0237356,
+        40.6974777,
+        -73.9934453,
+        40.7205308
+      ]
+    }
+  ]
+}

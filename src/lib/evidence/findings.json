@@ -63,6 +63,31 @@
       "mismatchedMeanSigned": 3.75
     }
   },
+  "classification/C4-synthetic-semantic-agreement": {
+    "title": "Synthetic diagnostic benchmark: does the classifier recover known composition?",
+    "domain": "classification",
+    "tier": "synthetic-diagnostic",
+    "verdict": {
+      "status": "inconclusive",
+      "statement": "Not run: 0 synthetic scenes and 0 classifier predictions are frozen, so the synthetic diagnostic benchmark has nothing to score. No agreement is claimed."
+    },
+    "findings": {
+      "frozenScenes": 0,
+      "scoredScenes": 0,
+      "excludedScenes": 0,
+      "predictions": 0,
+      "totalCompositionErrorPP": null,
+      "perviousShareMaePP": null,
+      "perviousShareBiasPP": null,
+      "vegetationMaePP": null,
+      "pavementMaePP": null,
+      "buildingsMaePP": null,
+      "bareSoilMaePP": null,
+      "waterMaePP": null,
+      "repeatSdPP": null,
+      "maxRepeatRangePP": null
+    }
+  },
   "hydrology/H1-cross-model-consistency": {
     "title": "Do the bulk budget and the routing engine agree on the same inputs?",
     "domain": "hydrology",
@@ -290,6 +315,37 @@
       "exampleNowRunoffMaxM3": 29094,
       "exampleAchievedMin": 31.6,
       "exampleTarget": 37
+    }
+  },
+  "substrate/S1-substrate-determinism": {
+    "title": "Does the substrate compiler reproduce the same spatial state from the same frozen inputs?",
+    "domain": "substrate",
+    "tier": "repeated-measurement",
+    "verdict": {
+      "status": "supported",
+      "statement": "Three compiles of the frozen sources (two clocks, one seeded record permutation) produced the same 29 tiles byte for byte and the same manifest sha256:c37b1a1ff534; validation found 0 errors and 16 source-data warnings. A study export replayed against the frozen substrate; moving one vertex by 1e-7° in nyc/512/41/47 made replay fail on that tile."
+    },
+    "findings": {
+      "tiles": 29,
+      "localTiles": 25,
+      "contextTiles": 4,
+      "manifestHash": "sha256:c37b1a1ff534862fb5e441ffcac9bade0477f78a0af46d2608adf8b9f6e40c62",
+      "tileIdMismatches": 0,
+      "tileContentMismatches": 0,
+      "geometryMismatches": 0,
+      "tileHashMismatches": 0,
+      "manifestEqualAcrossClocks": true,
+      "permutationInvariant": true,
+      "validationErrors": 0,
+      "validationWarnings": 16,
+      "buildings": 2725,
+      "streetSegments": 1717,
+      "streetGraphNodes": 1118,
+      "streetGraphEdges": 1540,
+      "trees": 2857,
+      "replayTiles": 17,
+      "replayReproduced": true,
+      "tamperDetected": true
     }
   }
 }

@@ -24,6 +24,11 @@ import { StormComparison } from "@/components/StormComparison";
 import { EvidencePanel } from "@/components/analyze/EvidencePanel";
 import { PlanningEnvelope } from "@/components/analyze/PlanningEnvelope";
 import { HowDoWeKnow } from "@/components/analyze/HowDoWeKnow";
+import { UrbanSubstratePanel } from "@/components/analyze/UrbanSubstratePanel";
+import { SubstrateLayer } from "@/components/analyze/SubstrateLayer";
+import { useUrbanSubstrate, type ResolvedSubstrate } from "@/hooks/useUrbanSubstrate";
+import { substrateRunKey } from "@/lib/urban-substrate/identity";
+import { substrateEvidence } from "@/lib/urban-substrate/evidence";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 import { controlledComparison } from "@/lib/counterfactual/controlled";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
@@ -353,6 +358,12 @@ export default function Analyze() {
   /** Real 1609 cover for the analyzed site, or an explicit "not surveyed" state. */
   const welikia1609 = useWelikia1609(analyzedBBox);
 
+  /** Compiled public-record substrate beneath the study extent, or an explicit reason there is none. */
+  const substrate = useUrbanSubstrate(analyzedBBox);
+  const [showSubstrate, setShowSubstrate] = useState(false);
+  // The substrate the current storm pair was routed with; exports describe exactly this one.
+  const [stormSubstrate, setStormSubstrate] = useState<ResolvedSubstrate | null>(null);
+
   /** What each tool has placed, counting only the part that can be modeled. */
   const drawnByType = useMemo(() => {
     const totals: Partial<Record<InterventionKey, { count: number; areaM2: number }>> = {};
@@ -463,6 +474,7 @@ export default function Analyze() {
     setCatalystFuture(null);
     setNowSeal(null);
     setPossibleSeal(null);
+    setStormSubstrate(null);
     setActiveIntervention(null);
     setInterventionFeatures([]);
     setSimWarnings([]);
@@ -565,6 +577,10 @@ export default function Analyze() {
 
     try {
       const extent = boundsToSimBBox(bounds);
+      // NOW and POSSIBLE record the same settled substrate identity (or the same reason there is none).
+      const resolvedSubstrate = stormSubstrate ?? (await substrate.resolve());
+      if (generation !== requestGeneration.current) return;
+      const substrateHash = substrateRunKey(resolvedSubstrate.state);
       const stormDefinition =
         nowSeal?.storm ?? buildStormDefinition(stormRainfallMm, stormResolution);
       const seal = createStormSeal(stormDefinition);
@@ -591,6 +607,7 @@ export default function Analyze() {
         surfaceId: "now",
         stormHash: stormDefinition.hash,
         surfaceHash: nowSurface.surfaceHash,
+        substrateHash,
       });
       if (generation !== requestGeneration.current) return;
 
@@ -616,12 +633,14 @@ export default function Analyze() {
           stormHash: stormDefinition.hash,
           surfaceHash: possibleSurface.surfaceHash,
           expectedElevationHash: nowRun.elevationHash,
+          substrateHash,
         });
         if (generation !== requestGeneration.current) return;
         const areaM2 = bboxAreaKm2(bounds) * 1e6;
         const future = projectFuture(result.land_cover, scenario, areaM2);
         setSimResult(nowRun);
         setStormExtent(extent);
+        setStormSubstrate(resolvedSubstrate);
         setSimWarnings([...nowRun.warnings, ...possibleRun.warnings]);
         setNowSeal(seal);
         setPossibleSeal(seal);
@@ -637,6 +656,7 @@ export default function Analyze() {
       } else {
         setSimResult(nowRun);
         setStormExtent(extent);
+        setStormSubstrate(resolvedSubstrate);
         setSimWarnings(nowRun.warnings);
         setNowSeal(seal);
         workflow.advance("STORM_COMPLETE");
@@ -688,7 +708,8 @@ export default function Analyze() {
     try {
       const size = nowSeal ? LOCAL_GRID[nowSeal.storm.resolution] : 0;
       const elevation = stormExtent && size ? cachedElevation(stormExtent, size, size) : null;
-      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult, extent: stormExtent, elevation });
+      const described = stormSubstrate ?? (substrate.status.phase === "ready" ? { state: substrate.status.state, view: substrate.status.view } : substrate.status.phase === "unavailable" ? { state: substrate.status.state, view: null } : null);
+      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult, extent: stormExtent, elevation, substrate: described ? substrateEvidence(described.state, described.view) : null });
       downloadTextFile(exportFilename(name || "mannahatta-experiment", "json"), JSON.stringify(evidence, null, 2), "application/json");
       toast.success("Experiment evidence exported.");
     } catch {
@@ -752,6 +773,10 @@ export default function Analyze() {
             center={{ lat: view.lat, lng: view.lng }}
             zoom={view.zoom}
           />
+
+          {showSubstrate && substrate.status.phase === "ready" && (
+            <SubstrateLayer map={mapInstance} view={substrate.status.view} />
+          )}
 
           {/* Hydrologic Inundation and Flow Vector Layers */}
           {simResult && showRiskHeatmap && (
@@ -1126,6 +1151,7 @@ export default function Analyze() {
 
                   <EvidencePanel analysis={result} image={capturedTile ?? result.image_data_url} />
                   <HowDoWeKnow />
+                  <UrbanSubstratePanel status={substrate.status} showOnMap={showSubstrate} onShowOnMap={setShowSubstrate} />
 
                   <Historical1609Panel
                     state={welikia1609}
@@ -1518,7 +1544,7 @@ export default function Analyze() {
                     <div className="atlas-exports mt-5">
                       <button type="button" onClick={handleExportExperiment}>
                         <FileJson className="h-4 w-4" aria-hidden="true" />
-                        <span><strong>Experiment evidence (JSON)</strong><small>Question, inputs with evidence status, drawings, assumptions, sealed storm, elevation grid and routed outputs — replayable</small></span>
+                        <span><strong>Experiment evidence (JSON)</strong><small>Question, inputs with evidence status, drawings, assumptions, sealed storm, elevation grid, urban substrate identity and routed outputs — replayable</small></span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <button type="button" onClick={handleExportPDF}>

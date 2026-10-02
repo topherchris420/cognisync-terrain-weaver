@@ -8,6 +8,7 @@ import type { ScientificStatus } from "@/lib/counterfactual/types";
 export type EvidenceStatus =
   | "measured" // instrument or survey observation (elevation, gauge, footprint)
   | "reported" // human reports of an outcome (311 complaints); not a measurement
+  | "reference" // an independent map or remote-sensing product (NLCD); has its own error
   | "inferred" // estimated from observations by a model, e.g. AI land cover
   | "modeled" // computed deterministically from inputs by this instrument's code
   | "assumed" // a coefficient or rate chosen by the authors
@@ -18,6 +19,7 @@ export type EvidenceStatus =
 export const EVIDENCE_META: Record<EvidenceStatus, { label: string; means: string }> = {
   measured: { label: "Measured", means: "Observed by an instrument or survey, with its own error." },
   reported: { label: "Reported", means: "People reported it; absence of a report is not evidence of absence." },
+  reference: { label: "Reference", means: "An independent map or remote-sensing product with its own error; not ground truth." },
   inferred: { label: "Inferred", means: "Estimated from observations by a model; not itself an observation." },
   modeled: { label: "Modeled", means: "Calculated by deterministic code from the inputs shown." },
   assumed: { label: "Assumed", means: "A chosen coefficient or rate. See the assumption registry." },

@@ -3,8 +3,8 @@ import type { SimulationResponse } from "@/lib/simulation-types";
 /**
  * A counterfactual is a controlled experiment: NOW and POSSIBLE must share
  * every input except the intervention. This check makes it impossible for an
- * accidental change of forcing, extent, resolution, land cover, terrain or
- * model to be reported as an intervention effect.
+ * accidental change of forcing, extent, resolution, land cover, terrain,
+ * model or urban substrate to be reported as an intervention effect.
  */
 export interface ControlledVariable {
   id: string;
@@ -35,6 +35,7 @@ const FIXED: Array<[keyof Metadata, string]> = [
   ["elevation_hash", "Elevation surface"],
   ["elevation_status", "Elevation status"],
   ["model", "Routing model version"],
+  ["substrate_hash", "Urban substrate (version, manifest and tiles)"],
 ];
 
 export function controlledComparison(now: SimulationResponse, possible: SimulationResponse): ControlledComparison {

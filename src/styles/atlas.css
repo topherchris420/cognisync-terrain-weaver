@@ -459,3 +459,10 @@
 .atlas-know-list details > p { padding: 0 0 12px; line-height: 1.55; color: hsl(var(--muted-foreground)); text-wrap: pretty; }
 .atlas-know-links { display: flex; flex-wrap: wrap; gap: 10px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; }
 .atlas-know-links a { color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Urban substrate: one collapsed section; provenance and diagnostics one click deeper. */
+.atlas-substrate > summary { list-style: none; cursor: pointer; }
+.atlas-substrate > summary::-webkit-details-marker { display: none; }
+.atlas-substrate > summary .atlas-section-title::after { content: " +"; color: hsl(var(--muted-foreground)); font-weight: 400; }
+.atlas-substrate[open] > summary .atlas-section-title::after { content: " −"; }
+.atlas-substrate small { color: hsl(var(--muted-foreground)); font-size: 10px; }

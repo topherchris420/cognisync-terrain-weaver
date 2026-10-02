@@ -6,6 +6,8 @@ import { LOCAL_HYDROLOGY_MODEL, type ElevationGrid, type SimExtent } from "./hyd
 import type { SimulationResponse } from "./simulation-types";
 import { verifyStormSeal, type StormSeal } from "./storm-identity";
 import type { LandCover } from "./types";
+import { SUBSTRATE_NONE, type SubstrateEvidence } from "./urban-substrate/identity";
+import { verifySubstrateIdentity, type SubstrateMismatch, type SubstrateReader } from "./urban-substrate/replay";
 
 /**
  * EXPORT → IMPORT → VERIFY INPUTS → RERUN → COMPARE.
@@ -14,6 +16,10 @@ import type { LandCover } from "./types";
  * every check separately, so a failure says exactly what no longer holds.
  * A result from an older routing model is re-run with the current one and
  * reported as a comparison, not as a reproduction.
+ *
+ * An experiment that used an urban substrate is replayed only against that
+ * exact substrate: every recorded tile must be found and must hash to the
+ * recorded value. Current data is never substituted.
  */
 export interface ReplayCheck {
   id: string;
@@ -26,7 +32,14 @@ export interface ReplayReport {
   reproduced: boolean;
   sameModel: boolean;
   checks: ReplayCheck[];
+  /** Substrate tiles or manifest that could not be reconstructed, for diagnostics. */
+  substrateMismatches: SubstrateMismatch[];
   rerun: { now: SimulationResponse; possible: SimulationResponse | null } | null;
+}
+
+export interface ReplayOptions {
+  /** Where to find the substrate the experiment claims (e.g. public/substrate/<label>). */
+  substrate?: SubstrateReader | null;
 }
 
 interface ReplayableExport {
@@ -40,6 +53,7 @@ interface ReplayableExport {
     elevation: (Omit<ElevationGrid, "warnings"> & { warnings?: string[] }) | null;
   };
   results: { now: SimulationResponse | null; possible: SimulationResponse | null };
+  substrate?: SubstrateEvidence | null;
   [key: string]: unknown;
 }
 
@@ -53,9 +67,10 @@ function close(a: number | undefined, b: number | undefined) {
   return Math.abs(a - b) <= TOLERANCE * Math.max(1, Math.abs(a), Math.abs(b));
 }
 
-export function replayExperiment(exported: ReplayableExport): ReplayReport {
+export function replayExperiment(exported: ReplayableExport, options: ReplayOptions = {}): ReplayReport {
   const checks: ReplayCheck[] = [];
   const add = (id: string, label: string, passed: boolean, detail: string) => checks.push({ id, label, passed, detail });
+  let substrateMismatches: SubstrateMismatch[] = [];
 
   const { evidenceHash, ...evidence } = exported;
   const recomputed = stableHash(evidence);
@@ -68,7 +83,24 @@ export function replayExperiment(exported: ReplayableExport): ReplayReport {
   const grid = exported.inputs?.elevation ?? null;
   const now = exported.results.now;
   add("inputs-present", "Extent and elevation embedded", Boolean(extent && grid && now), extent && grid ? `${grid.rows}×${grid.cols} grid` : "missing: export was made without replay inputs");
-  if (!storm || !extent || !grid || !now) return { reproduced: false, sameModel: false, checks, rerun: null };
+
+  // The substrate the runs recorded must be the one the export describes, and it must reconstruct.
+  const recordedSubstrate = now?.metadata.substrate_hash;
+  const described = exported.substrate ?? null;
+  if (!described) {
+    const none = recordedSubstrate === undefined || recordedSubstrate === SUBSTRATE_NONE;
+    add("substrate", "Urban substrate", none, none ? (recordedSubstrate === undefined ? "not recorded (export predates substrate identity)" : "none consulted") : `runs claim ${recordedSubstrate}, which the export does not describe`);
+  } else if (described.state.status !== "loaded") {
+    const consistent = recordedSubstrate === undefined || recordedSubstrate === described.state.identityHash;
+    add("substrate", "Urban substrate", consistent, `${described.state.status}: ${described.state.reason}${consistent ? "" : ` (runs recorded ${recordedSubstrate})`}`);
+  } else {
+    const consistent = recordedSubstrate === described.state.identityHash;
+    add("substrate-runs", "Runs used the described substrate", consistent, consistent ? described.state.identityHash : `runs recorded ${recordedSubstrate ?? "(nothing)"}, export describes ${described.state.identityHash}`);
+    const verification = verifySubstrateIdentity(described.state, options.substrate ?? null);
+    for (const check of verification.checks) add(check.id, check.label, check.passed, check.detail);
+    substrateMismatches = verification.mismatches;
+  }
+  if (!storm || !extent || !grid || !now) return { reproduced: false, sameModel: false, checks, substrateMismatches, rerun: null };
 
   const gridHash = stableHash(grid.values);
   add("elevation-hash", "Elevation grid identity", gridHash === grid.hash && gridHash === now.metadata.elevation_hash, `${gridHash}${gridHash === now.metadata.elevation_hash ? "" : ` ≠ routed ${now.metadata.elevation_hash}`}`);
@@ -83,6 +115,8 @@ export function replayExperiment(exported: ReplayableExport): ReplayReport {
     landCover: exported.study.landCover,
     stormHash: storm.storm.hash,
     elevation,
+    // Re-route under the substrate identity the runs recorded (verified above).
+    ...(recordedSubstrate !== undefined ? { substrateHash: recordedSubstrate } : {}),
   };
   const rerunNow = routeWatershed({ ...base, surfaceId: "now", surfaceHash: now.metadata.surface_hash ?? "now" });
   const possible = exported.results.possible;
@@ -122,6 +156,7 @@ export function replayExperiment(exported: ReplayableExport): ReplayReport {
     reproduced: checks.every((c) => c.passed),
     sameModel,
     checks,
+    substrateMismatches,
     rerun: { now: rerunNow, possible: rerunPossible },
   };
 }

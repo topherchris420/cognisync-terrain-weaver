@@ -98,15 +98,32 @@ MCP currently exposes scan read/write operations and deterministic land-cover sc
 
 The old `/tactical` operating-picture demonstration generated synthetic hazards around arbitrary coordinates. It is retired from public navigation; existing links now explain the limitation and return to the actual workstation. Its internal demo components remain in the repository for traceable future work.
 
+## Urban substrate
+
+Beneath every study sits a compiled, versioned city state: building footprints, street centrelines and their graph, shoreline and open water, street trees, park properties, NLCD reference land cover and ground elevation, compiled from NYC and federal open data into deterministic 512 m tiles (2,048 m simplified context tiles beyond).
+
+```
+public records → frozen source fixtures → normalised records → deterministic tiles + manifest → study extent → experiment → replay
+```
+
+- **Provenance.** Each source keeps its provider, dataset id and version stamp, exact query, retrieval time, licence and record-set SHA-256; every layer and attribute names its evidence status (measured, reported, reference, modeled). Unknown values stay `null` and are counted, never filled.
+- **Determinism.** The same records compile to byte-identical tiles and the same manifest hash, whatever the clock or record order ([S1](experiments/substrate/S1-substrate-determinism/REPORT.md)); `npm run validate` also proves the published tiles are exactly what the frozen sources compile to.
+- **Identity in every experiment.** Each routed run records the substrate it was made with; NOW and POSSIBLE must share it; exports carry the tile ids and hashes; replay reconstructs every tile or fails with the tile, the expected hash and the actual one.
+- **Limits.** One 2.56 km square of Lower Manhattan for now (elsewhere: "outside coverage"). The substrate is reproducible, not validated. D8 routing does not read its geometry yet, and nothing in it changes the AI land cover. Its surface-flow graph is an experimental structure for a future D8 comparison, not a drainage model.
+
+A synthetic perception benchmark foundation sends only RGB to the classifier and scores it against scenes with known composition, e.g. nadir renders from BoundlessNYC. It is labelled a **synthetic diagnostic benchmark**, never real-world accuracy; its experiment ([C4](experiments/classification/C4-synthetic-semantic-agreement/REPORT.md)) has no frozen scenes yet and reports inconclusive.
+
+The compiler, tiling, near/far loading, junction clustering and source documentation follow ideas from [BoundlessNYC](https://github.com/mkturkcan/boundless-nyc) by Mehmet Kerem Turkcan (MIT code; ODbL compiled city), reimplemented here; no BoundlessNYC code or data is included. Details, tile format and limitations: [docs/urban-substrate.md](docs/urban-substrate.md).
+
 ## Evidence that travels
 
 | Export | Included | Boundary |
 |---|---|---|
 | CSV / GeoJSON | Study identity, extent, cover, score, model label, example/provenance status and caveat | Geometry is the study boundary, not a flood extent |
 | PDF | Analysis summary, explicit provenance labels on every page, optional aggregate scenario | Does not contain the routed storm pair |
-| Experiment JSON (v2) | Question, every key value with its evidence status, model/assumption versions and code commit, cover, extent, drawings, registry, sealed storm, **elevation grid**, routed outputs, the controlled-variable check, validation evidence, evidence hash | Does not embed imagery, so the classification itself cannot be replayed |
+| Experiment JSON (v3) | Question, every key value with its evidence status, model/assumption versions and code commit, cover, extent, drawings, registry, sealed storm, **elevation grid**, **urban substrate identity** (version, manifest hash, tile hashes, sources), routed outputs, the controlled-variable check, validation evidence, evidence hash | Does not embed imagery, so the classification itself cannot be replayed |
 
-`npm run replay -- study.json` verifies the evidence hash, storm seal and elevation identity, re-routes NOW and POSSIBLE and compares every volume; a tampered file fails. A NOW/POSSIBLE pair is only exported as a comparison if storm, extent, resolution, land cover, terrain and model are identical and only the drawn surface differs. The evidence hash is not a cryptographic signature. The share action still reopens a **map view**; in-app import remains future work.
+`npm run replay -- study.json` verifies the evidence hash, storm seal and elevation identity, reconstructs every recorded substrate tile from its hash, re-routes NOW and POSSIBLE and compares every volume; a tampered file or tile fails. A NOW/POSSIBLE pair is only exported as a comparison if storm, extent, resolution, land cover, terrain, model and urban substrate are identical and only the drawn surface differs. The evidence hash is not a cryptographic signature. The share action still reopens a **map view**; in-app import remains future work.
 
 ## Architecture
 
@@ -123,6 +140,8 @@ The old `/tactical` operating-picture demonstration generated synthetic hazards 
 | Evidence status, ledger, assumption registry | `src/lib/evidence/`, `src/lib/assumptions/registry.ts` |
 | AI classification and persistence | Supabase `analyze-terrain`; shared `land-cover.ts` contract |
 | Agent interfaces | `src/lib/mcp/`; generated Supabase MCP bundle |
+| Urban substrate (compiler, tiles, graphs, loader, replay checks) | `src/lib/urban-substrate/`, `public/substrate/`, `scripts/substrate.ts`, `docs/urban-substrate.md` |
+| Synthetic perception benchmark | `src/lib/perception/`, `scripts/synthetic-benchmark.ts` |
 
 The local D8 engine is the main workstation path. The separate `run-simulation` edge function and Python reference backend still exist; they are not prerequisites for local storm experiments. Large map/application bundles remain a performance limitation.
 
@@ -149,7 +168,7 @@ npm run build
 Tests cover coefficient synchronization, water balance, geometry constraints, paired identities, async staleness, cost allocation, classification contracts, sensitivity, provenance, exports and replay. Passing tests establishes implementation consistency, **not empirical flood validation**. That is what the experiments are for:
 
 ```bash
-npm run validate        # re-run every experiment on frozen fixtures; fails if a committed result changed
+npm run validate        # re-run every experiment on frozen fixtures and recompile the substrate; fails if anything committed changed
 npm run experiment      # re-run and rewrite reports
 ```
 
@@ -157,7 +176,7 @@ See [implementation evidence and remaining gaps](docs/counterfactual-instrument.
 
 ## How we test the model
 
-Thirteen experiments compare the model with analytic answers, with itself, with independent reference data and with reported outcomes. They run on frozen fixtures in CI, and every report states its question, inputs, result and limitations. Full list: [experiments/INDEX.md](experiments/INDEX.md). One example, end to end:
+Fifteen experiments compare the model with analytic answers, with itself, with independent reference data and with reported outcomes (one, the synthetic diagnostic C4, has no frozen scenes yet). They run on frozen fixtures in CI, and every report states its question, inputs, result and limitations. Full list: [experiments/INDEX.md](experiments/INDEX.md). One example, end to end:
 
 | Step | Routed hotspots against reported street flooding |
 |---|---|
@@ -177,6 +196,7 @@ Other results, briefly:
 | Two water models | each other | 24.8 pp disagreement → 0 after unifying coefficients |
 | Coefficients | NRCS curve numbers | no depth dependence; soil and roof wires tripped |
 | Interventions | the model's own uncertainty | a 1,500 m² bioswale cuts routed runoff 0.18%, not 8%; target-sized plans do not survive classification error |
+| Urban substrate | itself, recompiled under two clocks and a shuffled record order | 29 tiles byte-identical, 0 validation errors; moving one vertex 1 cm fails replay on that tile |
 
 Negative results stay in the record. [REVISIONS](experiments/REVISIONS.md) lists every change measurement caused and everything it did not fix.
 

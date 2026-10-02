@@ -56,6 +56,12 @@ export interface LocalStormInput {
   surfaceHash: string;
   expectedElevationHash?: string;
   elevation?: ElevationGrid;
+  /**
+   * Identity of the urban substrate the study loaded (urban-substrate/identity).
+   * Recorded as a controlled variable; the D8 routing itself reads no
+   * substrate geometry. Omitted means no substrate was consulted.
+   */
+  substrateHash?: string;
 }
 
 export interface LocalStormResult extends SimulationResponse {
