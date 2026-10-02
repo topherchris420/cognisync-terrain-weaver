@@ -10,7 +10,7 @@
  *
  * Bump ASSUMPTION_REGISTRY_VERSION whenever a value, range or tripwire changes.
  */
-export const ASSUMPTION_REGISTRY_VERSION = "2026-09-29.2";
+export const ASSUMPTION_REGISTRY_VERSION = "2026-10-02.1";
 
 export type AssumptionBasis =
   /** Taken from a cited published range; the chosen point inside it is ours. */
@@ -278,6 +278,27 @@ export const ASSUMPTIONS: Assumption[] = [
       condition: "Revisit whenever the benchmark-derived pervious error moves more than 1 pp away from this default (the machine check covers upward drift).",
       basis: "The default should track the measured error at the resolution users can set (whole percentage points).",
       check: { experiment: "classification/C1-nlcd-agreement", finding: "perviousMaePP", comparison: ">", threshold: 8 },
+    },
+  },
+  {
+    id: "classification.synthetic_recovery_pp",
+    label: "Pervious-share error tolerated before a synthetic diagnostic calls for investigation",
+    value: 6.68,
+    unit: "percentage points of pervious share",
+    basis: "derived",
+    source: "classification/C1-nlcd-agreement: perviousMaePP, the classifier's measured disagreement with NLCD 2021 on real frames",
+    sourceDate: "2026-09-29",
+    geography: "Threshold measured on 16 real US frames; applied to rendered synthetic scenes (C4)",
+    range: null,
+    limitation:
+      "Synthetic-to-real domain shift: neither agreement nor disagreement on rendered scenes establishes accuracy on real imagery, and a large synthetic error may come from rendering rather than the classifier.",
+    usedBy: ["src/lib/validation/experiments/classification.ts (C4)"],
+    tripwire: {
+      condition:
+        "Investigate the classifier if its mean pervious-share error on frozen nadir synthetic scenes with exact ground truth exceeds its measured disagreement with NLCD on real frames. Not evaluable until synthetic scenes and predictions are frozen. A tripped wire never changes the sensitivity default or any real-world claim by itself.",
+      basis:
+        "Derived from measured performance, not chosen: a classifier that cannot recover exact, known composition within the error it already shows against an independent real-world reference has a recovery problem that the real benchmark cannot separate from NLCD's own error.",
+      check: { experiment: "classification/C4-synthetic-semantic-agreement", finding: "perviousShareMaePP", comparison: ">", threshold: 6.68 },
     },
   },
   {

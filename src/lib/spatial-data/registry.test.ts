@@ -13,7 +13,8 @@ describe("official spatial source registry", () => {
     expect(SPATIAL_SOURCE_REGISTRY["nyc-building-footprints"].socrataResourceId).toBe("5zhs-2jue");
     expect(SPATIAL_SOURCE_REGISTRY["nyc-roadbed"].socrataResourceId).toBe("i36f-5ih7");
     expect(SPATIAL_SOURCE_REGISTRY["nyc-sidewalk"].socrataResourceId).toBe("52n9-sdep");
-    expect(SPATIAL_SOURCE_REGISTRY["nyc-hydrography"].socrataResourceId).toBe("6hbv-tek4");
+    // Water bodies, not "Hydrography Structures" (6hbv-tek4: piers and jetties).
+    expect(SPATIAL_SOURCE_REGISTRY["nyc-hydrography"].socrataResourceId).toBe("pjs3-c3z5");
     expect(SPATIAL_SOURCE_REGISTRY["nyc-tree-inventory"].socrataResourceId).toBe("uvpi-gqnh");
     expect(SPATIAL_SOURCE_REGISTRY["usgs-3dep"].displayClass).toBeNull();
   });

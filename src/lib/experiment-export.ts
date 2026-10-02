@@ -12,8 +12,13 @@ import { verifyStormSeal } from "./storm-identity";
 import { INTERVENTIONS, type Scenario } from "./scenario";
 import type { AnalysisRecord } from "./types";
 import { modelVersions } from "./validation/experiment";
+import { SUBSTRATE_NONE, type SubstrateEvidence } from "./urban-substrate/identity";
 
-export const EXPERIMENT_SCHEMA = "mannahatta-experiment-v2";
+/**
+ * v3 (2026-10-02): adds the urban substrate an experiment used (identity,
+ * tile hashes, sources, coverage, diagnostics). Replay still reads v2.
+ */
+export const EXPERIMENT_SCHEMA = "mannahatta-experiment-v3";
 
 /** Build identity injected by Vite (VITE_GIT_COMMIT or the checkout's HEAD). */
 const CODE_COMMIT: string = (import.meta.env?.VITE_GIT_COMMIT as string | undefined) || "unrecorded";
@@ -38,6 +43,8 @@ export function buildExperimentExport(input: {
   extent?: SimExtent | null;
   /** The routed elevation grid; embedded to make replay possible. */
   elevation?: ElevationGrid | null;
+  /** The urban substrate the study loaded, or why none was available. */
+  substrate?: SubstrateEvidence | null;
   question?: string;
   hypothesis?: string | null;
 }) {
@@ -69,6 +76,15 @@ export function buildExperimentExport(input: {
     );
   if (input.elevation && input.now && input.elevation.hash !== input.now.metadata.elevation_hash)
     throw new Error("Embedded elevation does not match the routed elevation identity.");
+  // Fail closed on substrate identity: a pair must share it, and the export
+  // must describe exactly the substrate the runs recorded.
+  const runSubstrate = input.now?.metadata.substrate_hash ?? null;
+  if (input.possible && input.now && runSubstrate !== (input.possible.metadata.substrate_hash ?? null))
+    throw new Error("Routed results do not share an urban substrate identity.");
+  if (runSubstrate !== null && runSubstrate !== SUBSTRATE_NONE && runSubstrate !== input.substrate?.state.identityHash)
+    throw new Error("Routed results claim an urban substrate the export does not describe.");
+  if (input.substrate && runSubstrate !== null && runSubstrate !== input.substrate.state.identityHash)
+    throw new Error("The described urban substrate is not the one the routed results used.");
 
   const analysis = input.analysis;
   const exampleCover = analysis.status === "example";
@@ -114,6 +130,7 @@ export function buildExperimentExport(input: {
       score: "derived",
       storm: "simulated",
       elevation: input.now?.metadata.elevation_status ?? "not-loaded",
+      substrate: input.substrate?.state.status ?? "not-consulted",
     },
     /** Every number that matters, with its epistemic status. */
     values: {
@@ -141,12 +158,15 @@ export function buildExperimentExport(input: {
         ? { rows: input.elevation.rows, cols: input.elevation.cols, hash: input.elevation.hash, status: input.elevation.status, sourceId: input.elevation.sourceId, values: input.elevation.values }
         : null,
     },
+    substrate: input.substrate ?? null,
     results: { now: input.now, possible: input.possible },
     comparison,
     validationEvidence: EVIDENCE_LEDGER.map((e) => ({ component: e.component, evidence: e.evidence, validation: e.validation, finding: e.finding, experiments: e.experiments })),
     reproducibility: {
       replayable,
-      how: replayable ? "npm run replay -- <this file>: verifies the evidence hash, storm seal and elevation hash, re-routes NOW and POSSIBLE, and compares outputs." : "Not replayable: a routed pair, its extent and its elevation grid are all required.",
+      how: replayable
+        ? `npm run replay -- <this file>: verifies the evidence hash, storm seal and elevation hash${input.substrate?.state.status === "loaded" ? ", reconstructs every recorded substrate tile from its hash" : ""}, re-routes NOW and POSSIBLE, and compares outputs.`
+        : "Not replayable: a routed pair, its extent and its elevation grid are all required.",
       notEmbedded: ["captured imagery (the classification cannot be re-run from this file)"],
     },
     limitations: [
@@ -155,6 +175,7 @@ export function buildExperimentExport(input: {
       ROUTED_ZONES_CAVEAT,
       "Support within the model is not evidence of a real-world outcome.",
       "Imagery is not embedded; land cover is an inferred input. Identity hashes are not signatures.",
+      "The urban substrate is recorded as a controlled variable and as observed/reference context; D8 routing does not read substrate geometry in this version.",
       "Cost rates are unsourced installation assumptions; lifecycle costs excluded.",
     ],
   };

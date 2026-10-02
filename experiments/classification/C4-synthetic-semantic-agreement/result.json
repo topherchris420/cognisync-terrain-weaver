@@ -1,0 +1,31 @@
+{
+  "resultHash": "fnv1a64:6cfb7fdef4937b97",
+  "result": {
+    "verdict": {
+      "status": "inconclusive",
+      "statement": "Not run: 0 synthetic scenes and 0 classifier predictions are frozen, so the synthetic diagnostic benchmark has nothing to score. No agreement is claimed."
+    },
+    "findings": {
+      "frozenScenes": 0,
+      "scoredScenes": 0,
+      "excludedScenes": 0,
+      "predictions": 0,
+      "totalCompositionErrorPP": null,
+      "perviousShareMaePP": null,
+      "perviousShareBiasPP": null,
+      "vegetationMaePP": null,
+      "pavementMaePP": null,
+      "buildingsMaePP": null,
+      "bareSoilMaePP": null,
+      "waterMaePP": null,
+      "repeatSdPP": null,
+      "maxRepeatRangePP": null
+    },
+    "observations": [
+      "The scene contract, BoundlessNYC adapter, metrics and fail-safe classifier mode exist and are unit-tested; the frozen inputs are deliberately empty until scenes are rendered and ingested.",
+      "When scenes exist, the tripwire compares pervious-share error with the 6.68 pp the classifier disagrees with NLCD on real frames (C1). A tripped wire calls for investigating the classifier; it never changes a real-world claim by itself.",
+      "Synthetic agreement does not establish classifier accuracy on real imagery (synthetic-to-real domain shift)."
+    ],
+    "tables": []
+  }
+}

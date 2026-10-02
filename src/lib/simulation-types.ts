@@ -63,6 +63,8 @@ export interface SimulationResponse {
     extent_hash?: string;
     land_cover_hash?: string;
     modifier_hash?: string;
+    /** Urban substrate identity the run was made with ("substrate:none" when none was consulted). */
+    substrate_hash?: string;
   };
 }
 

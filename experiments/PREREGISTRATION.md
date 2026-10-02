@@ -155,3 +155,30 @@ below 0 m are receiving tidal water.** Water reaching them leaves the land
 system, exactly as at the extent boundary. The development analysis is re-run
 with this model; the holdout is still evaluated once, on the model as frozen
 after this addendum.
+
+## Addendum 4 — 2026-10-02, urban substrate and synthetic diagnostics
+
+Written with the code that implements them, before S1 was first run and
+before any synthetic scene or prediction existed.
+
+1. **S1 (substrate determinism).** Question: does the urban substrate
+   compiler produce the same experiment-relevant spatial state from the same
+   frozen inputs? Inputs: the nine frozen sources under
+   `experiments/data/substrate/nyc-lower-manhattan/`. Procedure: compile twice
+   with different non-authoritative timestamps and commits, and a third time
+   with every record list permuted by `mulberry32(1609)`. **Pass only if all
+   hold:** zero tile-id, tile-byte, geometry and tile-hash mismatches; equal
+   manifest hashes; zero validation errors (warnings are reported, not
+   failed); a study export routed on the example extent with that substrate
+   replays; and moving one footprint vertex by 1e-7° in `nyc/512/41/47` makes
+   the same replay fail and name that tile. Any other outcome is recorded as
+   not supported.
+2. **C4 (synthetic semantic agreement).** Registered as C4 because C3 is the
+   stored-score audit. Tier: synthetic diagnostic benchmark, never described
+   as real-world accuracy. Only nadir scenes are scored; scenes rendered with
+   MetaHuman-derived pedestrians are refused. The classifier receives the RGB
+   image only. The one machine-checked threshold is derived, not chosen: the
+   classifier's measured pervious-share disagreement with NLCD on real frames
+   (C1, 6.68 pp). Any synthetic-specific threshold will be added here, dated,
+   before the predictions it judges are read. No favourable number is
+   assumed: with no frozen scenes the experiment reports inconclusive.

@@ -24,6 +24,7 @@ const VERDICT_WORD: Record<ExperimentResult["verdict"]["status"], string> = {
 
 const TIER_MEANING: Record<ExperimentSpec["tier"], string> = {
   "synthetic-verification": "Synthetic verification: does the code reproduce known analytic answers?",
+  "synthetic-diagnostic": "Synthetic diagnostic benchmark: agreement with known ground truth in rendered scenes. Says nothing about accuracy on real imagery.",
   "internal-consistency": "Internal consistency: do the instrument's own parts agree? Says nothing about nature.",
   "repeated-measurement": "Repeated measurement: how stable is an output under repetition or resampling?",
   "reference-model": "Reference model: comparison with an independent published model, not with observations.",

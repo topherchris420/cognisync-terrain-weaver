@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Analyze from "./Analyze";
@@ -62,7 +62,9 @@ describe("Analyze request lifecycle", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
-    expect(mocks.storm).toHaveBeenCalledTimes(1);
+    // The storm first settles the study's urban substrate identity, then routes.
+    await waitFor(() => expect(mocks.storm).toHaveBeenCalledTimes(1));
+    expect(mocks.storm.mock.calls[0][0].substrateHash).toMatch(/^substrate:|^sha256:/);
     expect(screen.getByRole("button", { name: "Reset" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     await act(async () => { storm.resolve(undefined as never); });

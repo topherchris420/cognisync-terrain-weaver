@@ -96,6 +96,15 @@ export const EVIDENCE_LEDGER: LedgerEntry[] = [
     experiments: ["hydrology/H1-cross-model-consistency"],
   },
   {
+    id: "substrate",
+    question: "What is?",
+    component: "Urban substrate (compiled public records)",
+    evidence: "measured",
+    validation: "internally-consistent",
+    finding: `Building footprints, street centrelines, shoreline, trees and reference land cover from NYC and federal open data, compiled into ${finding("substrate/S1-substrate-determinism", "tiles")} versioned tiles that recompile byte for byte from frozen inputs; tampering with one tile fails replay. Reproducibility, not accuracy: the records carry their own survey error, and routing does not read this geometry yet.`,
+    experiments: ["substrate/S1-substrate-determinism"],
+  },
+  {
     id: "elevation",
     question: "What is?",
     component: "Elevation surface",

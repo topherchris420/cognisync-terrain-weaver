@@ -1,0 +1,1604 @@
+{
+  "schemaVersion": "mannahatta-substrate/1",
+  "substrateVersion": "nyc-lower-manhattan-2026-10",
+  "title": "Lower Manhattan and the Brooklyn waterfront, compiled from NYC public records",
+  "generatedAt": "2026-10-02T21:50:23.011Z",
+  "nonAuthoritative": [
+    "generatedAt",
+    "compiler.commit"
+  ],
+  "bounds": [
+    -74.0237356,
+    40.6974777,
+    -73.9934453,
+    40.7205308
+  ],
+  "crs": "EPSG:4326",
+  "grid": {
+    "id": "nyc-local-equirectangular-v1",
+    "projection": "local equirectangular: x = (lon − -74.26)·84515.477, y = (lat − 40.49)·111048.086 (metres); geometry stored as EPSG:4326 rounded to 1e-7°",
+    "origin": [
+      -74.26,
+      40.49
+    ],
+    "metresPerDegree": [
+      84515.477,
+      111048.086
+    ],
+    "referenceLatitude": 40.7,
+    "maxScaleError": 0.0033
+  },
+  "tileSizeMeters": 512,
+  "levels": {
+    "local": {
+      "tileSizeMeters": 512,
+      "description": "Full geometry and every compiled attribute, for the study extent and a buffer."
+    },
+    "context": {
+      "tileSizeMeters": 2048,
+      "description": "Simplified geometry and reduced attributes, for surroundings."
+    }
+  },
+  "sources": [
+    {
+      "sourceId": "mapzen-terrarium",
+      "title": "Terrarium elevation tiles (AWS Terrain Tiles / Mapzen)",
+      "provider": "Mapzen / Linux Foundation Terrain Tiles on AWS (blend of USGS 3DEP and other sources)",
+      "datasetId": null,
+      "url": "https://registry.opendata.aws/terrain-tiles/",
+      "query": "z15 Terrarium PNG tiles: https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9646/12319.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9646/12320.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9646/12321.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9647/12319.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9647/12320.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9647/12321.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9648/12319.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9648/12320.png https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9648/12321.png",
+      "datasetVersion": null,
+      "retrievedAt": "2026-10-02T21:06:15.067Z",
+      "license": "Terrain Tiles attribution (https://github.com/tilezen/joerd/blob/master/docs/attribution.md); USGS 3DEP is public domain",
+      "evidence": "measured",
+      "crs": "EPSG:3857 tiles, sampled at substrate grid cell centres",
+      "recordCount": 25600,
+      "contentHash": "sha256:6525d36ee1ad61b79ba4ebf24d05221be0f38433d25f532468d40dd2eebd51ed",
+      "method": "Bilinear sample (the app's sampleTerrarium) at the centre of every 16 m cell of the substrate grid over the coverage, row-major from the north row, stored as integer centimetres. Grid west/south 19967.998 / 23040.001 m.",
+      "caveats": [
+        "Terrarium blends sources and includes bathymetry; along NYC shorelines it contains artefacts down to −14 km (routing/R3).",
+        "Nominal z15 pixel is about 3.6 m at this latitude; the underlying source resolution varies by place.",
+        "Vertical datum is not stated per tile by the provider."
+      ]
+    },
+    {
+      "sourceId": "nyc-borough-boundaries-shoreline",
+      "title": "Borough Boundaries",
+      "provider": "NYC Department of City Planning",
+      "datasetId": "gthc-hcne",
+      "url": "https://data.cityofnewyork.us/d/gthc-hcne",
+      "query": "https://data.cityofnewyork.us/resource/gthc-hcne.json?%24select=the_geom%2Cborocode%2Cboroname&%24order=borocode&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2026-05-26T19:35:50.000Z",
+      "retrievedAt": "2026-10-02T21:06:15.067Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "measured",
+      "crs": "EPSG:4326 (rounded to 1e-7° after clipping)",
+      "recordCount": 2,
+      "contentHash": "sha256:f590d052ec6810a3ac216d844c304258dbb094ab8e79e637dc0ac7c67c2b88f1",
+      "method": "Shoreline-clipped borough polygons. Before freezing, every ring was clipped (Sutherland–Hodgman, in the substrate grid) to the coverage plus a 64 m margin and rounded to 1e-7°; rings are stored without polygon nesting because land is filled by even-odd parity. Full boundary content hash: sha256:42ea0b7db4c561416f7322eaeac3e3418caa5e9d62a28535619a62a87ab9e054.",
+      "caveats": [
+        "The shoreline is a digitised boundary at an unspecified tide; piers may or may not be included as land.",
+        "Land outside the five boroughs (New Jersey) is not in this dataset and appears as no-data, not water."
+      ]
+    },
+    {
+      "sourceId": "nyc-building-footprints",
+      "title": "BUILDING",
+      "provider": "NYC Office of Technology and Innovation",
+      "datasetId": "5zhs-2jue",
+      "url": "https://data.cityofnewyork.us/d/5zhs-2jue",
+      "query": "https://data.cityofnewyork.us/resource/5zhs-2jue.json?%24select=the_geom%2Cbin%2Cdoitt_id%2Cbase_bbl%2Cmappluto_bbl%2Cconstruction_year%2Cfeature_code%2Cgeom_source%2Cground_elevation%2Cheight_roof%2Clast_status_type&%24where=intersects%28the_geom%2C+%27POLYGON%28%28-74.0237356+40.6974777%2C+-73.9934453+40.6974777%2C+-73.9934453+40.7205308%2C+-74.0237356+40.7205308%2C+-74.0237356+40.6974777%29%29%27%29&%24order=doitt_id&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2026-09-27T11:54:35.000Z",
+      "retrievedAt": "2026-10-02T21:20:46.463Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "measured",
+      "crs": "EPSG:4326 (Socrata geometry)",
+      "recordCount": 2780,
+      "contentHash": "sha256:57f9776c7905621dc27d2920d06242f7867270111cff26875228e4299df40f08",
+      "method": "Every footprint whose geometry intersects the coverage box (Socrata intersects), selected fields only, as returned.",
+      "caveats": [
+        "Footprints are photogrammetric or manually digitised planimetric survey; individual footprints may be outdated.",
+        "height_roof and ground_elevation are in feet and are absent or zero for some records."
+      ]
+    },
+    {
+      "sourceId": "nyc-mappluto",
+      "title": "Primary Land Use Tax Lot Output (PLUTO)",
+      "provider": "NYC Department of City Planning",
+      "datasetId": "64uk-42ks",
+      "url": "https://data.cityofnewyork.us/d/64uk-42ks",
+      "query": "31 batched requests by tax lot (BBL) of the frozen footprints, e.g. https://data.cityofnewyork.us/resource/64uk-42ks.json?%24select=bbl%2Clanduse%2Cnumfloors%2Cbldgclass&%24where=bbl+in%281000020001%2C1000020002%2C1000020003%2C1000020023%2C1000030001%2C1000030002%2C1000030003%2C1000030010%2C1000047501%2C1000050010%2C1000057501%2C1000070027%2C1000070028%2C1000070029%2C1000070030%2C1000070031%2C1000070033%2C1000070035%2C1000070037%2C1000070038%2C1000077501%2C1000077502%2C1000080039%2C1000080044%2C1000080051%2C1000087501%2C1000090001%2C1000090007%2C1000090014%2C1000090029%2C1000100001%2C1000100014%2C1000100015%2C1000100016%2C1000100019%2C1000100023%2C1000100032%2C1000100033%2C1000110001%2C1000110007%2C1000110009%2C1000110010%2C1000110011%2C1000110012%2C1000110014%2C1000110015%2C1000110017%2C1000110021%2C1000110026%2C1000110029%2C1000117501%2C1000120001%2C1000130001%2C1000130005%2C1000130027%2C1000150022%2C1000157501%2C1000157502%2C1000160001%2C1000160003%2C1000160010%2C1000160015%2C1000160020%2C1000160040%2C1000160100%2C1000160120%2C1000160125%2C1000160140%2C1000160150%2C1000160180%2C1000160185%2C1000160195%2C1000160205%2C1000160210%2C1000160215%2C1000160220%2C1000160221%2C1000160225%2C1000160260%2C1000167501%29&%24order=bbl&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2026-08-24T20:48:51.000Z",
+      "retrievedAt": "2026-10-02T21:20:46.463Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "reported",
+      "crs": "none (tabular, joined by BBL)",
+      "recordCount": 2444,
+      "contentHash": "sha256:82167a6c1a85dfa99dcbfdae8e33e7f1b82e885e11d29b3225ca94d010e5ab04",
+      "method": "Tax-lot attributes for the 2458 distinct BBLs referenced by frozen footprints (mappluto_bbl, else base_bbl).",
+      "caveats": [
+        "PLUTO describes tax lots, not buildings: land use is the lot's, and numfloors is the tallest building on the lot.",
+        "Administrative records compiled from several city agencies; not a field survey."
+      ]
+    },
+    {
+      "sourceId": "nyc-parks-properties",
+      "title": "Parks Properties",
+      "provider": "NYC Department of Parks & Recreation",
+      "datasetId": "enfh-gkve",
+      "url": "https://data.cityofnewyork.us/d/enfh-gkve",
+      "query": "https://data.cityofnewyork.us/resource/enfh-gkve.json?%24select=multipolygon%2Cgispropnum%2Csignname%2Ctypecategory%2Csubcategory%2Cacres&%24where=intersects%28multipolygon%2C+%27POLYGON%28%28-74.0237356+40.6974777%2C+-73.9934453+40.6974777%2C+-73.9934453+40.7205308%2C+-74.0237356+40.7205308%2C+-74.0237356+40.6974777%29%29%27%29&%24order=gispropnum&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2026-09-16T20:40:49.000Z",
+      "retrievedAt": "2026-10-02T21:20:46.463Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "reference",
+      "crs": "EPSG:4326 (Socrata geometry)",
+      "recordCount": 42,
+      "contentHash": "sha256:4000664d142c1a8c541cdb885c1c02a86c7a4570916bceee0fb1a18f644a8c2e",
+      "method": "Parks properties intersecting the coverage box, selected fields only, as returned.",
+      "caveats": [
+        "A property boundary, not a vegetation map: plazas, playgrounds and esplanades inside parks are often paved."
+      ]
+    },
+    {
+      "sourceId": "nyc-planimetric-hydrography",
+      "title": "NYC Planimetric Database: Hydrography",
+      "provider": "NYC Office of Technology and Innovation (planimetrics)",
+      "datasetId": "pjs3-c3z5",
+      "url": "https://data.cityofnewyork.us/d/pjs3-c3z5",
+      "query": "https://data.cityofnewyork.us/resource/pjs3-c3z5.json?%24select=the_geom%2Csource_id%2Cname%2Cfeat_code%2Csub_code%2Cstatus&%24where=intersects%28the_geom%2C+%27POLYGON%28%28-74.0237356+40.6974777%2C+-73.9934453+40.6974777%2C+-73.9934453+40.7205308%2C+-74.0237356+40.7205308%2C+-74.0237356+40.6974777%29%29%27%29&%24order=source_id&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2024-04-24T20:08:25.000Z",
+      "retrievedAt": "2026-10-02T21:20:46.463Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "measured",
+      "crs": "EPSG:4326 (Socrata geometry)",
+      "recordCount": 8,
+      "contentHash": "sha256:1d9999962c27dc8aae948e523bfd98c8c049861d43ea5b3f35daddf4dd80c58f",
+      "method": "Hydrography polygons (feature codes 2600–2660: lake, pond, river, stream, wetland, beach, bay) intersecting the coverage box. Capture rules: https://github.com/CityOfNewYork/nyc-planimetrics/blob/master/Capture_Rules.md",
+      "caveats": [
+        "Not the 'Hydrography Structures' layer (6hbv-tek4), which holds piers and jetties, not water.",
+        "Open harbour and river water is mostly absent from this layer; the substrate derives open water from the shoreline instead."
+      ]
+    },
+    {
+      "sourceId": "nyc-street-centerline",
+      "title": "Centerline",
+      "provider": "NYC Office of Technology and Innovation (CSCL)",
+      "datasetId": "inkn-q76z",
+      "url": "https://data.cityofnewyork.us/d/inkn-q76z",
+      "query": "https://data.cityofnewyork.us/resource/inkn-q76z.json?%24select=the_geom%2Cglobalid%2Cphysicalid%2Cfull_street_name%2Crw_type%2Cstatus%2Ctrafdir%2Cstreetwidth%2Cnumber_travel_lanes%2Cnumber_park_lanes%2Cfrom_level_code%2Cto_level_code%2Cnonped&%24where=intersects%28the_geom%2C+%27POLYGON%28%28-74.0237356+40.6974777%2C+-73.9934453+40.6974777%2C+-73.9934453+40.7205308%2C+-74.0237356+40.7205308%2C+-74.0237356+40.6974777%29%29%27%29&%24order=globalid&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2026-09-26T20:40:21.000Z",
+      "retrievedAt": "2026-10-02T21:20:46.463Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "measured",
+      "crs": "EPSG:4326 (Socrata geometry)",
+      "recordCount": 1776,
+      "contentHash": "sha256:3fa8d558ae74eb93418ddc741c03e08cc2f98bf35da606366284c0b2f5cc121a",
+      "method": "Every CSCL segment whose geometry intersects the coverage box, selected fields only, as returned. Field meanings: https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_StreetCenterline.md",
+      "caveats": [
+        "streetwidth is the paved width in feet and is absent for many segments.",
+        "trafdir is relative to the segment's address range; nonped is not documented in the published dictionary.",
+        "Vertical level codes describe grade separation (13 = at grade), not elevation."
+      ]
+    },
+    {
+      "sourceId": "nyc-street-tree-census-2015",
+      "title": "2015 Street Tree Census - Tree Data",
+      "provider": "NYC Department of Parks & Recreation",
+      "datasetId": "uvpi-gqnh",
+      "url": "https://data.cityofnewyork.us/d/uvpi-gqnh",
+      "query": "https://data.cityofnewyork.us/resource/uvpi-gqnh.json?%24select=tree_id%2Clatitude%2Clongitude%2Cstatus%2Cspc_common%2Ctree_dbh%2Chealth&%24where=latitude+between+40.6974777+and+40.7205308+AND+longitude+between+-74.0237356+and+-73.9934453&%24order=tree_id&%24limit=50000",
+      "datasetVersion": "rowsUpdatedAt 2017-10-04T13:41:26.000Z",
+      "retrievedAt": "2026-10-02T21:06:15.067Z",
+      "license": "NYC Open Data Terms of Use (https://www.nyc.gov/home/terms-of-use.page)",
+      "evidence": "measured",
+      "crs": "EPSG:4326 (latitude/longitude fields)",
+      "recordCount": 2857,
+      "contentHash": "sha256:6601d46b80d52fe21abac71daf3c01673337733ac8853f3986376abe155d9503",
+      "method": "Every 2015 census record (alive, dead or stump) in the coverage box.",
+      "caveats": [
+        "Street trees only; trees in parks and private lots are not censused.",
+        "Points, not canopy; the census is from 2015.",
+        "tree_dbh is diameter at breast height in inches."
+      ]
+    },
+    {
+      "sourceId": "usgs-nlcd-2021",
+      "title": "USGS National Land Cover Database 2021: land cover and percent developed imperviousness (CONUS)",
+      "provider": "U.S. Geological Survey / Multi-Resolution Land Characteristics Consortium",
+      "datasetId": "NLCD_2021_Land_Cover_L48; NLCD_2021_Impervious_L48",
+      "url": "https://www.mrlc.gov/data",
+      "query": "https://www.mrlc.gov/geoserver/ows?service=WCS&version=2.0.1&request=GetCoverage&coverageId=mrlc_download__NLCD_2021_Land_Cover_L48&subsettingCrs=http://www.opengis.net/def/crs/EPSG/0/4326&outputCrs=http://www.opengis.net/def/crs/EPSG/0/4326&subset=Long(-74.0237356,-73.9934453)&subset=Lat(40.6974777,40.7205308)&format=text/plain ; https://www.mrlc.gov/geoserver/ows?service=WCS&version=2.0.1&request=GetCoverage&coverageId=mrlc_download__NLCD_2021_Impervious_L48&subsettingCrs=http://www.opengis.net/def/crs/EPSG/0/4326&outputCrs=http://www.opengis.net/def/crs/EPSG/0/4326&subset=Long(-74.0237356,-73.9934453)&subset=Lat(40.6974777,40.7205308)&format=text/plain",
+      "datasetVersion": "NLCD 2021 (release of 2023)",
+      "retrievedAt": "2026-10-02T21:06:15.067Z",
+      "license": "U.S. Government work, public domain",
+      "evidence": "reference",
+      "crs": "EPSG:4326 (server-side nearest-neighbour reprojection of 30 m Albers cells)",
+      "recordCount": 10506,
+      "contentHash": "sha256:dacb2d4df7708ce547cc7aaec1df7237f48fc2d750d3ddda1305a75137a24dff",
+      "method": "Raw class codes and impervious percent per cell over the coverage box, as returned.",
+      "caveats": [
+        "NLCD is a remote-sensing product with its own error; agreement with it is not agreement with ground truth.",
+        "30 m cells; epoch 2021. Buildings and pavement are not separable."
+      ]
+    }
+  ],
+  "compiler": {
+    "name": "mannahatta-urban-substrate-compiler",
+    "version": "1.0.0",
+    "commit": "405e0b1",
+    "configHash": "sha256:d537924220dfaa224853effd69f52348bd2cac11373cb5a7c3a20d9199fd94b8",
+    "config": {
+      "label": "nyc-lower-manhattan-2026-10",
+      "title": "Lower Manhattan and the Brooklyn waterfront, compiled from NYC public records",
+      "region": "nyc",
+      "coverageTiles": {
+        "ixMin": 39,
+        "iyMin": 45,
+        "ixMax": 43,
+        "iyMax": 49
+      },
+      "elevation": {
+        "localCellM": 16,
+        "contextCellM": 64,
+        "artefactBelowM": -50
+      },
+      "water": {
+        "localCellM": 8,
+        "contextCellM": 32
+      },
+      "graph": {
+        "nodeMergeToleranceM": 0.5,
+        "flatSlope": 0.002,
+        "receiverReachM": 40,
+        "lowPointSnapM": 24
+      },
+      "context": {
+        "buildingToleranceM": 2,
+        "streetToleranceM": 4
+      },
+      "randomness": "none"
+    }
+  },
+  "layers": {
+    "buildings": {
+      "id": "buildings",
+      "title": "Building footprints",
+      "evidence": "measured",
+      "geometry": "Polygon / MultiPolygon footprints (EPSG:4326)",
+      "sources": [
+        "nyc-building-footprints",
+        "nyc-mappluto"
+      ],
+      "attributes": [
+        {
+          "name": "footprint",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-building-footprints",
+          "field": "the_geom",
+          "transform": "rounded to 1e-7°, rings closed and oriented; self-intersections flagged, not repaired"
+        },
+        {
+          "name": "footprintAreaM2",
+          "unit": "m²",
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "planar shoelace area in the substrate grid (≤0.33% scale error), outer minus holes"
+        },
+        {
+          "name": "roofPlanAreaM2",
+          "unit": "m²",
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "plan-view roof area taken as the footprint area; overhangs, setbacks and roof pitch ignored"
+        },
+        {
+          "name": "roofHeightM",
+          "unit": "m above ground",
+          "evidence": "measured",
+          "source": "nyc-building-footprints",
+          "field": "height_roof",
+          "transform": "feet × 0.3048; null where the source records 0 or nothing (dictionary: not available)"
+        },
+        {
+          "name": "groundElevationM",
+          "unit": "m (NAVD88 where photogrammetric)",
+          "evidence": "measured",
+          "source": "nyc-building-footprints",
+          "field": "ground_elevation",
+          "transform": "feet × 0.3048; null where absent"
+        },
+        {
+          "name": "constructionYear",
+          "unit": "year",
+          "evidence": "reported",
+          "source": "nyc-building-footprints",
+          "field": "construction_year",
+          "transform": "integer; null where absent or 0"
+        },
+        {
+          "name": "featureType",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-building-footprints",
+          "field": "feature_code",
+          "transform": "code mapped to the data dictionary label"
+        },
+        {
+          "name": "lot.landUse",
+          "unit": null,
+          "evidence": "reported",
+          "source": "nyc-mappluto",
+          "field": "landuse",
+          "transform": "joined by BBL (mappluto_bbl, else base_bbl); the tax lot's land use, not the building's"
+        },
+        {
+          "name": "lot.lotNumFloors",
+          "unit": "floors",
+          "evidence": "reported",
+          "source": "nyc-mappluto",
+          "field": "numfloors",
+          "transform": "floors of the tallest building on the lot; null where 0 or absent"
+        }
+      ],
+      "transformations": [
+        "parse Socrata strings to numbers; feet to metres",
+        "identify by DOITT feature id (BIN where no DOITT id; dummy BINs are not identifiers)",
+        "round coordinates to 1e-7°, drop repeated vertices, close and orient rings",
+        "flag self-intersections without repairing them",
+        "join PLUTO tax-lot attributes by BBL",
+        "assign each footprint to the local tile containing its area-weighted centroid; reference it from every other tile its bounds touch",
+        "context level: outer rings Douglas–Peucker simplified at 2 m; height and area kept"
+      ],
+      "representation": {
+        "local": "full footprint and all attributes",
+        "context": "simplified outer rings, height and area"
+      },
+      "counts": {
+        "local": 2725,
+        "context": 2723
+      },
+      "missing": {
+        "bin": 0,
+        "constructionYear": 46,
+        "groundElevationM": 4,
+        "lot": 16,
+        "roofHeightM": 5
+      },
+      "summary": {
+        "input": 2780,
+        "kept": 2780,
+        "outsideCoverage": 55
+      },
+      "caveats": [
+        "Footprints meet ASPRS Class 1 (±2 ft) where photogrammetric; manually digitised ones are less accurate.",
+        "Roof plan area is the footprint area; roof height is above ground, not above sea level.",
+        "PLUTO land use and floors describe the tax lot, not the individual building."
+      ]
+    },
+    "streets": {
+      "id": "streets",
+      "title": "Street centrelines and modelled surfaces",
+      "evidence": "measured",
+      "geometry": "LineString centrelines; Polygon modelled surfaces",
+      "sources": [
+        "nyc-street-centerline"
+      ],
+      "attributes": [
+        {
+          "name": "geometry",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-street-centerline",
+          "field": "the_geom",
+          "transform": "contiguous MultiLineString parts joined, rounded to 1e-7°, consecutive duplicates removed"
+        },
+        {
+          "name": "lengthM",
+          "unit": "m",
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "planar length in the substrate grid (SHAPE__Length is marked 'do not use' by the provider)"
+        },
+        {
+          "name": "roadClass",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-street-centerline",
+          "field": "rw_type",
+          "transform": "code mapped to the data dictionary label"
+        },
+        {
+          "name": "widthM",
+          "unit": "m",
+          "evidence": "measured",
+          "source": "nyc-street-centerline",
+          "field": "streetwidth",
+          "transform": "paved width in feet × 0.3048; null where 0 or absent"
+        },
+        {
+          "name": "trafficDirection",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-street-centerline",
+          "field": "trafdir",
+          "transform": "FT/TF/TW/NV mapped; relative to the address range, which the street graph assumes runs from the first to the last vertex (CSCL convention, not verified per segment)"
+        },
+        {
+          "name": "travelLanes",
+          "unit": "lanes",
+          "evidence": "measured",
+          "source": "nyc-street-centerline",
+          "field": "number_travel_lanes",
+          "transform": "integer; null where absent"
+        },
+        {
+          "name": "levelCodes",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-street-centerline",
+          "field": "from_level_code, to_level_code",
+          "transform": "raw codes; 13 = at grade, others grade-separated"
+        },
+        {
+          "name": "pedestrianExcluded",
+          "unit": null,
+          "evidence": "modeled",
+          "source": "derived",
+          "field": "nonped, rw_type, status",
+          "transform": "true for non-physical segments, highways, ramps, tunnels, and any non-empty nonped (undocumented; treated conservatively)"
+        },
+        {
+          "name": "surface",
+          "unit": null,
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "centreline offset by half the recorded width; null where the width is unknown; not the planimetric roadbed"
+        },
+        {
+          "name": "surfaceAreaM2",
+          "unit": "m²",
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "planar area of the modelled surface"
+        }
+      ],
+      "transformations": [
+        "join contiguous MultiLineString parts; round coordinates to 1e-7°",
+        "map CSCL codes (rw_type, trafdir, status) to labels; feet to metres",
+        "mark segments not on the ground (paper streets, non-physical segments, ferry routes)",
+        "offset centrelines by half the recorded width to model a street surface where the width is known",
+        "assign each segment to the tile containing its length midpoint; reference it from every other tile it crosses",
+        "context level: Douglas–Peucker at 4 m; class and width kept; physical segments only"
+      ],
+      "representation": {
+        "local": "full centrelines, attributes and modelled surfaces",
+        "context": "simplified physical centrelines with class and width"
+      },
+      "counts": {
+        "local": 1717,
+        "context": 1540
+      },
+      "missing": {
+        "name": 0,
+        "trafficDirection": 0,
+        "travelLanes": 347,
+        "widthM": 495
+      },
+      "summary": {
+        "input": 1776,
+        "kept": 1776,
+        "outsideCoverage": 59
+      },
+      "caveats": [
+        "Modelled surfaces ignore medians, curb returns and junction geometry; they are not the planimetric roadbed.",
+        "Widths are unknown for a large share of segments and are never filled."
+      ]
+    },
+    "streetGraph": {
+      "id": "streetGraph",
+      "title": "Street graph",
+      "evidence": "modeled",
+      "geometry": "nodes (intersections, endpoints, continuations) and edges (physical street segments)",
+      "sources": [
+        "nyc-street-centerline",
+        "mapzen-terrarium"
+      ],
+      "attributes": [
+        {
+          "name": "nodes",
+          "unit": null,
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "segment endpoints merged within 0.5 m on the same CSCL level"
+        },
+        {
+          "name": "elevationM",
+          "unit": "m",
+          "evidence": "modeled",
+          "source": "mapzen-terrarium",
+          "field": null,
+          "transform": "bilinear sample of the elevation lattice at at-grade nodes; null near artefacts or not at grade"
+        },
+        {
+          "name": "slope",
+          "unit": "m/m",
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "(to − from elevation) / length for at-grade edges"
+        }
+      ],
+      "transformations": [
+        "endpoint keys from rounded positions and level codes",
+        "union-find merge within tolerance",
+        "degree and kind from compiled edges",
+        "boundary flag where the coverage truncates topology",
+        "node owned by its tile (boundary nodes outside coverage by their first edge's tile); edge owned with its segment"
+      ],
+      "representation": {
+        "local": "nodes and edges with external-node references",
+        "context": "absent"
+      },
+      "counts": {
+        "local": 1540,
+        "context": 0
+      },
+      "missing": {},
+      "summary": {
+        "boundaryNodes": 35,
+        "endpoints": 3080,
+        "maxMergeDistanceM": 0,
+        "mergedEndpoints": 0,
+        "nodes": 1118,
+        "nodesWithoutElevation": 279,
+        "selfLoops": 0
+      },
+      "caveats": [
+        "Topology only: no turn restrictions, signals or lane connectivity.",
+        "Traffic direction assumes the address range runs from the first to the last vertex."
+      ]
+    },
+    "pedestrianGraph": {
+      "id": "pedestrianGraph",
+      "title": "Pedestrian access (centreline level)",
+      "evidence": "modeled",
+      "geometry": "subset of street-graph edges",
+      "sources": [
+        "nyc-street-centerline"
+      ],
+      "attributes": [
+        {
+          "name": "excluded",
+          "unit": null,
+          "evidence": "modeled",
+          "source": "derived",
+          "field": "nonped, rw_type, status",
+          "transform": "excluded with a reason: not physical, highway/ramp/tunnel, or a non-empty nonped flag"
+        }
+      ],
+      "transformations": [
+        "classify each street-graph edge as usable by pedestrians or excluded, with the reason"
+      ],
+      "representation": {
+        "local": "edge ids and exclusions",
+        "context": "absent"
+      },
+      "counts": {
+        "local": 1147,
+        "context": 0
+      },
+      "missing": {},
+      "summary": {
+        "excluded": 393
+      },
+      "caveats": [
+        "Not sidewalk geometry: both sides of a street are one edge.",
+        "nonped is undocumented in the published dictionary and is treated conservatively."
+      ]
+    },
+    "surfaceFlowGraph": {
+      "id": "surfaceFlowGraph",
+      "title": "Surface-flow structure (experimental)",
+      "evidence": "modeled",
+      "geometry": "street nodes, terrain low points and open-water receivers with oriented links",
+      "sources": [
+        "nyc-street-centerline",
+        "mapzen-terrarium",
+        "nyc-borough-boundaries-shoreline"
+      ],
+      "attributes": [
+        {
+          "name": "edges",
+          "unit": null,
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "street edges oriented downhill (flat below 0.002); sinks within 40 m of open water linked to it; terrain low points linked to the nearest street node within 24 m"
+        }
+      ],
+      "transformations": [
+        "orient at-grade street edges by sampled elevation",
+        "identify street-network sinks",
+        "link sinks to open-water receivers",
+        "detect strict terrain low points on land above 0 m",
+        "link low points to nearby street nodes"
+      ],
+      "representation": {
+        "local": "nodes, edges and external-node references",
+        "context": "absent"
+      },
+      "counts": {
+        "local": 1342,
+        "context": 0
+      },
+      "missing": {},
+      "summary": {
+        "streetNodes": 839,
+        "downhillEdges": 1021,
+        "flatEdges": 197,
+        "streetSinks": 142,
+        "sinksLinkedToWater": 23,
+        "waterReceivers": 13,
+        "lowPoints": 352,
+        "lowPointsLinked": 101
+      },
+      "caveats": [
+        "Experimental structure for a future comparison with D8; not used by any routed result.",
+        "Not a sewer or drainage-network model: no pipes, inlets, capacities, volumes or timing.",
+        "Street grades come from sampled ground elevation at nodes; grade-separated edges are excluded."
+      ]
+    },
+    "elevation": {
+      "id": "elevation",
+      "title": "Ground elevation",
+      "evidence": "measured",
+      "geometry": "north-up grids: 16 m (local), 64 m (context)",
+      "sources": [
+        "mapzen-terrarium"
+      ],
+      "attributes": [
+        {
+          "name": "valuesCm",
+          "unit": "cm",
+          "evidence": "measured",
+          "source": "mapzen-terrarium",
+          "field": "Terrarium RGB",
+          "transform": "bilinear sample at local-cell centres, integer centimetres; context cells are the mean of 4 × 4 local cells, null if any is missing"
+        }
+      ],
+      "transformations": [
+        "sample Terrarium at local cell centres (at fetch)",
+        "store integer centimetres",
+        "aggregate whole local cells for context"
+      ],
+      "representation": {
+        "local": "16 m cells",
+        "context": "64 m cells"
+      },
+      "counts": {
+        "local": 25,
+        "context": 4
+      },
+      "missing": {
+        "tilesWithoutElevation": 0
+      },
+      "summary": {
+        "artefactCells": 98,
+        "nullCells": 0
+      },
+      "caveats": [
+        "Terrarium blends sources and includes bathymetry; shoreline artefacts far below sea level are kept and counted, not repaired.",
+        "The app's storm routing still loads elevation itself; this layer is the substrate's own record and is not substituted into routed experiments.",
+        "No synthetic or illustrative elevation is ever written into the substrate."
+      ]
+    },
+    "landCover": {
+      "id": "landCover",
+      "title": "Reference land cover (NLCD 2021)",
+      "evidence": "reference",
+      "geometry": "per-tile class counts and reference shares",
+      "sources": [
+        "usgs-nlcd-2021"
+      ],
+      "attributes": [
+        {
+          "name": "classCounts",
+          "unit": "cells",
+          "evidence": "reference",
+          "source": "usgs-nlcd-2021",
+          "field": "land cover class",
+          "transform": "count of 30 m cells whose centre falls in the tile and the coverage"
+        },
+        {
+          "name": "reference",
+          "unit": "% of reference cells",
+          "evidence": "reference",
+          "source": "usgs-nlcd-2021",
+          "field": "class, impervious",
+          "transform": "water = class 11 share; impervious = mean percent imperviousness of non-water cells over all cells; pervious = remainder"
+        }
+      ],
+      "transformations": [
+        "assign 30 m cells to tiles by centre",
+        "count classes; compute water, impervious and pervious shares"
+      ],
+      "representation": {
+        "local": "per-tile summary",
+        "context": "per-tile summary"
+      },
+      "counts": {
+        "local": 25,
+        "context": 4
+      },
+      "missing": {},
+      "summary": {
+        "cells": 5039
+      },
+      "caveats": [
+        "A reference map with its own error, kept separate from the AI classification and never written into it.",
+        "Buildings and pavement are not separable; epoch 2021."
+      ]
+    },
+    "vegetation": {
+      "id": "vegetation",
+      "title": "Street trees and park properties",
+      "evidence": "measured",
+      "geometry": "tree points; park property polygons",
+      "sources": [
+        "nyc-street-tree-census-2015",
+        "nyc-parks-properties"
+      ],
+      "attributes": [
+        {
+          "name": "trees.position",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-street-tree-census-2015",
+          "field": "latitude, longitude",
+          "transform": "rounded to 1e-7°"
+        },
+        {
+          "name": "trees.dbhCm",
+          "unit": "cm",
+          "evidence": "measured",
+          "source": "nyc-street-tree-census-2015",
+          "field": "tree_dbh",
+          "transform": "inches × 2.54; null where 0 or absent (stumps record 0)"
+        },
+        {
+          "name": "trees.status",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-street-tree-census-2015",
+          "field": "status",
+          "transform": "as recorded in 2015 (Alive, Dead, Stump)"
+        },
+        {
+          "name": "parkProperties.geometry",
+          "unit": null,
+          "evidence": "reference",
+          "source": "nyc-parks-properties",
+          "field": "multipolygon",
+          "transform": "normalised like footprints; a property boundary, not vegetation"
+        }
+      ],
+      "transformations": [
+        "round positions; inches to centimetres",
+        "normalise park polygons",
+        "assign trees by position and parks by centroid"
+      ],
+      "representation": {
+        "local": "trees and park properties",
+        "context": "counts only"
+      },
+      "counts": {
+        "local": 2857,
+        "context": 2857
+      },
+      "missing": {
+        "dbhCm": 34,
+        "speciesCommon": 112
+      },
+      "summary": {
+        "parkIssue.self-intersection-after-rounding": 1,
+        "parkProperties": 42,
+        "parksOutsideCoverage": 5,
+        "trees": 2857,
+        "treesOutsideCoverage": 0
+      },
+      "caveats": [
+        "Street trees only (2015 census), as points, not canopy.",
+        "Park properties include paved plazas and playgrounds; they are not a vegetation map."
+      ]
+    },
+    "water": {
+      "id": "water",
+      "title": "Open water and inland water bodies",
+      "evidence": "modeled",
+      "geometry": "land/water mask (8 m local, 32 m context); inland water polygons",
+      "sources": [
+        "nyc-borough-boundaries-shoreline",
+        "nyc-planimetric-hydrography"
+      ],
+      "attributes": [
+        {
+          "name": "mask",
+          "unit": null,
+          "evidence": "modeled",
+          "source": "nyc-borough-boundaries-shoreline",
+          "field": "the_geom",
+          "transform": "cell centres inside shoreline-clipped borough land (even-odd scanline) are L, others W; N outside the declared coverage"
+        },
+        {
+          "name": "openWaterAreaM2",
+          "unit": "m²",
+          "evidence": "modeled",
+          "source": "derived",
+          "field": null,
+          "transform": "W cells × cell area"
+        },
+        {
+          "name": "bodies",
+          "unit": null,
+          "evidence": "measured",
+          "source": "nyc-planimetric-hydrography",
+          "field": "the_geom",
+          "transform": "inland water polygons, normalised like footprints"
+        }
+      ],
+      "transformations": [
+        "fill shoreline-clipped borough land by even-odd scanline at cell centres",
+        "everything else inside coverage is open water",
+        "outside coverage is no-data, not water",
+        "normalise inland water polygons"
+      ],
+      "representation": {
+        "local": "mask and inland water bodies",
+        "context": "mask only"
+      },
+      "counts": {
+        "local": 41580,
+        "context": 2603
+      },
+      "missing": {},
+      "summary": {
+        "waterBodies": 8,
+        "waterBodiesOutsideCoverage": 2
+      },
+      "caveats": [
+        "Open water is receiving water: it is never counted as retention or pervious area.",
+        "The shoreline is a digitised boundary at an unspecified tide; New Jersey is not in the source and is no-data."
+      ]
+    }
+  },
+  "tiles": {
+    "nyc/512/39/45": {
+      "level": "local",
+      "path": "tiles/512/39/45.json",
+      "bytes": 25089,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 0,
+        "streets": 29,
+        "streetNodes": 0,
+        "streetEdges": 0,
+        "surfaceFlowNodes": 0,
+        "surfaceFlowEdges": 0,
+        "trees": 0,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/40/45": {
+      "level": "local",
+      "path": "tiles/512/40/45.json",
+      "bytes": 104185,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 10,
+        "streets": 52,
+        "streetNodes": 40,
+        "streetEdges": 42,
+        "surfaceFlowNodes": 28,
+        "surfaceFlowEdges": 25,
+        "trees": 5,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/41/45": {
+      "level": "local",
+      "path": "tiles/512/41/45.json",
+      "bytes": 35286,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 2,
+        "streets": 22,
+        "streetNodes": 7,
+        "streetEdges": 8,
+        "surfaceFlowNodes": 11,
+        "surfaceFlowEdges": 9,
+        "trees": 0,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/42/45": {
+      "level": "local",
+      "path": "tiles/512/42/45.json",
+      "bytes": 35471,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 0,
+        "streets": 41,
+        "streetNodes": 0,
+        "streetEdges": 0,
+        "surfaceFlowNodes": 2,
+        "surfaceFlowEdges": 0,
+        "trees": 0,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/43/45": {
+      "level": "local",
+      "path": "tiles/512/43/45.json",
+      "bytes": 362444,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 226,
+        "streets": 67,
+        "streetNodes": 55,
+        "streetEdges": 67,
+        "surfaceFlowNodes": 43,
+        "surfaceFlowEdges": 47,
+        "trees": 311,
+        "parkProperties": 9,
+        "waterBodies": 4
+      }
+    },
+    "nyc/512/39/46": {
+      "level": "local",
+      "path": "tiles/512/39/46.json",
+      "bytes": 29182,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 4,
+        "streets": 10,
+        "streetNodes": 4,
+        "streetEdges": 6,
+        "surfaceFlowNodes": 9,
+        "surfaceFlowEdges": 10,
+        "trees": 21,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/40/46": {
+      "level": "local",
+      "path": "tiles/512/40/46.json",
+      "bytes": 341659,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 63,
+        "streets": 143,
+        "streetNodes": 109,
+        "streetEdges": 143,
+        "surfaceFlowNodes": 103,
+        "surfaceFlowEdges": 117,
+        "trees": 177,
+        "parkProperties": 2,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/41/46": {
+      "level": "local",
+      "path": "tiles/512/41/46.json",
+      "bytes": 295621,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 93,
+        "streets": 116,
+        "streetNodes": 75,
+        "streetEdges": 114,
+        "surfaceFlowNodes": 96,
+        "surfaceFlowEdges": 123,
+        "trees": 169,
+        "parkProperties": 2,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/42/46": {
+      "level": "local",
+      "path": "tiles/512/42/46.json",
+      "bytes": 105304,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 36,
+        "streets": 48,
+        "streetNodes": 25,
+        "streetEdges": 31,
+        "surfaceFlowNodes": 36,
+        "surfaceFlowEdges": 33,
+        "trees": 30,
+        "parkProperties": 1,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/43/46": {
+      "level": "local",
+      "path": "tiles/512/43/46.json",
+      "bytes": 98984,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 26,
+        "streets": 48,
+        "streetNodes": 34,
+        "streetEdges": 36,
+        "surfaceFlowNodes": 21,
+        "surfaceFlowEdges": 22,
+        "trees": 18,
+        "parkProperties": 0,
+        "waterBodies": 2
+      }
+    },
+    "nyc/512/39/47": {
+      "level": "local",
+      "path": "tiles/512/39/47.json",
+      "bytes": 30743,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 3,
+        "streets": 12,
+        "streetNodes": 5,
+        "streetEdges": 4,
+        "surfaceFlowNodes": 13,
+        "surfaceFlowEdges": 5,
+        "trees": 41,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/40/47": {
+      "level": "local",
+      "path": "tiles/512/40/47.json",
+      "bytes": 340224,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 78,
+        "streets": 124,
+        "streetNodes": 93,
+        "streetEdges": 123,
+        "surfaceFlowNodes": 119,
+        "surfaceFlowEdges": 126,
+        "trees": 338,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/41/47": {
+      "level": "local",
+      "path": "tiles/512/41/47.json",
+      "bytes": 284102,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 175,
+        "streets": 80,
+        "streetNodes": 42,
+        "streetEdges": 80,
+        "surfaceFlowNodes": 58,
+        "surfaceFlowEdges": 84,
+        "trees": 31,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/42/47": {
+      "level": "local",
+      "path": "tiles/512/42/47.json",
+      "bytes": 422301,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 137,
+        "streets": 176,
+        "streetNodes": 143,
+        "streetEdges": 176,
+        "surfaceFlowNodes": 104,
+        "surfaceFlowEdges": 107,
+        "trees": 196,
+        "parkProperties": 4,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/43/47": {
+      "level": "local",
+      "path": "tiles/512/43/47.json",
+      "bytes": 196468,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 26,
+        "streets": 90,
+        "streetNodes": 78,
+        "streetEdges": 89,
+        "surfaceFlowNodes": 45,
+        "surfaceFlowEdges": 54,
+        "trees": 137,
+        "parkProperties": 3,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/39/48": {
+      "level": "local",
+      "path": "tiles/512/39/48.json",
+      "bytes": 33707,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 0,
+        "streets": 40,
+        "streetNodes": 1,
+        "streetEdges": 2,
+        "surfaceFlowNodes": 2,
+        "surfaceFlowEdges": 3,
+        "trees": 0,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/40/48": {
+      "level": "local",
+      "path": "tiles/512/40/48.json",
+      "bytes": 168342,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 23,
+        "streets": 52,
+        "streetNodes": 34,
+        "streetEdges": 52,
+        "surfaceFlowNodes": 58,
+        "surfaceFlowEdges": 58,
+        "trees": 254,
+        "parkProperties": 2,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/41/48": {
+      "level": "local",
+      "path": "tiles/512/41/48.json",
+      "bytes": 281487,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 191,
+        "streets": 65,
+        "streetNodes": 36,
+        "streetEdges": 65,
+        "surfaceFlowNodes": 55,
+        "surfaceFlowEdges": 66,
+        "trees": 96,
+        "parkProperties": 1,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/42/48": {
+      "level": "local",
+      "path": "tiles/512/42/48.json",
+      "bytes": 254197,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 40,
+        "streets": 107,
+        "streetNodes": 79,
+        "streetEdges": 107,
+        "surfaceFlowNodes": 84,
+        "surfaceFlowEdges": 89,
+        "trees": 109,
+        "parkProperties": 3,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/43/48": {
+      "level": "local",
+      "path": "tiles/512/43/48.json",
+      "bytes": 638905,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 467,
+        "streets": 124,
+        "streetNodes": 93,
+        "streetEdges": 124,
+        "surfaceFlowNodes": 68,
+        "surfaceFlowEdges": 94,
+        "trees": 223,
+        "parkProperties": 4,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/39/49": {
+      "level": "local",
+      "path": "tiles/512/39/49.json",
+      "bytes": 5139,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 0,
+        "streets": 0,
+        "streetNodes": 0,
+        "streetEdges": 0,
+        "surfaceFlowNodes": 0,
+        "surfaceFlowEdges": 0,
+        "trees": 0,
+        "parkProperties": 0,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/40/49": {
+      "level": "local",
+      "path": "tiles/512/40/49.json",
+      "bytes": 175011,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 24,
+        "streets": 53,
+        "streetNodes": 35,
+        "streetEdges": 53,
+        "surfaceFlowNodes": 64,
+        "surfaceFlowEdges": 56,
+        "trees": 322,
+        "parkProperties": 1,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/41/49": {
+      "level": "local",
+      "path": "tiles/512/41/49.json",
+      "bytes": 391114,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 303,
+        "streets": 72,
+        "streetNodes": 44,
+        "streetEdges": 72,
+        "surfaceFlowNodes": 80,
+        "surfaceFlowEdges": 78,
+        "trees": 194,
+        "parkProperties": 3,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/42/49": {
+      "level": "local",
+      "path": "tiles/512/42/49.json",
+      "bytes": 378512,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 312,
+        "streets": 79,
+        "streetNodes": 44,
+        "streetEdges": 79,
+        "surfaceFlowNodes": 71,
+        "surfaceFlowEdges": 80,
+        "trees": 78,
+        "parkProperties": 1,
+        "waterBodies": 0
+      }
+    },
+    "nyc/512/43/49": {
+      "level": "local",
+      "path": "tiles/512/43/49.json",
+      "bytes": 521143,
+      "coverage": {
+        "status": "complete",
+        "coveredFraction": 1
+      },
+      "features": {
+        "buildings": 486,
+        "streets": 67,
+        "streetNodes": 42,
+        "streetEdges": 67,
+        "surfaceFlowNodes": 34,
+        "surfaceFlowEdges": 56,
+        "trees": 107,
+        "parkProperties": 1,
+        "waterBodies": 0
+      }
+    },
+    "nyc/2048/9/11": {
+      "level": "context",
+      "path": "tiles/2048/9/11.json",
+      "bytes": 11501,
+      "coverage": {
+        "status": "partial",
+        "coveredFraction": 0.1875
+      },
+      "features": {
+        "buildings": 7,
+        "streets": 10,
+        "trees": 62,
+        "parkProperties": 0
+      }
+    },
+    "nyc/2048/10/11": {
+      "level": "context",
+      "path": "tiles/2048/10/11.json",
+      "bytes": 429683,
+      "coverage": {
+        "status": "partial",
+        "coveredFraction": 0.75
+      },
+      "features": {
+        "buildings": 871,
+        "streets": 909,
+        "trees": 1412,
+        "parkProperties": 21
+      }
+    },
+    "nyc/2048/9/12": {
+      "level": "context",
+      "path": "tiles/2048/9/12.json",
+      "bytes": 6729,
+      "coverage": {
+        "status": "partial",
+        "coveredFraction": 0.125
+      },
+      "features": {
+        "buildings": 0,
+        "streets": 2,
+        "trees": 0,
+        "parkProperties": 0
+      }
+    },
+    "nyc/2048/10/12": {
+      "level": "context",
+      "path": "tiles/2048/10/12.json",
+      "bytes": 615076,
+      "coverage": {
+        "status": "partial",
+        "coveredFraction": 0.5
+      },
+      "features": {
+        "buildings": 1845,
+        "streets": 619,
+        "trees": 1383,
+        "parkProperties": 16
+      }
+    }
+  },
+  "validation": {
+    "errors": 0,
+    "warnings": 16,
+    "checks": [
+      {
+        "id": "tile-identity",
+        "label": "Tile ids, levels, bounds, CRS and schema are consistent",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "29 tiles"
+      },
+      {
+        "id": "tile-hashes",
+        "label": "Every tile's content matches its recorded hash",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "29 tile hashes reproduced"
+      },
+      {
+        "id": "finite-coordinates",
+        "label": "All coordinates finite and within WGS84 range; bounds ordered",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "all finite"
+      },
+      {
+        "id": "polygon-validity",
+        "label": "Rings closed, ≥ 4 positions, areas non-negative",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "all rings valid"
+      },
+      {
+        "id": "feature-ownership",
+        "label": "Each feature lies in the tile that owns it",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "every feature inside its owner tile"
+      },
+      {
+        "id": "unique-ownership",
+        "label": "Each feature is owned by exactly one tile",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "no feature owned twice"
+      },
+      {
+        "id": "tile-references",
+        "label": "Every reference names an existing tile that owns the feature",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "all references resolve"
+      },
+      {
+        "id": "provenance",
+        "label": "Every layer, attribute and feature names a complete source record",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "9 complete source records"
+      },
+      {
+        "id": "elevation-coverage",
+        "label": "Elevation grids cover each covered tile at the declared resolution",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "covered tiles fully gridded"
+      },
+      {
+        "id": "water-not-retention",
+        "label": "Open water is receiving water and never counted as pervious land",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "water receives; never retention"
+      },
+      {
+        "id": "context-consistency",
+        "label": "Context features are simplifications of compiled local features",
+        "severity": "error",
+        "passed": true,
+        "failures": 0,
+        "detail": "context derived from local features"
+      },
+      {
+        "id": "source-geometry",
+        "label": "Source geometry problems (flagged, not repaired)",
+        "severity": "warning",
+        "passed": true,
+        "failures": 0,
+        "detail": "none"
+      },
+      {
+        "id": "rounding-touches",
+        "label": "Rings whose edges touch only after rounding to 1e-7° (source edges within ~1 cm; flagged, not repaired)",
+        "severity": "warning",
+        "passed": false,
+        "failures": 1,
+        "detail": "1 failure(s), e.g. park:B431: self-intersection-after-rounding"
+      },
+      {
+        "id": "elevation-artefacts",
+        "label": "Elevation cells far below sea level (source artefacts, kept)",
+        "severity": "warning",
+        "passed": false,
+        "failures": 15,
+        "detail": "15 failure(s), e.g. nyc/512/39/45: 15 cells; nyc/512/41/45: 13 cells; nyc/512/42/45: 1 cells"
+      },
+      {
+        "id": "features-in-open-water",
+        "label": "Buildings or trees located on open-water cells of the shoreline mask",
+        "severity": "warning",
+        "passed": true,
+        "failures": 0,
+        "detail": "none"
+      }
+    ]
+  },
+  "hashes": {
+    "manifest": "sha256:c37b1a1ff534862fb5e441ffcac9bade0477f78a0af46d2608adf8b9f6e40c62",
+    "tiles": {
+      "nyc/512/39/45": "sha256:0413221b5221d05870135c9192172335649281c3755e238dce8c99b89054e82d",
+      "nyc/512/40/45": "sha256:4f84c907b7f925f9ff60cb1e78b2da7216af43957044f25b5860fd4c6c37e221",
+      "nyc/512/41/45": "sha256:cf0e0c9680b2808face43add4427fb8a8199c49201df95090566a7dc914f8121",
+      "nyc/512/42/45": "sha256:ce2e710d5ad4134cc52f7040ed9f452766791f52714566007510ae237d16274b",
+      "nyc/512/43/45": "sha256:d763f6c85e44e9416ee5b58cf3dcd91635cfa33c77c9f4c164b378017aafd040",
+      "nyc/512/39/46": "sha256:2eec84147c035e863b2f9ad8404266833f10f5df606cff1899a177977d43eac2",
+      "nyc/512/40/46": "sha256:5399023965f6417c9ef54d1ebea8248287883d1993f78e53080583dda07630a4",
+      "nyc/512/41/46": "sha256:0e33578b17a8f332a46561f870237ba6ce7452b2a92234f40df9b70f5dd8283a",
+      "nyc/512/42/46": "sha256:932e55de40132e3df6814418f514d889b2fa98df4df5530d75099a71dd2262ca",
+      "nyc/512/43/46": "sha256:3c2a38ac50ec0c27238e81f19889b13554209706d8e34e0585135c0b4036874d",
+      "nyc/512/39/47": "sha256:6a97a52765d315bf08953386786639f85cbb3cd352ea5aa7bffa68c240ad3564",
+      "nyc/512/40/47": "sha256:35574c552205f770ce06b56e4860b1cc26fa699e7b685df3eea33aad0a3bd089",
+      "nyc/512/41/47": "sha256:3192c3ae9ecccb6bb7c1f9d6d9545376b09885df32478ab4c977ff23bf7e0ba7",
+      "nyc/512/42/47": "sha256:54e94b552665801a4b16060f34c30df992c0b2063a4e0bf35fef452f700eb083",
+      "nyc/512/43/47": "sha256:d682486012b44b053bcd46b21df1f6d9b24f6541cc5ef3446ba4e467d02a8a9e",
+      "nyc/512/39/48": "sha256:0e180a3b300774c7c0631edfe347549bf08057428311c84664b0c62fa9bfa121",
+      "nyc/512/40/48": "sha256:0b4d6bfe6dc0f7666a783eecc755f78275350f0d541768a4668fc6be39352a58",
+      "nyc/512/41/48": "sha256:27a272a239633e0cebc69c6ff063de34c009da11739ec1f7c7a0ddc618683850",
+      "nyc/512/42/48": "sha256:78b61ced188bd7a80a5723dfdd9761e070b9d06dd1cf8b969f1174ef5281316c",
+      "nyc/512/43/48": "sha256:7641a1df6018979cd678747de157eadd62b0b9d595acb671b5c6f30d1247b268",
+      "nyc/512/39/49": "sha256:9b0fb5dd84db184809afd3cd4eadaa4a2e026bf579e636a741245bc3525fe0b5",
+      "nyc/512/40/49": "sha256:b1ee204f9ea4af349ae859686422af5beb5d8e31d3b1c7e4a6bd4c0b88817404",
+      "nyc/512/41/49": "sha256:6e0fbbb04209cb6b3a985968a1d31f407e2b4cda6c9d6ecd007f5a23066fae26",
+      "nyc/512/42/49": "sha256:2ebf9e1a99e22f522f7d08bb18c2c48ab06f31ebd08cadacc0fbff3ad35759b8",
+      "nyc/512/43/49": "sha256:135c2df503ee5128fa44b9e1be568ee64c955126f905458abdd19fa922b540f2",
+      "nyc/2048/9/11": "sha256:7513240c23944808fd63154ae79e558b32ac2fdd4c0b517825289e6e9bc35926",
+      "nyc/2048/10/11": "sha256:73b872dacbb0b6a2dc2d9270577dd70ba48c4da1cef6c5a08c2612e4cd47c57a",
+      "nyc/2048/9/12": "sha256:a530a60f701a6501d23b696f9d2aa9a873d1e8f332918f9e1971a446ba5391ef",
+      "nyc/2048/10/12": "sha256:f4f27f8773b72f89947a5105734f70f726854fa0172af2e0ccf0cc473aec3122"
+    }
+  }
+}

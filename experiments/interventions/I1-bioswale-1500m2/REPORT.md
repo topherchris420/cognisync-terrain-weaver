@@ -14,7 +14,7 @@ Converting 1,500 m² of eligible pavement to bioswale on the example extent redu
 
 **NOT SUPPORTED.** Not supported by the model. The bioswale reduces routed runoff by 0.18% (57.8 of 32,148 m³), below the 8% threshold. Reaching 8% would take about 66,605 m² of bioswale, 27% of the extent's classified pavement.
 
-- Controlled comparison: 9 fixed variables identical (sealed storm identity, rainfall depth (mm), duration (min), study extent and grid, resolution (cells), initial land-cover composition, elevation surface, elevation status, routing model version); only the intervention surface differs.
+- Controlled comparison: 10 fixed variables identical (sealed storm identity, rainfall depth (mm), duration (min), study extent and grid, resolution (cells), initial land-cover composition, elevation surface, elevation status, routing model version, urban substrate (version, manifest and tiles)); only the intervention surface differs.
 - This negative result is kept deliberately: a single street-scale bioswale is small against the runoff of a whole 0.85 km² extent, and a claim of district-scale benefit from it would be false within the model itself.
 - Support within the model is not evidence about a real bioswale. That would require monitored inflow/outflow data for installed practices.
 
@@ -66,7 +66,7 @@ None: a model experiment. Support here is support within the model, not evidence
 npm run experiment -- interventions/I1-bioswale-1500m2
 ```
 
-Inputs are frozen fixtures; no network access is needed. Result hash `fnv1a64:8b373f2eb03982d9`. CI re-runs this experiment and fails if the committed result no longer matches the code.
+Inputs are frozen fixtures; no network access is needed. Result hash `fnv1a64:68c186166ffaf0b0`. CI re-runs this experiment and fails if the committed result no longer matches the code.
 
 | input | evidence | source | retrieved | content hash |
 |---|---|---|---|---|
@@ -77,6 +77,7 @@ Inputs are frozen fixtures; no network access is needed. Result hash `fnv1a64:8b
 | score | `urban-absorption:fnv1a64:489acc5fd4bfe2ea` |
 | bulkBudget | `land-budget-v1` |
 | routing | `mannahatta-d8-local-v2` |
-| assumptions | `2026-09-29.1` |
+| assumptions | `2026-10-02.1` |
+| substrateCompiler | `mannahatta-urban-substrate-compiler@1.0.0 (mannahatta-substrate/1)` |
 
-Run at 2026-09-29T11:56:55.152Z from commit `6b9473e` with uncommitted changes (the commit that adds this report contains them) on Node v22.22.2.
+Run at 2026-10-02T21:42:04.302Z from commit `405e0b1` with uncommitted changes (the commit that adds this report contains them) on Node v22.22.0.

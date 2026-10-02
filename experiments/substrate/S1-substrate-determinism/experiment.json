@@ -1,0 +1,73 @@
+{
+  "spec": {
+    "id": "substrate/S1-substrate-determinism",
+    "domain": "substrate",
+    "title": "Does the substrate compiler reproduce the same spatial state from the same frozen inputs?",
+    "question": "Does the urban substrate compiler produce the same experiment-relevant spatial state from the same frozen inputs?",
+    "hypothesis": "Compiling the frozen Lower Manhattan sources twice (with different non-authoritative timestamps and commits) and a third time with every source's records in a seeded random order yields identical tile ids, identical tile bytes and geometry, identical tile hashes and an identical manifest hash; validation reports zero errors; a study export routed with that substrate replays; and moving one footprint vertex by 1e-7° in one tile makes the same replay fail on that tile.",
+    "tier": "repeated-measurement",
+    "inputs": [
+      "substrate/nyc-lower-manhattan/buildings.json",
+      "substrate/nyc-lower-manhattan/pluto.json",
+      "substrate/nyc-lower-manhattan/streets.json",
+      "substrate/nyc-lower-manhattan/water-bodies.json",
+      "substrate/nyc-lower-manhattan/shoreline.json",
+      "substrate/nyc-lower-manhattan/parks.json",
+      "substrate/nyc-lower-manhattan/trees.json",
+      "substrate/nyc-lower-manhattan/elevation.json",
+      "substrate/nyc-lower-manhattan/nlcd-2021.json",
+      "dem/lower-manhattan-example.json"
+    ],
+    "conditions": {
+      "region": "nyc-lower-manhattan-2026-10",
+      "compiler": "mannahatta-urban-substrate-compiler@1.0.0",
+      "schema": "mannahatta-substrate/1",
+      "localTileM": 512,
+      "contextTileM": 2048,
+      "permutationSeed": 1609,
+      "runA": "2026-10-02T00:00:00.000Z / s1-run-a",
+      "runB": "2031-01-01T12:00:00.000Z / s1-run-b",
+      "replayExtent": "lower-manhattan-example",
+      "tamper": "one footprint vertex in nyc/512/41/47 moved by 1e-7°"
+    },
+    "split": "None: a determinism and integrity test on frozen inputs. Pass criteria were written with the hypothesis, before the first run.",
+    "metrics": [
+      "tile id mismatches between compiles (pass: 0)",
+      "tile byte, geometry and hash mismatches (pass: 0)",
+      "manifest hash equality, including under record permutation (pass: equal)",
+      "validation errors (pass: 0; warnings are reported, not failed)",
+      "replay of a study export against the frozen substrate (pass: reproduced)",
+      "replay with one tampered tile (pass: fails, naming that tile)"
+    ],
+    "limitations": [
+      "Determinism is not correctness: two identical compiles can be identically wrong. Source accuracy is not judged here; validation warnings report what is known.",
+      "Runs in one JavaScript engine (Node/V8). Cross-engine identity is argued from construction (only correctly rounded IEEE-754 operations in authoritative paths, no Math.pow, trigonometry or locale-dependent sorting) but not tested.",
+      "One frozen snapshot (retrieved 2026-10-02) of one 2.56 km square; other places and later releases are untested.",
+      "The replay fixture uses illustrative example land cover and a synthetic square intervention; it tests identity, not hydrology.",
+      "Content hashes detect change; they are not signatures and do not authenticate who compiled a substrate."
+    ]
+  },
+  "inputs": [
+    {
+      "path": "dem/lower-manhattan-example.json",
+      "contentHash": "fnv1a64:d08e7b3ff8c9a0b8",
+      "source": "Mapzen Terrarium tiles (AWS Terrain Tiles) and USGS 3DEP Bare Earth dynamic ImageServer",
+      "retrievedAt": "2026-09-29T11:21:17.250Z",
+      "evidence": "measured"
+    },
+    {
+      "path": "substrate/ (9 files)",
+      "contentHash": "fnv1a64:e0252ab4b04d6833",
+      "source": "BUILDING",
+      "retrievedAt": "2026-10-02T21:20:46.463Z",
+      "evidence": "measured"
+    }
+  ],
+  "modelVersions": {
+    "score": "urban-absorption:fnv1a64:489acc5fd4bfe2ea",
+    "bulkBudget": "land-budget-v1",
+    "routing": "mannahatta-d8-local-v2",
+    "assumptions": "2026-10-02.1",
+    "substrateCompiler": "mannahatta-urban-substrate-compiler@1.0.0 (mannahatta-substrate/1)"
+  }
+}

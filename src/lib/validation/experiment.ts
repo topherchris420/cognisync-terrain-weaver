@@ -12,8 +12,9 @@ import { ASSUMPTION_REGISTRY_VERSION } from "@/lib/assumptions/registry";
 import { stableHash } from "@/lib/counterfactual/hashing";
 import { LOCAL_HYDROLOGY_MODEL } from "@/lib/hydrology/types";
 import { STORM_PROVENANCE } from "@/lib/paired-storm";
+import { SUBSTRATE_COMPILER, SUBSTRATE_SCHEMA_VERSION } from "@/lib/urban-substrate/config";
 
-export type ExperimentDomain = "classification" | "hydrology" | "routing" | "interventions";
+export type ExperimentDomain = "classification" | "hydrology" | "routing" | "interventions" | "substrate";
 
 /**
  * What the comparison is against. Ordered from weakest to strongest; a result
@@ -21,6 +22,7 @@ export type ExperimentDomain = "classification" | "hydrology" | "routing" | "int
  */
 export type EvidenceTier =
   | "synthetic-verification" // analytic cases: does code match known answers?
+  | "synthetic-diagnostic" // rendered scenes with known ground truth: says nothing about real imagery
   | "internal-consistency" // do the instrument's own parts agree?
   | "repeated-measurement" // does the same input give the same output?
   | "reference-model" // comparison with an independent published model
@@ -91,6 +93,7 @@ export function modelVersions() {
     bulkBudget: STORM_PROVENANCE.model,
     routing: LOCAL_HYDROLOGY_MODEL,
     assumptions: ASSUMPTION_REGISTRY_VERSION,
+    substrateCompiler: `${SUBSTRATE_COMPILER.name}@${SUBSTRATE_COMPILER.version} (${SUBSTRATE_SCHEMA_VERSION})`,
   };
 }
 

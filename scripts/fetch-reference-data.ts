@@ -28,6 +28,8 @@ import {
 import { EVENTS, OUTCOME_DESCRIPTORS } from "@/lib/validation/events";
 import { decodePng } from "./lib/png";
 import { decodeFloat32Tiff } from "./lib/tiff";
+import { fetchWithRetry } from "./lib/http";
+import { nlcdCoverage } from "./lib/nlcd-wcs";
 
 const ROOT = resolve(import.meta.dirname ?? __dirname, "..");
 const DATA = resolve(ROOT, "experiments/data");
@@ -54,21 +56,6 @@ function write(relative: string, provenance: Provenance, data: unknown) {
 
 function read<T>(relative: string): T {
   return JSON.parse(readFileSync(resolve(DATA, relative), "utf8")).data as T;
-}
-
-async function fetchWithRetry(url: string, attempts = 4): Promise<Response> {
-  let last: unknown;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(180_000) });
-      if (response.ok) return response;
-      last = new Error(`${response.status} ${url}`);
-    } catch (error) {
-      last = error;
-    }
-    await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
-  }
-  throw last;
 }
 
 /* ------------------------------------------------------------ scan feed */
@@ -147,29 +134,6 @@ export interface NlcdGrid {
   dy: number;
   landCover: number[];
   impervious: number[];
-}
-
-function parseGeoServerText(text: string) {
-  const range = text.match(/GeneralGridEnvelope\[(\d+)\.\.(\d+), (\d+)\.\.(\d+)\]/);
-  const param = (name: string) => Number(text.match(new RegExp(`"${name}", ([-0-9.eE]+)`))?.[1]);
-  if (!range) throw new Error("Unrecognised WCS text response.");
-  const [c0, c1, r0, r1] = range.slice(1).map(Number);
-  const body = text.split("Band 0:")[1].trim().split(/\s+/).map(Number);
-  const cols = c1 - c0 + 1;
-  const rows = r1 - r0 + 1;
-  if (body.length !== cols * rows) throw new Error(`WCS grid size mismatch ${body.length} vs ${cols}×${rows}`);
-  const dx = param("elt_0_0");
-  const dy = param("elt_1_1");
-  // GeoTools grid-to-world maps grid indices (pixel centres) to world coordinates.
-  return { cols, rows, x0: dx * c0 + param("elt_0_2"), y0: dy * r0 + param("elt_1_2"), dx, dy, values: body };
-}
-
-async function nlcdCoverage(coverage: string, bbox: SimExtent) {
-  const crs = "http://www.opengis.net/def/crs/EPSG/0/4326";
-  const url =
-    `https://www.mrlc.gov/geoserver/ows?service=WCS&version=2.0.1&request=GetCoverage&coverageId=${coverage}` +
-    `&subsettingCrs=${crs}&outputCrs=${crs}&subset=Long(${bbox.west},${bbox.east})&subset=Lat(${bbox.south},${bbox.north})&format=text/plain`;
-  return { url, grid: parseGeoServerText(await (await fetchWithRetry(url)).text()) };
 }
 
 async function fetchNlcd() {

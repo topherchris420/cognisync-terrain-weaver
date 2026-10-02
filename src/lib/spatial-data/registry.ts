@@ -96,8 +96,11 @@ export const SPATIAL_SOURCE_REGISTRY = {
     id: "nyc-hydrography",
     title: "NYC Planimetric Database: Hydrography",
     agency: "NYC Office of Technology and Innovation",
-    officialUrl: "https://data.cityofnewyork.us/d/6hbv-tek4",
-    socrataResourceId: "6hbv-tek4",
+    // pjs3-c3z5 is the water-body layer (lakes, ponds, rivers, streams, bays).
+    // 6hbv-tek4, used here until 2026-10-02, is "Hydrography Structures":
+    // piers and jetties, which are not water (Capture Rules, feature codes 2800/2810).
+    officialUrl: "https://data.cityofnewyork.us/d/pjs3-c3z5",
+    socrataResourceId: "pjs3-c3z5",
     geometryField: "the_geom",
     geometryType: "MultiPolygon",
     displayClass: "water",
@@ -106,7 +109,10 @@ export const SPATIAL_SOURCE_REGISTRY = {
     confidence: "high",
     status: "observed",
     license: OPEN_DATA_LICENSE,
-    caveats: ["Layer-level observation date is not published."],
+    caveats: [
+      "Layer-level observation date is not published.",
+      "Open harbour and river water is largely absent from this layer; it holds inland water bodies.",
+    ],
     availability: "live",
     processingMethod: "Official polygons clipped by a bounded Socrata query.",
     affectedMetrics: ["surface water area", "runoff context"],
