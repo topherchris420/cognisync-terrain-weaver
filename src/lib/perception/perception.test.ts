@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { stableHash } from "@/lib/counterfactual/hashing";
 import { boundlessSceneAdapter, compositionFromHistogram, histogramFromPalette, BOUNDLESS_CLASSES, type BoundlessSceneRecord } from "./boundless-adapter";
 import { evaluateSyntheticBenchmark, runSyntheticBenchmark, type BenchmarkPrediction } from "./benchmark";
+import { compositionFromValdradaHistogram, decodeClassU8, histogramFromClassU8, valdradaSceneAdapter, type ValdradaSceneRecord } from "./valdrada-adapter";
 import { NOT_REAL_WORLD, SYNTHETIC_LABEL, type ImageSource, type SyntheticScene } from "./synthetic-scene";
 
 // Every number below is a hand-made test input, not a measured result.
@@ -46,6 +47,31 @@ describe("BoundlessNYC adapter", () => {
     expect(() => boundlessSceneAdapter.toScene(record({ rgbSha256: "nope" }))).toThrow(/SHA-256/);
     // Absent optional fields are omitted, so scenes can always be hashed canonically.
     expect(() => stableHash(boundlessSceneAdapter.toScene(record({ lighting: undefined })))).not.toThrow();
+  });
+});
+
+describe("Valdrada class_u8 adapter", () => {
+  const raw: ValdradaSceneRecord = {
+    id: "val-1", rgbPath: "rgb/val-1.png", rgbSha256: SHA,
+    semantic: { width: 10, height: 1, data: new Uint8Array([7, 8, 11, 21, 22, 23, 26, 0, 15, 32]) },
+    camera: { view: "nadir", pitchDeg: -90, altitudeM: 250 }, simulatorVersion: "0.3.1", pedestrians: "procedural",
+  };
+
+  it("decodes one byte per pixel and maps Cityscapes-compatible classes", () => {
+    expect(histogramFromClassU8(raw.semantic)).toEqual({ road: 1, sidewalk: 1, building: 1, vegetation: 1, terrain: 1, sky: 1, car: 1, unlabeled: 1, bridge: 1, water: 1 });
+  });
+
+  it("rejects malformed payloads and unknown semantic ids", () => {
+    expect(() => decodeClassU8(new Uint8Array([1]), 2, 1)).toThrow(/dimensions|payload/);
+    expect(() => histogramFromClassU8({ width: 1, height: 1, data: new Uint8Array([250]) })).toThrow(/Unknown Valdrada/);
+  });
+
+  it("creates a provenance-bearing synthetic scene without treating it as real evidence", () => {
+    const scene = valdradaSceneAdapter.toScene(raw);
+    expect(scene.metadata.source).toBe("valdrada@0.3.1");
+    expect(scene.metadata.attribution).toContain("© OpenStreetMap contributors");
+    expect(compositionFromValdradaHistogram({ road: 50, vegetation: 50 }).composition).toEqual({ vegetation: 50, pavement: 50, buildings: 0, bareSoil: 0, water: 0 });
+    expect(() => valdradaSceneAdapter.toScene({ ...raw, pedestrians: "metahuman" })).toThrow(/restricted/);
   });
 });
 
