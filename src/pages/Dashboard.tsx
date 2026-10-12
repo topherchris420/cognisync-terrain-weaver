@@ -65,7 +65,13 @@ const SORTERS: Record<SortKey, (a: AnalysisRecord, b: AnalysisRecord) => number>
 // backoff) — around 20s, down from the ~48s of three 15s attempts.
 const FEED_TIMEOUT_MS = 10_000;
 
-async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
+interface Feed {
+  rows: AnalysisRecord[];
+  /** Set when the live feed was unreachable and the bundled snapshot is shown. */
+  snapshot?: { retrievedAt: string; reason: string };
+}
+
+async function fetchLiveAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
   const { data, error } = await supabase
     .from("analyses")
     .select("*")
@@ -74,6 +80,44 @@ async function fetchAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
     .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(FEED_TIMEOUT_MS)]));
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as AnalysisRecord[]).map(withCurrentScore);
+}
+
+// When the live backend is unreachable, show the frozen read-only snapshot of
+// the feed (experiments/data/scan-feed.json) instead of an empty error state.
+// The snapshot omits name, imagery, notes and recommendations; fill neutral
+// defaults so every row renders.
+async function loadSnapshot(): Promise<{ rows: AnalysisRecord[]; retrievedAt: string }> {
+  const { default: feed } = await import("../../experiments/data/scan-feed.json");
+  const rows = (feed.data as Array<Partial<AnalysisRecord>>)
+    .map(
+      (r) =>
+        ({
+          name: "",
+          image_data_url: null,
+          recommendations: [],
+          ai_notes: null,
+          ...r,
+        }) as AnalysisRecord
+    )
+    .map(withCurrentScore)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return { rows, retrievedAt: feed.provenance.retrievedAt };
+}
+
+async function fetchAnalyses(signal: AbortSignal): Promise<Feed> {
+  try {
+    return { rows: await fetchLiveAnalyses(signal) };
+  } catch (err) {
+    // A query cancelled by React Query (unmount, refetch) is not an outage.
+    if (signal.aborted) throw err;
+    const reason = err instanceof Error ? err.message : String(err);
+    try {
+      const { rows, retrievedAt } = await loadSnapshot();
+      return { rows, snapshot: { retrievedAt, reason } };
+    } catch {
+      throw err;
+    }
+  }
 }
 
 export default function Dashboard() {
@@ -85,7 +129,7 @@ export default function Dashboard() {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const {
-    data: rows,
+    data: feed,
     isPending,
     isError,
     error,
@@ -97,6 +141,8 @@ export default function Dashboard() {
     // its error+Retry state in ~20s on a dead network, not sit on skeletons.
     retry: 1,
   });
+  const rows = feed?.rows;
+  const snapshot = feed?.snapshot;
 
   const stats = useMemo(() => {
     if (!rows || rows.length === 0) return null;
@@ -214,6 +260,20 @@ export default function Dashboard() {
             </Link>
           </Button>
         </div>
+
+        {snapshot && (
+          <div className="atlas-index-hint" role="status">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+            <span className="flex-1">
+              The live feed is unreachable ({snapshot.reason}). Showing a read-only snapshot from{" "}
+              {new Date(snapshot.retrievedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}.
+            </span>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()}>
+              <RotateCcw className="h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        )}
 
         {stats && stats.total >= 3 && rows && (
           <figure className="atlas-strip" aria-labelledby="strip-caption">
