@@ -1,4 +1,4 @@
-import { ArrowRight, Layers3, Loader2, MapPin } from "lucide-react";
+import { ArrowRight, FolderOpen, Layers3, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AnalysisLaunchPanelProps {
@@ -7,11 +7,13 @@ interface AnalysisLaunchPanelProps {
   mapReady: boolean;
   onAnalyze: () => void;
   onExample?: () => void;
+  /** Reopen an exported experiment file: verified and replayed before anything is shown. */
+  onOpenFile?: (file: File) => void;
 }
 
 const isApple = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, onExample }: AnalysisLaunchPanelProps) {
+export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, onExample, onOpenFile }: AnalysisLaunchPanelProps) {
   return (
     <section aria-labelledby="analysis-launch-title" className="atlas-launch">
       <p className="mb-3 text-sm font-medium">The land remembers.</p>
@@ -48,6 +50,26 @@ export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, on
             Explore an example <ArrowRight size={15} aria-hidden="true" />
           </button>
           <p className="mt-1 text-[11px] text-muted-foreground">Illustrative data. No scan or account needed.</p>
+        </div>
+      )}
+      {onOpenFile && (
+        <div className="atlas-example-link atlas-open-link">
+          <label className="flex w-full cursor-pointer items-center justify-between text-sm font-medium hover:text-primary">
+            <span>Open an experiment file</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="sr-only"
+              aria-label="Open an experiment file"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onOpenFile(file);
+                event.target.value = "";
+              }}
+            />
+            <FolderOpen size={15} aria-hidden="true" />
+          </label>
+          <p className="mt-1 text-[11px] text-muted-foreground">Exported evidence (JSON) is verified and replayed here before anything is shown.</p>
         </div>
       )}
     </section>

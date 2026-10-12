@@ -7,13 +7,13 @@ export default defineTool({
   name: "list_scans",
   title: "List terrain scans",
   description:
-    "List recent urban terrain scans with their Urban Absorption Score and flood-risk band, newest first.",
+    "List recent urban terrain scans with their Urban Absorption Score and score band (`flood_risk`: low, moderate or high runoff share; a screening category, not a validated flood hazard), newest first.",
   inputSchema: {
     limit: z.number().int().min(1).max(50).default(10).describe("How many scans to return."),
     flood_risk: z
       .enum(["low", "moderate", "high"])
       .optional()
-      .describe("Optional filter by flood-risk band."),
+      .describe("Optional filter by score band (low, moderate or high runoff share; recomputed from land cover, not the stored value)."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit, flood_risk }) => {

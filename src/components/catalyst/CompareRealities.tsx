@@ -126,7 +126,7 @@ export function CompareRealities({ open, onClose, baseMap, currentScore, futureS
         <dl className="comparison-metrics">
           <div><dt>Runoff · m³</dt><dd><span>{numberLabel(runoffBase)}</span><span aria-hidden="true">→</span><strong>{numberLabel(runoffFuture)}</strong></dd></div>
           <div><dt>Absorption score / 100</dt><dd><span>{numberLabel(currentScore)}</span><span aria-hidden="true">→</span><strong>{numberLabel(futureScore)}</strong></dd></div>
-          <div><dt>Score-based risk band</dt><dd><span>{currentRisk}</span><span aria-hidden="true">→</span><strong>{futureRisk}</strong></dd></div>
+          <div><dt>Score band (runoff share)</dt><dd><span>{currentRisk}</span><span aria-hidden="true">→</span><strong>{futureRisk}</strong></dd></div>
         </dl>
         {illustrative && <p className="comparison-caveat">Illustrative terrain · exploratory comparison, not a surveyed flood prediction.</p>}
         {!illustrative && <p className="comparison-caveat">Terrain-routed screening estimate. Sewer capacity and drainage are not modeled.</p>}

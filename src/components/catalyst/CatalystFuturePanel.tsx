@@ -361,7 +361,7 @@ export function CatalystFuturePanel({
           ) : (
             <p className="catalyst-body mt-4 text-[11px] text-muted-foreground">
               This analysis stored no footprint, so volumes, areas and costs
-              cannot be sized. The score and risk-band projection above are
+              cannot be sized. The score and band projection above are
               still exact.
             </p>
           )}
@@ -436,7 +436,7 @@ function ScoreCard({
       >
         {score.toFixed(1)}
       </div>
-      <div className="mt-1 text-[11px] text-muted-foreground">{risk} flood risk</div>
+      <div className="mt-1 text-[11px] text-muted-foreground">{risk} runoff band</div>
       {runoff > 0 && (
         <div className="mt-1 font-mono text-[10px] text-muted-foreground">
           {formatVolumeM3(runoff)}/yr runoff

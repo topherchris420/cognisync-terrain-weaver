@@ -37,7 +37,7 @@ const riskBadge = (score: number) => {
           : "border-destructive/30 bg-destructive/10 text-destructive"
       )}
     >
-      {riskLabel(risk)} risk
+      {riskLabel(risk)} runoff
     </span>
   );
 };

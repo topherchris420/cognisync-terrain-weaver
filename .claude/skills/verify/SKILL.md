@@ -5,8 +5,9 @@ description: Build, serve, and drive this app in a headless browser to verify ch
 
 # Verifying cognisync-terrain-weaver
 
-SPA: React + Vite, routes `/` (landing), `/analyze` (MapLibre map + scan panel),
-`/dashboard` (public feed), `*` (404).
+SPA: React + Vite, routes `/` (the workstation: MapLibre map + study drawer),
+`/analyze` (redirects to `/`), `/dashboard` (public feed), `/tactical` (retired,
+explains itself), `*` (404).
 
 ## Build & serve
 
@@ -29,6 +30,10 @@ Flows worth driving:
 - `/analyze`: preset chips fly the map; after `moveend` the URL syncs to `?lat=&lng=&zoom=` (flyTo animation takes ~5s — wait for it). Deep links restore the view; garbage params fall back to Manhattan default.
 - Copy-link button needs `permissions: ["clipboard-read", "clipboard-write"]` on the context.
 - `/dashboard`: skeletons → cards, or error+Retry state.
+- Reopen an experiment: export a study (Export → Experiment evidence JSON), then
+  choose it from "Open an experiment file" on the intro panel or the Export tab;
+  the Overview shows every replay check, and Compare shows "Where the water
+  moved" with its map layer. Works offline against the example.
 
 ## Environment gotchas
 

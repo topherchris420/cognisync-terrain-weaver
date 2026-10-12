@@ -15,7 +15,7 @@ export default defineTool({
   name: "create_analysis",
   title: "Create terrain scan",
   description:
-    "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are always computed deterministically; authoritative scores cannot be overridden.",
+    "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and score band are always computed deterministically; authoritative scores cannot be overridden.",
   inputSchema: {
     name: z.string().trim().min(1).describe("Human-readable name for the scan."),
     center_lat: z.number().min(-90).max(90).describe("Latitude of the scan centre."),
@@ -71,7 +71,7 @@ export default defineTool({
       content: [
         {
           type: "text",
-          text: `Created scan "${data.name}" (${data.id}) — absorption ${absorption_score}/100, flood risk ${flood_risk}.`,
+          text: `Created scan "${data.name}" (${data.id}) — absorption ${absorption_score}/100, runoff band ${flood_risk}.`,
         },
       ],
       structuredContent: { scan: data },

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SUBSTRATE_PUBLIC_DIR } from "@/lib/urban-substrate/config";
 import { unavailable, type SubstrateIdentity, type SubstrateState, type SubstrateUnavailable } from "@/lib/urban-substrate/identity";
-import { httpStore, loadSubstrateIndex, loadSubstrateView, selectSubstrate, SubstrateIntegrityError, type SubstrateView } from "@/lib/urban-substrate/loader";
+import { httpStore, loadSubstrateIndex, loadSubstrateView, publishedSubstrateBaseUrl, selectSubstrate, SubstrateIntegrityError, type SubstrateView } from "@/lib/urban-substrate/loader";
 import type { BBox } from "@/lib/geo";
 
 export type UrbanSubstrateStatus =
@@ -15,13 +14,8 @@ export interface ResolvedSubstrate {
   view: SubstrateView | null;
 }
 
-function substrateBaseUrl(): string {
-  const base = (import.meta.env?.BASE_URL as string | undefined) ?? "/";
-  return `${base.endsWith("/") ? base : `${base}/`}${SUBSTRATE_PUBLIC_DIR}/`;
-}
-
 async function resolveSubstrate(extent: { west: number; south: number; east: number; north: number }, fetchImpl: typeof fetch): Promise<ResolvedSubstrate> {
-  const base = substrateBaseUrl();
+  const base = publishedSubstrateBaseUrl();
   try {
     const index = await loadSubstrateIndex(base, fetchImpl);
     const entry = selectSubstrate(index, extent);

@@ -84,7 +84,13 @@ export function computeAbsorptionScore(cover: LandCover): number {
 }
 
 /**
- * Flood-risk bands.
+ * Score bands, read as runoff share.
+ *
+ * The stored field is still called `flood_risk` and the values low, moderate
+ * and high are kept for compatibility, but the bands are categories of the
+ * screening score and nothing more: no band has been shown to separate
+ * observed flooding outcomes (assumption registry, score.band.*), so the
+ * interface names them runoff bands, never flood risk.
  *
  * Physically meaningful, and checked against the 18-site calibration set:
  *

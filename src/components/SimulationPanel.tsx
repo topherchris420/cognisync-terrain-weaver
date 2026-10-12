@@ -79,7 +79,7 @@ export function SimulationPanel({
       </div>
       <p className="-mt-2 text-xs text-muted-foreground">
         Route a design storm across the terrain and see where water accumulates.
-        Flow paths and flood-risk zones draw straight onto the map.
+        Flow paths and routed accumulation zones draw straight onto the map.
       </p>
 
       {/* Rainfall Slider */}

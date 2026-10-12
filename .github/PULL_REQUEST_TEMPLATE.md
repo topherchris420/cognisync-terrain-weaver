@@ -18,6 +18,7 @@ Fixes / Relates to #
 - [ ] My code follows the code style guidelines of this project
 - [ ] I have performed a self-review of my own code
 - [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes (`pnpm test`)
-- [ ] TypeScript typecheck passes (`pnpm typecheck`)
-- [ ] ESLint checks pass (`pnpm lint`)
+- [ ] New and existing unit tests pass locally with my changes (`npm test`)
+- [ ] TypeScript typecheck passes (`npm run typecheck`)
+- [ ] ESLint checks pass (`npm run lint`)
+- [ ] Committed experiment results still reproduce (`npm run validate`), or the re-run reports are committed with the change

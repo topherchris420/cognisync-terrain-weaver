@@ -64,6 +64,22 @@ export interface LocalStormInput {
   substrateHash?: string;
 }
 
+/**
+ * Per-cell water for one routed run, in cubic metres. Kept in memory so a
+ * controlled NOW / POSSIBLE pair can be compared cell by cell (where the
+ * redesign changed what passes through the ground). Never exported: a replay
+ * recomputes it from the inputs, so a file cannot assert a map it did not earn.
+ */
+export interface StormCellGrid {
+  rows: number;
+  cols: number;
+  cellAreaM2: number;
+  /** Runoff generated on each cell before routing. Differs between NOW and POSSIBLE only where the drawn surface changed. */
+  generatedM3: number[][];
+  /** Water passing through each cell after fill-and-spill routing, upstream contributions included. */
+  accumulationM3: number[][];
+}
+
 export interface LocalStormResult extends SimulationResponse {
   waterBalance: WaterBalance;
   hydrograph: HydrographPoint[];
@@ -74,6 +90,7 @@ export interface LocalStormResult extends SimulationResponse {
   modelVersion: string;
   surfaceId: "now" | "possible";
   warnings: string[];
+  cells: StormCellGrid;
 }
 
 export interface StormMetadataExtras {
