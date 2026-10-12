@@ -220,7 +220,12 @@ async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
   }
 
   const data = await res.json();
-  const content: string | undefined = data?.choices?.[0]?.message?.content;
+  const content: string | undefined =
+    provider.name === "gemini"
+      ? data?.candidates?.[0]?.content?.parts
+          ?.map((p: { text?: string }) => p.text ?? "")
+          .join("") || undefined
+      : data?.choices?.[0]?.message?.content;
   if (!content) {
     throw new Response(
       JSON.stringify({ error: "AI returned no content.", raw: data }),
