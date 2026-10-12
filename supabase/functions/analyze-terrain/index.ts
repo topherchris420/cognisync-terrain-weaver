@@ -51,7 +51,7 @@ function resolveAIProvider(): AIProvider | null {
       name: "gemini",
       apiKey: geminiKey,
       model: GEMINI_MODEL,
-      url: GEMINI_API_URL,
+      url: `${GEMINI_API_BASE.replace(/\/+$/, "")}/models/${GEMINI_MODEL}:generateContent`,
     };
   }
 
@@ -140,14 +140,53 @@ function jsonError(status: number, message: string, extra?: unknown) {
   );
 }
 
-async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
+type ChatPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+type ChatMessage = { role: string; content: string | ChatPart[] };
+type ChatPayload = {
+  messages: ChatMessage[];
+  response_format?: { type: string };
+  temperature?: number;
+};
+
+// Translate the OpenAI-style chat payload into a native Gemini
+// generateContent request (JSON mode via responseMimeType).
+function toGeminiRequest(payload: ChatPayload) {
+  const parts = payload.messages.flatMap((m) =>
+    typeof m.content === "string"
+      ? [{ text: m.content }]
+      : m.content.map((p) => {
+          if (p.type === "text") return { text: p.text };
+          const match = p.image_url.url.match(/^data:([^;,]+);base64,(.*)$/s);
+          if (!match) throw new Error("Image must be a base64 data URL.");
+          return { inline_data: { mime_type: match[1], data: match[2] } };
+        })
+  );
+  return {
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      ...(payload.temperature !== undefined ? { temperature: payload.temperature } : {}),
+      ...(payload.response_format?.type === "json_object"
+        ? { responseMimeType: "application/json" }
+        : {}),
+    },
+  };
+}
+
+async function callAI(payload: ChatPayload, provider: AIProvider) {
+  const gemini = provider.name === "gemini";
   const res = await fetch(provider.url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${provider.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ ...payload, model: provider.model }),
+    headers: gemini
+      ? { "x-goog-api-key": provider.apiKey, "Content-Type": "application/json" }
+      : {
+          Authorization: `Bearer ${provider.apiKey}`,
+          "Content-Type": "application/json",
+        },
+    body: JSON.stringify(
+      gemini ? toGeminiRequest(payload) : { ...payload, model: provider.model },
+    ),
   });
 
   if (!res.ok) {
@@ -172,7 +211,11 @@ async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
   }
 
   const data = await res.json();
-  const content: string | undefined = data?.choices?.[0]?.message?.content;
+  const content: string | undefined = gemini
+    ? data?.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text ?? "")
+        .join("") || undefined
+    : data?.choices?.[0]?.message?.content;
   if (!content) {
     throw new Response(
       JSON.stringify({ error: "AI returned no content.", raw: data }),
