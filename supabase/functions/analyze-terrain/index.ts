@@ -51,7 +51,7 @@ function resolveAIProvider(): AIProvider | null {
       name: "gemini",
       apiKey: geminiKey,
       model: GEMINI_MODEL,
-      url: GEMINI_API_URL,
+      url: GEMINI_API_BASE,
     };
   }
 
@@ -140,15 +140,63 @@ function jsonError(status: number, message: string, extra?: unknown) {
   );
 }
 
-async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
-  const res = await fetch(provider.url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${provider.apiKey}`,
-      "Content-Type": "application/json",
+type ChatPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+function toGeminiBody(payload: Record<string, unknown>) {
+  const messages = (payload.messages ?? []) as {
+    content: string | ChatPart[];
+  }[];
+  const parts: Record<string, unknown>[] = [];
+  for (const m of messages) {
+    const items: ChatPart[] =
+      typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content;
+    for (const p of items) {
+      if (p.type === "text") parts.push({ text: p.text });
+      else {
+        const match = p.image_url.url.match(/^data:([^;]+);base64,(.*)$/);
+        if (match) parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
+      }
+    }
+  }
+  return {
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: payload.temperature ?? 0.2,
     },
-    body: JSON.stringify({ ...payload, model: provider.model }),
-  });
+  };
+}
+
+async function callGemini(payload: Record<string, unknown>, provider: AIProvider) {
+  const url = `${GEMINI_API_BASE}/models/${provider.model}:generateContent`;
+  const body = JSON.stringify(toGeminiBody(payload));
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "x-goog-api-key": provider.apiKey, "Content-Type": "application/json" },
+      body,
+    });
+    if (res.status !== 503) break;
+    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+  }
+  return res!;
+}
+
+async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
+  const res =
+    provider.name === "gemini"
+      ? await callGemini(payload, provider)
+      : await fetch(provider.url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${provider.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...payload, model: provider.model }),
+        });
 
   if (!res.ok) {
     const text = await res.text();
