@@ -72,10 +72,10 @@ import { withCurrentScore } from "npm:@/lib/score-integrity";
 var list_scans_default = defineTool({
   name: "list_scans",
   title: "List terrain scans",
-  description: "List recent urban terrain scans with their Urban Absorption Score and flood-risk band, newest first.",
+  description: "List recent urban terrain scans with their Urban Absorption Score and score band (`flood_risk`: low, moderate or high runoff share; a screening category, not a validated flood hazard), newest first.",
   inputSchema: {
     limit: z.number().int().min(1).max(50).default(10).describe("How many scans to return."),
-    flood_risk: z.enum(["low", "moderate", "high"]).optional().describe("Optional filter by flood-risk band.")
+    flood_risk: z.enum(["low", "moderate", "high"]).optional().describe("Optional filter by score band (low, moderate or high runoff share; recomputed from land cover, not the stored value).")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit, flood_risk }) => {
@@ -99,7 +99,7 @@ import { withCurrentScore as withCurrentScore2 } from "npm:@/lib/score-integrity
 var get_scan_default = defineTool2({
   name: "get_scan",
   title: "Get terrain scan",
-  description: "Fetch one terrain scan by id, including land-cover breakdown, absorption score, flood risk and climate-adaptation recommendations.",
+  description: "Fetch one terrain scan by id, including land-cover breakdown, absorption score, score band (runoff share) and climate-adaptation recommendations.",
   inputSchema: { id: z2.string().uuid().describe("The scan id.") },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }) => {
@@ -184,7 +184,7 @@ import { classifyFloodRisk, computeAbsorptionScore } from "npm:@/lib/absorption"
 var score_land_cover_default = defineTool4({
   name: "score_land_cover",
   title: "Score a land-cover mix",
-  description: "Compute the Urban Absorption Score (0-100) and flood-risk band for a hypothetical land-cover mix. Percentages should sum to 100 within 0.5 percentage points.",
+  description: "Compute the Urban Absorption Score (0-100) and score band (`flood_risk`: low, moderate or high runoff share; a screening category, not a validated flood hazard) for a hypothetical land-cover mix. Percentages should sum to 100 within 0.5 percentage points.",
   inputSchema: {
     pavement: z4.number().min(0).max(100).describe("Pavement percentage."),
     buildings: z4.number().min(0).max(100).describe("Building rooftop percentage."),
@@ -201,7 +201,7 @@ var score_land_cover_default = defineTool4({
       content: [
         {
           type: "text",
-          text: `Urban Absorption Score: ${score}/100 \u2014 flood risk: ${risk}.`
+          text: `Urban Absorption Score: ${score}/100 \u2014 runoff band: ${risk} (a screening category, not a validated flood hazard).`
         }
       ],
       structuredContent: { absorption_score: score, flood_risk: risk }
@@ -222,7 +222,7 @@ var recommendation = z5.object({
 var create_analysis_default = defineTool5({
   name: "create_analysis",
   title: "Create terrain scan",
-  description: "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and flood-risk band are always computed deterministically; authoritative scores cannot be overridden.",
+  description: "Store a new terrain scan owned by the signed-in user. Provide the land-cover mix in percentages; the Urban Absorption Score and score band are always computed deterministically; authoritative scores cannot be overridden.",
   inputSchema: {
     name: z5.string().trim().min(1).describe("Human-readable name for the scan."),
     center_lat: z5.number().min(-90).max(90).describe("Latitude of the scan centre."),
@@ -269,7 +269,7 @@ var create_analysis_default = defineTool5({
       content: [
         {
           type: "text",
-          text: `Created scan "${data.name}" (${data.id}) \u2014 absorption ${absorption_score}/100, flood risk ${flood_risk}.`
+          text: `Created scan "${data.name}" (${data.id}) \u2014 absorption ${absorption_score}/100, runoff band ${flood_risk}.`
         }
       ],
       structuredContent: { scan: data }
@@ -290,7 +290,7 @@ var recommendation2 = z6.object({
 var update_analysis_default = defineTool6({
   name: "update_analysis",
   title: "Update terrain scan",
-  description: "Update a terrain scan owned by the signed-in user. Supplying a full land-cover mix recomputes the Urban Absorption Score and flood-risk band.",
+  description: "Update a terrain scan owned by the signed-in user. Supplying a full land-cover mix recomputes the Urban Absorption Score and score band.",
   inputSchema: {
     id: z6.string().uuid().describe("The scan id to update."),
     name: z6.string().trim().min(1).optional(),
@@ -392,7 +392,7 @@ var mcp_default = defineMcp({
   name: "cognisync-terrain-weaver",
   title: "cognisync-terrain-weaver",
   version: "0.2.0",
-  instructions: "Tools for the Urban Resilience Intelligence platform. Terrain scans classify satellite imagery into pavement, buildings, vegetation, water and soil, then derive an Urban Absorption Score (0-100) and a flood-risk band. Read: `list_scans`, `find_scans_near`, `get_scan`, `score_land_cover`. Write (acts as the signed-in user): `create_analysis` stores a new scan, `update_analysis` and `delete_analysis` manage scans you own, and `list_my_scans` lists them.",
+  instructions: "Tools for Mannahatta, a counterfactual urban resilience instrument. Terrain scans classify satellite imagery into pavement, buildings, vegetation, water and soil, then derive an Urban Absorption Score (0-100) and a score band (`flood_risk`: low, moderate or high runoff share; a screening category, not a validated flood hazard). Scores are computed from land cover by code, never read from storage or accepted from a model. Read: `list_scans`, `find_scans_near`, `get_scan`, `score_land_cover`. Write (acts as the signed-in user): `create_analysis` stores a new scan, `update_analysis` and `delete_analysis` manage scans you own, and `list_my_scans` lists them.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"

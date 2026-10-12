@@ -32,10 +32,10 @@ function exportJson() {
   return JSON.parse(JSON.stringify(evidence));
 }
 
-describe("experiment export v3", () => {
+describe("experiment export v4", () => {
   it("records controlled variables, evidence status and reproducibility", () => {
     const evidence = exportJson();
-    expect(evidence.schema).toBe("mannahatta-experiment-v3");
+    expect(evidence.schema).toBe("mannahatta-experiment-v4");
     expect(evidence.provenance.substrate).toBe("not-consulted");
     expect(evidence.comparison.controlled.fixed.find((v: { id: string }) => v.id === "substrate_hash").identical).toBe(true);
     expect(evidence.comparison.controlled.valid).toBe(true);
@@ -44,6 +44,18 @@ describe("experiment export v3", () => {
     expect(evidence.values.possibleResult.status).toBe("counterfactual");
     expect(evidence.reproducibility.replayable).toBe(true);
     expect(evidence.validationEvidence.find((e: { component: string }) => e.component === "Routed accumulation zones").validation).toBe("failed");
+  });
+
+  it("records where the water moved, and never the per-cell grids themselves", () => {
+    const evidence = exportJson();
+    expect(evidence.results.now).not.toHaveProperty("cells");
+    expect(evidence.results.possible).not.toHaveProperty("cells");
+    expect(evidence.comparison.spatial.summary.less).toBeGreaterThan(0);
+    expect(evidence.comparison.spatial.summary.more).toBe(0);
+    expect(evidence.comparison.spatial.summary.sourceCells).toBeGreaterThan(0);
+    expect(evidence.comparison.spatial.caveat).toMatch(/not where flooding/);
+    expect(evidence.reproducibility.how).toMatch(/where the water moved/);
+    expect(evidence.reproducibility.notEmbedded.join(" ")).toMatch(/per-cell/);
   });
 
   it("refuses an embedded grid that is not the routed one", () => {
@@ -74,6 +86,19 @@ describe("replay", () => {
     evidence.evidenceHash = stableHash(rest);
     const report = replayExperiment(evidence);
     expect(report.checks.find((c) => c.id === "elevation-hash")?.passed).toBe(false);
+  });
+
+  it("recomputes where the water moved and rejects a forged spatial summary", () => {
+    const evidence = exportJson();
+    expect(replayExperiment(evidence).checks.find((c) => c.id === "spatial-difference")?.passed).toBe(true);
+    evidence.comparison.spatial.summary.less += 7;
+    evidence.comparison.spatial.summary.downstreamCells += 7;
+    const { evidenceHash: _unused, ...rest } = evidence;
+    evidence.evidenceHash = stableHash(rest);
+    const report = replayExperiment(evidence);
+    expect(report.checks.find((c) => c.id === "evidence-hash")?.passed).toBe(true);
+    expect(report.checks.find((c) => c.id === "spatial-difference")?.passed).toBe(false);
+    expect(report.reproduced).toBe(false);
   });
 
   it("says plainly when an export cannot be replayed", () => {

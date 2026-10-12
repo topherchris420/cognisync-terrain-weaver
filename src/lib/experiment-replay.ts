@@ -1,8 +1,9 @@
+import { spatialDifferenceSummary, type SpatialDifferenceSummary } from "./counterfactual/difference";
 import { stableHash } from "./counterfactual/hashing";
-import { rasterizeSurfaceModifiers } from "./counterfactual/modifiers";
+import { MODIFIER_RASTERIZER_VERSION, rasterizeSurfaceModifiers } from "./counterfactual/modifiers";
 import type { InterventionFeature } from "./counterfactual/types";
 import { routeWatershed } from "./hydrology/engine";
-import { LOCAL_HYDROLOGY_MODEL, type ElevationGrid, type SimExtent } from "./hydrology/types";
+import { LOCAL_HYDROLOGY_MODEL, type ElevationGrid, type LocalStormResult, type SimExtent } from "./hydrology/types";
 import type { SimulationResponse } from "./simulation-types";
 import { verifyStormSeal, type StormSeal } from "./storm-identity";
 import type { LandCover } from "./types";
@@ -34,7 +35,8 @@ export interface ReplayReport {
   checks: ReplayCheck[];
   /** Substrate tiles or manifest that could not be reconstructed, for diagnostics. */
   substrateMismatches: SubstrateMismatch[];
-  rerun: { now: SimulationResponse; possible: SimulationResponse | null } | null;
+  /** This build's own routing of the file's inputs, per-cell grids included. */
+  rerun: { now: LocalStormResult; possible: LocalStormResult | null } | null;
 }
 
 export interface ReplayOptions {
@@ -42,7 +44,7 @@ export interface ReplayOptions {
   substrate?: SubstrateReader | null;
 }
 
-interface ReplayableExport {
+export interface ReplayableExport {
   schema: string;
   evidenceHash: string;
   study: { landCover: LandCover };
@@ -54,6 +56,10 @@ interface ReplayableExport {
   };
   results: { now: SimulationResponse | null; possible: SimulationResponse | null };
   substrate?: SubstrateEvidence | null;
+  /** v4: the spatial difference the export recorded, recomputed and checked here. */
+  comparison?: { spatial?: { summary: SpatialDifferenceSummary } | null } | null;
+  /** v4 records the cell-coverage rule behind the intervention surface identity; earlier exports used v1. */
+  models?: { rasterizer?: string } | null;
   [key: string]: unknown;
 }
 
@@ -145,12 +151,41 @@ export function replayExperiment(exported: ReplayableExport, options: ReplayOpti
   compare("now", now, rerunNow);
   if (possible && rerunPossible) {
     compare("possible", possible, rerunPossible);
+    const fileRasterizer = exported.models?.rasterizer ?? "cell-coverage-v1";
+    const sameIdentity = possible.metadata.modifier_hash === rerunPossible.metadata.modifier_hash;
     add(
       "treatment",
       "Intervention surface identity",
-      possible.metadata.modifier_hash === undefined || possible.metadata.modifier_hash === rerunPossible.metadata.modifier_hash,
-      possible.metadata.modifier_hash === undefined ? "not recorded by this export" : `${rerunPossible.metadata.modifier_hash}`,
+      possible.metadata.modifier_hash === undefined || sameIdentity,
+      possible.metadata.modifier_hash === undefined
+        ? "not recorded by this export"
+        : sameIdentity
+          ? `${rerunPossible.metadata.modifier_hash}`
+          : fileRasterizer === MODIFIER_RASTERIZER_VERSION
+            ? `exported ${possible.metadata.modifier_hash}, replayed ${rerunPossible.metadata.modifier_hash}`
+            : `exported ${possible.metadata.modifier_hash} under ${fileRasterizer}, replayed ${rerunPossible.metadata.modifier_hash} under ${MODIFIER_RASTERIZER_VERSION}: partially covered cells are measured by a different rule, so read the volumes above as the comparison`,
     );
+    // v4 records where the water moved; the recomputed field must say the same.
+    const recorded = exported.comparison?.spatial?.summary;
+    if (recorded) {
+      const recomputed = spatialDifferenceSummary(rerunNow, rerunPossible);
+      const counts: Array<keyof SpatialDifferenceSummary> = ["cells", "changed", "less", "more", "sourceCells", "downstreamCells"];
+      const volumes: Array<keyof SpatialDifferenceSummary> = ["farthestReachM", "largestDecreaseM3", "largestIncreaseM3", "generatedDeltaM3", "passageDeltaM3"];
+      const same =
+        recomputed !== null &&
+        counts.every((key) => recorded[key] === recomputed[key]) &&
+        volumes.every((key) => close(recorded[key], recomputed[key]));
+      add(
+        "spatial-difference",
+        "Where the water moved",
+        same,
+        recomputed === null
+          ? "the replayed pair is not a controlled comparison"
+          : same
+            ? `${recomputed.less} cells carry less water (${recomputed.downstreamCells} downstream, reach ${Math.round(recomputed.farthestReachM)} m), ${recomputed.more} more`
+            : `exported ${recorded.less} less / ${recorded.more} more / ${recorded.downstreamCells} downstream; replayed ${recomputed.less} / ${recomputed.more} / ${recomputed.downstreamCells}`,
+      );
+    }
   }
   return {
     reproduced: checks.every((c) => c.passed),

@@ -197,13 +197,13 @@ export default function Dashboard() {
             <p className="atlas-index-lede">
               {stats ? (
                 <>
-                  {stats.total} {stats.total === 1 ? "site" : "sites"} scanned by the platform. The median absorbs{" "}
+                  {stats.total} {stats.total === 1 ? "site" : "sites"} scanned with the instrument. The median absorbs{" "}
                   <strong>{stats.median.toFixed(1)}</strong>, about{" "}
                   {Math.round((stats.median / BASELINE_SCORE) * 100)}% of the estimated{" "}
                   {BASELINE_SCORE.toFixed(0)} for Mannahatta in 1609.
                 </>
               ) : (
-                "Every live scan run on the platform, in one public feed."
+                "Every live scan run with the instrument, in one public feed."
               )}
             </p>
           </div>
@@ -220,7 +220,7 @@ export default function Dashboard() {
             <div
               className="atlas-strip-plot"
               role="img"
-              aria-label={`Absorption scores of ${stats.total} sites on a 0 to 100 scale. ${stats.highRisk} high risk, ${stats.lowRisk} low risk, median ${stats.median.toFixed(1)}, against an estimated pre-development baseline of ${BASELINE_SCORE.toFixed(1)}.`}
+              aria-label={`Absorption scores of ${stats.total} sites on a 0 to 100 scale. ${stats.highRisk} in the high-runoff band, ${stats.lowRisk} in the low-runoff band, median ${stats.median.toFixed(1)}, against an estimated pre-development baseline of ${BASELINE_SCORE.toFixed(1)}.`}
             >
               <span className="atlas-strip-band atlas-strip-band--high" style={{ left: 0, right: `${100 - RISK_BANDS.moderate}%` }} />
               <span className="atlas-strip-band atlas-strip-band--moderate" style={{ left: `${RISK_BANDS.moderate}%`, right: `${100 - RISK_BANDS.low}%` }} />
@@ -250,9 +250,9 @@ export default function Dashboard() {
               <span className="atlas-strip-flag atlas-strip-flag--baseline" style={{ left: `${BASELINE_SCORE}%` }}>1609 · {BASELINE_SCORE.toFixed(0)}</span>
             </div>
             <figcaption id="strip-caption" className="atlas-strip-legend">
-              <span><i className="atlas-strip-key atlas-strip-key--high" />High risk · {stats.highRisk}</span>
+              <span><i className="atlas-strip-key atlas-strip-key--high" />High runoff · {stats.highRisk}</span>
               <span><i className="atlas-strip-key atlas-strip-key--moderate" />Moderate · {stats.total - stats.highRisk - stats.lowRisk}</span>
-              <span><i className="atlas-strip-key atlas-strip-key--low" />Low risk · {stats.lowRisk}</span>
+              <span><i className="atlas-strip-key atlas-strip-key--low" />Low runoff · {stats.lowRisk}</span>
               <span className="text-muted-foreground">Mean {stats.avg.toFixed(1)}</span>
             </figcaption>
           </figure>
@@ -384,7 +384,7 @@ export default function Dashboard() {
               <span>Site</span>
               <span className="hidden md:block">Land cover</span>
               <span className="text-right">Score</span>
-              <span className="hidden sm:block">Risk</span>
+              <span className="hidden sm:block">Band</span>
               <span className="hidden lg:block text-right">Scanned</span>
               <span />
             </li>

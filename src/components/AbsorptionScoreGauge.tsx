@@ -42,7 +42,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
     return () => cancelAnimationFrame(frame);
   }, [score, animated, reduceMotion]);
 
-  // The word and the pill must agree. Both derive from the same risk band --
+  // The word and the pill must agree. Both derive from the same score band --
   // independent thresholds here once let a score of 58 read "Vulnerable"
   // beside a pill that said "Low" risk.
   const statusText =
@@ -58,7 +58,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
         <span className="atlas-reading-scale">/100</span>
       </div>
       <p className="sr-only">
-        Urban absorption score {targetClamped.toFixed(0)} out of 100, {statusText}, {riskLabel(risk)} flood risk.
+        Urban absorption score {targetClamped.toFixed(0)} out of 100, {statusText}, {riskLabel(risk)} runoff band.
       </p>
 
       <div className="min-w-0 flex-1" aria-hidden="true">
@@ -68,7 +68,7 @@ export function AbsorptionScoreGauge({ score, className, animated = true }: Prop
           <span className="atlas-reading-pill">
             <span className={cn("atlas-reading-pip", tone)} />
             <span>{riskLabel(risk)}</span>
-            <span className="text-muted-foreground">flood risk</span>
+            <span className="text-muted-foreground">runoff band</span>
           </span>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">

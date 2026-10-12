@@ -237,7 +237,13 @@ where the browser exposes it.
 - Experiment export **v3** carries the substrate state (version, manifest
   hash, tile ids and hashes), source summaries, layer statuses, coverage,
   compiler, diagnostics and an explicit statement of use. Export fails
-  closed if the runs and the described substrate disagree.
+  closed if the runs and the described substrate disagree. **v4** keeps all
+  of this and adds the controlled pair's spatial difference summary, which
+  replay recomputes and checks.
+- **Open an experiment file** in the app runs the same verification in the
+  browser: the tiles the file names are fetched from the published store and
+  hashed before the pair is routed again. A tile that differs or is missing
+  fails its check by name; the study still opens, and says so.
 - `npm run replay -- study.json` finds the substrate by manifest hash (or
   `--substrate <dir>`) and verifies schema, manifest hash, version and every
   recorded tile before re-routing. It never substitutes current data:

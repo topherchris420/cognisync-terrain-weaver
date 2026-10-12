@@ -80,7 +80,7 @@ export function RecentScans() {
                       {s.location_label ?? s.name}
                     </div>
                     <div className={cn("text-xs", tone)}>
-                      {riskLabel(risk)} risk
+                      {riskLabel(risk)} runoff
                     </div>
                   </div>
                   <span

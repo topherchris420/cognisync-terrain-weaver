@@ -28,6 +28,18 @@ describe("AnalysisLaunchPanel", () => {
     expect(screen.getByRole("button", { name: /acquiring satellite feed/i })).toBeDisabled();
   });
 
+  it("hands a chosen experiment file to the workstation and clears the picker", () => {
+    const onOpenFile = vi.fn();
+    render(<AnalysisLaunchPanel location="Manhattan" areaKm2={0} mapReady={false} onAnalyze={vi.fn()} onOpenFile={onOpenFile} />);
+    const input = screen.getByLabelText(/open an experiment file/i) as HTMLInputElement;
+    expect(input).toHaveAttribute("accept", ".json,application/json");
+    const file = new File(["{}"], "study.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(onOpenFile).toHaveBeenCalledWith(file);
+    expect(input.value).toBe("");
+    expect(screen.getByText(/verified and replayed here before anything is shown/i)).toBeInTheDocument();
+  });
+
   it("lets visitors open an explicitly labeled example while imagery is unavailable", () => {
     const onExample = vi.fn();
     render(<AnalysisLaunchPanel location="Manhattan" areaKm2={0} mapReady={false} onAnalyze={vi.fn()} onExample={onExample} />);

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { InterventionFeature } from "./types";
 import {
+  MODIFIER_RASTERIZER_VERSION,
   buildRealitySurface,
+  planarArea,
   rasterizeSurfaceModifiers,
 } from "./modifiers";
 
@@ -178,5 +180,42 @@ describe("area-weighted rasterization (hydrology/H1)", () => {
       expect(credited / swale.eligibility.validAreaM2).toBeGreaterThan(0.96);
       expect(credited / swale.eligibility.validAreaM2).toBeLessThan(1.04);
     }
+  });
+});
+
+describe("cell coverage is engine-independent (cell-coverage-v2)", () => {
+  const halfCell: GeoJSON.Polygon = {
+    type: "Polygon",
+    // Covers exactly the western half of the single cell of a 1 × 1 grid over bbox.
+    coordinates: [[[0, 0], [0.5, 0], [0.5, 1], [0, 1], [0, 0]]],
+  };
+  const half: InterventionFeature = { ...feature("half"), geometry: halfCell, eligibility: { ...feature("half").eligibility, validGeometry: halfCell } };
+
+  it("measures a partially covered cell as a planar area ratio, exactly", () => {
+    const grid = rasterizeSurfaceModifiers([half], bbox, 1, 1);
+    expect(grid.cells).toHaveLength(1);
+    // 0.7 × 0.5: planar shoelace on translated coordinates reproduces the exact fraction.
+    expect(grid.cells[0].retentionFractionDelta).toBe(0.35);
+  });
+
+  it("subtracts holes and is unchanged by translation", () => {
+    const withHole: GeoJSON.Polygon = {
+      type: "Polygon",
+      coordinates: [
+        [[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
+        [[1, 1], [1, 3], [3, 3], [3, 1], [1, 1]],
+      ],
+    };
+    expect(planarArea(withHole)).toBe(12);
+    expect(planarArea(withHole, [-74, 40.7])).toBeCloseTo(12, 9);
+    const multi: GeoJSON.MultiPolygon = { type: "MultiPolygon", coordinates: [withHole.coordinates, [[[10, 10], [11, 10], [11, 11], [10, 11], [10, 10]]]] };
+    expect(planarArea(multi)).toBe(13);
+  });
+
+  it("gives the same surface identity whatever order the cells are visited in", () => {
+    const a = rasterizeSurfaceModifiers([half], bbox, 7, 5);
+    const b = rasterizeSurfaceModifiers([half], bbox, 7, 5);
+    expect(a.cells).toEqual(b.cells);
+    expect(MODIFIER_RASTERIZER_VERSION).toBe("cell-coverage-v2");
   });
 });

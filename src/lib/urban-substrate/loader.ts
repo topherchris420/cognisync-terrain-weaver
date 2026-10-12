@@ -1,4 +1,4 @@
-import { DEFAULT_SUBSTRATE_LOADING, SUBSTRATE_INDEX_FILE } from "./config";
+import { DEFAULT_SUBSTRATE_LOADING, SUBSTRATE_INDEX_FILE, SUBSTRATE_PUBLIC_DIR } from "./config";
 import { bboxToLocal, tileId, tilesIntersectingM, compareTileIds, parseTileId } from "./tile-id";
 import { computeManifestHash, hashTileText, isCompatibleSchema, textBytes, tilePath } from "./manifest";
 import { decodeRle } from "./layers/water";
@@ -72,6 +72,12 @@ export interface SubstrateView {
   context: Map<string, ContextTile>;
   identity: SubstrateIdentity;
   diagnostics: SubstrateDiagnostics;
+}
+
+/** Where this build publishes compiled substrates, as a URL prefix ending in "/". */
+export function publishedSubstrateBaseUrl(): string {
+  const base = (import.meta.env?.BASE_URL as string | undefined) ?? "/";
+  return `${base.endsWith("/") ? base : `${base}/`}${SUBSTRATE_PUBLIC_DIR}/`;
 }
 
 export function httpStore(baseUrl: string, fetchImpl: typeof fetch = fetch): SubstrateStore {

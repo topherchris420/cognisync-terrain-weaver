@@ -16,8 +16,8 @@ This is a reproducible calculation, not a measured site outcome or a screenshot.
 2. In **Overview**, inspect the composition, historical reconstruction where available, and vegetation–pavement sensitivity. Live scans also expose the captured imagery.
 3. In **Storm**, choose rainfall and resolution, then route a one-hour design event. Its forcing is sealed for the comparison.
 4. In **Mitigation**, ask Catalyst what a target and budget permit. Then draw supported interventions on the actual study extent.
-5. Rerun the sealed storm and compare **NOW / POSSIBLE** with the synchronized map view.
-6. Export the study or its **experiment evidence JSON**, including inputs, drawings, coefficients, forcing and available routed results.
+5. Rerun the sealed storm and compare **NOW / POSSIBLE** with the synchronized map view. Then read **where the water moved**: the cells that carry less water on the redesigned surface, the drawing's own footprint on the grid, and how far downstream the change reaches.
+6. Export the study or its **experiment evidence JSON**, including inputs, drawings, coefficients, forcing, routed results and the spatial difference. **Open an experiment file** reopens it: every identity is verified and the pair is routed again by the running build before anything is shown.
 
 Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. Example land cover never becomes a measurement merely because the terrain loaded successfully.
 
@@ -82,6 +82,8 @@ Fixed coefficients yield linear responses: this model **cannot identify saturati
 
 The browser loads Terrarium elevation onto a finite grid and routes water with D8 over static **fill-and-spill** (routing v2): closed depressions hold up to their volume and spill the rest, and cells at or below 0 m are treated as receiving tidal water. The original D8 stranded a median 81% of routed water in single-cell pits and in Terrarium artefacts as deep as −14 km; the analytic pit and flat cases now pass ([R1](experiments/routing/R1-synthetic-terrains/REPORT.md), [R2](experiments/routing/R2-resolution-sensitivity/REPORT.md)). Intervention modifiers are weighted by the share of each cell a drawing covers, so credited area no longer depends on resolution. A synthetic slope is used and labeled if elevation is unavailable. NOW and POSSIBLE share rainfall, duration, resolution and elevation identity; edited futures invalidate the previous comparison. Surface identities include study bounds and classified cover.
 
+A controlled pair is also subtracted cell by cell. The **difference layer** colours the cells through which the redesigned surface sends less water (and any through which it sends more), outlines the drawing's own cells, and reports how far downstream the change reaches; the ledger beside it keeps the avoided runoff, because water is counted at every cell it passes. A pair that differs in anything but the drawn surface has no difference layer, only a list of what differs. Like every routed quantity, it shows where this model sends water, not where flooding becomes less likely.
+
 **Routed zones did not locate reported flooding.** On a preregistered held-out storm (29 September 2023, 145 NYC street-flooding reports across 68 of 208 study areas), routed accumulation ranked reported locations no better than chance (AUC 0.50), while simply ranking low ground did better (0.62) ([R5](experiments/routing/R5-311-association-holdout/REPORT.md)). Flow directions also change with the elevation source for about two thirds of cells ([R3](experiments/routing/R3-dem-source-sensitivity/REPORT.md)). Read the map as where this model sends water, not where flooding is likely. The app says so beside every routed result.
 
 The engine conserves rain across retained/infiltrated, stored and runoff terms; runoff is further split into water ponded in depressions and water leaving the extent. It constructs a volume-scaled triangular hydrograph. **The hydrograph shape is prescribed, not calibrated discharge.** Accumulation divided by cell area is an equivalent routing metric, not hydraulically solved standing-water depth. Display severity is relative within a run, so colored zones must not be read as official hazard categories.
@@ -121,21 +123,23 @@ The compiler, tiling, near/far loading, junction clustering and source documenta
 |---|---|---|
 | CSV / GeoJSON | Study identity, extent, cover, score, model label, example/provenance status and caveat | Geometry is the study boundary, not a flood extent |
 | PDF | Analysis summary, explicit provenance labels on every page, optional aggregate scenario | Does not contain the routed storm pair |
-| Experiment JSON (v3) | Question, every key value with its evidence status, model/assumption versions and code commit, cover, extent, drawings, registry, sealed storm, **elevation grid**, **urban substrate identity** (version, manifest hash, tile hashes, sources), routed outputs, the controlled-variable check, validation evidence, evidence hash | Does not embed imagery, so the classification itself cannot be replayed |
+| Experiment JSON (v4) | Question, every key value with its evidence status, model/assumption versions and code commit, cover, extent, drawings, registry, sealed storm, **elevation grid**, **urban substrate identity** (version, manifest hash, tile hashes, sources), routed outputs, the controlled-variable check, **where the water moved** (spatial difference summary), validation evidence, evidence hash | Does not embed imagery, so the classification itself cannot be replayed; per-cell water is recomputed on replay, never read from the file |
 
-`npm run replay -- study.json` verifies the evidence hash, storm seal and elevation identity, reconstructs every recorded substrate tile from its hash, re-routes NOW and POSSIBLE and compares every volume; a tampered file or tile fails. A NOW/POSSIBLE pair is only exported as a comparison if storm, extent, resolution, land cover, terrain, model and urban substrate are identical and only the drawn surface differs. The evidence hash is not a cryptographic signature. The share action still reopens a **map view**; in-app import remains future work.
+`npm run replay -- study.json` verifies the evidence hash, storm seal and elevation identity, reconstructs every recorded substrate tile from its hash, re-routes NOW and POSSIBLE and compares every volume and the spatial difference; a tampered file or tile fails. A NOW/POSSIBLE pair is only exported as a comparison if storm, extent, resolution, land cover, terrain, model and urban substrate are identical and only the drawn surface differs. The evidence hash is not a cryptographic signature.
+
+The same verification runs in the browser. **Open an experiment file** (on the intro panel or the Export step) parses the file, fetches the substrate tiles it names from the published store and checks their hashes, routes NOW and POSSIBLE again with the running build, and only then loads the study, with every check listed beside it. The score is recomputed from the file's land cover; the routed results shown are the build's own; the file's recorded results are only compared with them. A file that fails a check still opens and says which check; a storm whose seal does not verify is not loaded at all. v2 and v3 exports reopen too. Identities are computed with engine-independent arithmetic, so a file exported from a browser reproduces on the command line and the other way round ([REVISIONS §6](experiments/REVISIONS.md)). The share action still reopens a **map view**.
 
 ## Architecture
 
 | Domain | Implementation |
 |---|---|
-| Map and study orchestration | `src/pages/Analyze.tsx`, MapLibre, `MapEditor` |
+| Map and study orchestration | `src/pages/Analyze.tsx`, MapLibre, `MapEditor`, `DifferenceLayer` |
 | Aggregate physics and planning | `src/lib/absorption.ts`, `scenario.ts`, `paired-storm.ts`, `catalyst.ts` |
 | Sensitivity | `src/lib/land-cover-sensitivity.ts` |
-| Spatial constraints and identity | `src/lib/counterfactual/` |
+| Spatial constraints, identity and the spatial difference | `src/lib/counterfactual/` (`controlled.ts`, `difference.ts`) |
 | Local terrain routing | `src/lib/hydrology/` |
 | Historical reconstruction | `src/lib/historical/`, `public/data/welikia-1609-blocks.json` |
-| Evidence and reports | `experiment-export.ts`, `experiment-replay.ts`, `geo.ts`, `pdf-export.ts` |
+| Evidence that travels and returns | `experiment-export.ts`, `experiment-replay.ts`, `experiment-import.ts`, `geo.ts`, `pdf-export.ts` |
 | Validation harness | `src/lib/validation/`, `experiments/`, `scripts/experiment.ts` |
 | Evidence status, ledger, assumption registry | `src/lib/evidence/`, `src/lib/assumptions/registry.ts` |
 | AI classification and persistence | Supabase `analyze-terrain`; shared `land-cover.ts` contract |
@@ -165,7 +169,7 @@ npm run lint
 npm run build
 ```
 
-Tests cover coefficient synchronization, water balance, geometry constraints, paired identities, async staleness, cost allocation, classification contracts, sensitivity, provenance, exports and replay. Passing tests establishes implementation consistency, **not empirical flood validation**. That is what the experiments are for:
+Tests cover coefficient synchronization, water balance, geometry constraints, paired identities, the spatial difference, async staleness, cost allocation, classification contracts, sensitivity, provenance, exports, replay and reopening. Passing tests establishes implementation consistency, **not empirical flood validation**. That is what the experiments are for:
 
 ```bash
 npm run validate        # re-run every experiment on frozen fixtures and recompile the substrate; fails if anything committed changed

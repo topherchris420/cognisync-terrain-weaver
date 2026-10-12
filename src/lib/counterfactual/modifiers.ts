@@ -1,4 +1,4 @@
-import { area as turfArea, bbox as geometryBbox, bboxPolygon, booleanPointInPolygon, feature as turfFeature, featureCollection, intersect } from "@turf/turf";
+import { bbox as geometryBbox, bboxPolygon, booleanPointInPolygon, feature as turfFeature, featureCollection, intersect } from "@turf/turf";
 import type {
   DataProvenance,
   InterventionFeature,
@@ -84,11 +84,58 @@ function contains(
  */
 export const MODIFIER_SUBSAMPLES = 16;
 
+/**
+ * Version of the cell-coverage rule, recorded in exports so a replay knows
+ * which rule produced the intervention surface identity it is checking.
+ *
+ * v2 (2026-10-12): the coverage of a partially covered cell is the ratio of
+ * planar (longitude/latitude) areas, computed with the shoelace formula on
+ * coordinates translated to the cell's corner. v1 divided two spherical
+ * areas from @turf/area, whose trigonometry is correctly rounded differently
+ * by different JavaScript engines; the formula's large cancelling terms
+ * amplified those last-bit differences to about 3e-10 of the coverage, so the
+ * same drawing hashed to a different surface identity in Chromium 141 and
+ * Node 22 (7 of 49 cells in one measured study). Planar area uses only
+ * addition, subtraction and multiplication, which every engine rounds
+ * identically; within one cell the metric scale varies by under 1e-4, far
+ * below any hydrological meaning, and it cancels in the ratio.
+ */
+export const MODIFIER_RASTERIZER_VERSION = "cell-coverage-v2";
+
+/**
+ * Planar (shoelace) area of a polygon in its own coordinates, holes
+ * subtracted, with coordinates translated to `origin` first so the sum does
+ * not cancel catastrophically for a cell-sized shape. Only +, − and ×: the
+ * same bits on every IEEE-754 engine.
+ */
+export function planarArea(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon, origin: [number, number] = [0, 0]): number {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  let total = 0;
+  for (const rings of polygons) {
+    rings.forEach((ring, index) => {
+      let twice = 0;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        const xj = ring[j][0] - origin[0];
+        const yj = ring[j][1] - origin[1];
+        const xi = ring[i][0] - origin[0];
+        const yi = ring[i][1] - origin[1];
+        twice += xj * yi - xi * yj;
+      }
+      const ringArea = Math.abs(twice) / 2;
+      total += index === 0 ? ringArea : -ringArea;
+    });
+  }
+  return Math.max(0, total);
+}
+
 function exactCoverage(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon, cell: [number, number, number, number]): number | null {
   try {
     const box = bboxPolygon(cell);
     const overlap = intersect(featureCollection([turfFeature(geometry), box]));
-    return overlap ? Math.min(1, turfArea(overlap) / turfArea(box)) : 0;
+    if (!overlap) return 0;
+    const boxArea = (cell[2] - cell[0]) * (cell[3] - cell[1]);
+    if (!(boxArea > 0)) return 0;
+    return Math.min(1, planarArea(overlap.geometry, [cell[0], cell[1]]) / boxArea);
   } catch {
     return null;
   }

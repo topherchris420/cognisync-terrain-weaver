@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Analyze from "./Analyze";
 import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
 import { SensorOpticsProvider } from "@/lib/sensor-optics-context";
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), capture: vi.fn(), storm: vi.fn() }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), capture: vi.fn(), storm: vi.fn(), remember: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
-vi.mock("@/lib/hydrology", () => ({ LOCAL_GRID: { low: 30, medium: 60, high: 90 }, runLocalStorm: mocks.storm }));
+vi.mock("@/lib/hydrology", () => ({ LOCAL_GRID: { low: 30, medium: 60, high: 90 }, runLocalStorm: mocks.storm, rememberElevation: mocks.remember, cachedElevation: () => null }));
 vi.mock("@/hooks/useWelikia1609", () => ({ useWelikia1609: () => ({ status: "idle" }) }));
 vi.mock("@/components/historical/Historical1609Panel", () => ({ Historical1609Panel: () => null }));
 vi.mock("@/components/MapView", async () => {
@@ -56,6 +56,53 @@ describe("Analyze request lifecycle", () => {
     expect(screen.getByText("Illustrative example")).toBeVisible();
     expect(screen.queryByText("Obsolete site")).not.toBeInTheDocument();
   });
+  it("reopens an exported experiment only after verifying and replaying it", async () => {
+    const { buildExperimentExport } = await import("@/lib/experiment-export");
+    const { routeWatershed } = await import("@/lib/hydrology/engine");
+    const { syntheticElevation } = await import("@/lib/hydrology/dem");
+    const { createStormSeal } = await import("@/lib/storm-identity");
+    const { stableHash } = await import("@/lib/counterfactual/hashing");
+    const { rasterizeSurfaceModifiers } = await import("@/lib/counterfactual/modifiers");
+    const { squareIntervention } = await import("@/lib/validation/fixtures");
+    const bbox = { west: -74.014, east: -74.004, south: 40.703, north: 40.712 };
+    const forcing = { rainfallDepthMm: 50, durationMinutes: 60, distribution: "uniform" as const, resolution: "low" as const, includeDrainage: false as const };
+    const storm = createStormSeal({ ...forcing, id: "file-storm", hash: stableHash(forcing) }, "2026-10-12T00:00:00.000Z");
+    const elevation = syntheticElevation(bbox, 36, 36);
+    const swale = squareIntervention("bioswales", bbox, 4000);
+    const base = { ...forcing, bbox, landCover: EXAMPLE_ANALYSIS.land_cover, stormHash: storm.storm.hash, elevation };
+    const now = routeWatershed({ ...base, surfaceId: "now", surfaceHash: "surface:now" });
+    const possible = routeWatershed({ ...base, surfaceId: "possible", surfaceHash: "surface:possible", modifiers: rasterizeSurfaceModifiers([swale], bbox, 36, 36), expectedElevationHash: now.elevationHash });
+    const text = JSON.stringify(buildExperimentExport({ analysis: EXAMPLE_ANALYSIS, scenario: { street_trees: 0, bioswales: 0.1, permeable_pavement: 0, green_roofs: 0 }, interventions: [swale], storm, now, possible, extent: bbox, elevation }));
+    mount();
+    const input = screen.getByLabelText(/open an experiment file/i);
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File([text], "study.json", { type: "application/json" })] } });
+    });
+    // The pair opens on Compare, with the verification beside it and the spatial reading beneath it.
+    expect(await screen.findByText(/Same storm, two grounds/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/Reopened evidence\. Reproduced: every input verified and every output matched/);
+    expect(screen.getByTestId("difference-summary")).toHaveTextContent(/Less water passes through \d+ cells/);
+    expect(screen.getByRole("switch", { name: /show where the water moved/i })).toBeChecked();
+    expect(screen.getByText("Illustrative example")).toBeVisible();
+    expect(mocks.remember).toHaveBeenCalledWith(expect.objectContaining({ hash: elevation.hash }), bbox);
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.storm).not.toHaveBeenCalled();
+    // The full report lives in Overview.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Overview" }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole("heading", { name: /Reproduced: every input verified/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Replay checks").querySelectorAll("li[data-failed]")).toHaveLength(0);
+  });
+
+  it("refuses a file that is not an experiment, and says why", async () => {
+    mount();
+    const input = screen.getByLabelText(/open an experiment file/i);
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(["{\"hello\":1}"], "notes.json", { type: "application/json" })] } });
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/names no schema/);
+    expect(screen.getByRole("button", { name: /explore an example/i })).toBeVisible();
+  });
+
   it("reset invalidates pending storm completion", async () => {
     const storm = deferred<never>();
     mocks.storm.mockReturnValue(storm.promise);

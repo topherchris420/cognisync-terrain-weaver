@@ -7,7 +7,7 @@ export default defineTool({
   name: "score_land_cover",
   title: "Score a land-cover mix",
   description:
-    "Compute the Urban Absorption Score (0-100) and flood-risk band for a hypothetical land-cover mix. Percentages should sum to 100 within 0.5 percentage points.",
+    "Compute the Urban Absorption Score (0-100) and score band (`flood_risk`: low, moderate or high runoff share; a screening category, not a validated flood hazard) for a hypothetical land-cover mix. Percentages should sum to 100 within 0.5 percentage points.",
   inputSchema: {
     pavement: z.number().min(0).max(100).describe("Pavement percentage."),
     buildings: z.number().min(0).max(100).describe("Building rooftop percentage."),
@@ -24,7 +24,7 @@ export default defineTool({
       content: [
         {
           type: "text",
-          text: `Urban Absorption Score: ${score}/100 — flood risk: ${risk}.`,
+          text: `Urban Absorption Score: ${score}/100 — runoff band: ${risk} (a screening category, not a validated flood hazard).`,
         },
       ],
       structuredContent: { absorption_score: score, flood_risk: risk },

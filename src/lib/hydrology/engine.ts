@@ -381,6 +381,7 @@ export function routeWatershed(
     modelVersion: LOCAL_HYDROLOGY_MODEL,
     surfaceId: input.surfaceId,
     warnings,
+    cells: { rows, cols, cellAreaM2, generatedM3: generatedRunoff, accumulationM3: accumulation },
   };
 }
 

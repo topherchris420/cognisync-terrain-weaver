@@ -13,12 +13,35 @@ import { INTERVENTIONS, type Scenario } from "./scenario";
 import type { AnalysisRecord } from "./types";
 import { modelVersions } from "./validation/experiment";
 import { SUBSTRATE_NONE, type SubstrateEvidence } from "./urban-substrate/identity";
+import { SPATIAL_DIFFERENCE_CAVEAT, spatialDifferenceSummary } from "./counterfactual/difference";
+import { MODIFIER_RASTERIZER_VERSION } from "./counterfactual/modifiers";
 
 /**
+ * v4 (2026-10-12): the comparison carries a spatial summary of where the
+ * water moved (cells carrying less or more water, the drawing's footprint,
+ * downstream reach), which replay recomputes and checks; routed results carry
+ * only the routed contract, never per-cell grids, so a file cannot assert a
+ * map it did not earn; and the file reopens in the app, where it is verified
+ * and replayed before anything is shown. Replay still reads v2 and v3.
+ *
  * v3 (2026-10-02): adds the urban substrate an experiment used (identity,
- * tile hashes, sources, coverage, diagnostics). Replay still reads v2.
+ * tile hashes, sources, coverage, diagnostics).
  */
-export const EXPERIMENT_SCHEMA = "mannahatta-experiment-v3";
+export const EXPERIMENT_SCHEMA = "mannahatta-experiment-v4";
+
+/** Schemas this build can verify, replay and reopen. */
+export const READABLE_EXPERIMENT_SCHEMAS: readonly string[] = ["mannahatta-experiment-v2", "mannahatta-experiment-v3", EXPERIMENT_SCHEMA];
+
+/**
+ * The routed contract of a run, without the in-memory per-cell grids. What a
+ * file records is what a replay can check; the grids are recomputed from the
+ * inputs, never read back.
+ */
+function exportableRun(run: SimulationResponse | null): SimulationResponse | null {
+  if (!run) return null;
+  const { cells: _cells, ...rest } = run as SimulationResponse & { cells?: unknown };
+  return rest;
+}
 
 /** Build identity injected by Vite (VITE_GIT_COMMIT or the checkout's HEAD). */
 const CODE_COMMIT: string = (import.meta.env?.VITE_GIT_COMMIT as string | undefined) || "unrecorded";
@@ -89,10 +112,19 @@ export function buildExperimentExport(input: {
   const analysis = input.analysis;
   const exampleCover = analysis.status === "example";
   const control = input.now && input.possible ? controlledComparison(input.now, input.possible) : null;
+  const spatial = spatialDifferenceSummary(input.now, input.possible);
   const comparison =
     input.now && input.possible
       ? {
           controlled: control,
+          /** Where the water moved, cell by cell; null unless the pair is controlled and the runs still carry their grids. */
+          spatial: spatial
+            ? {
+                summary: spatial,
+                method: "POSSIBLE − NOW routed accumulation per cell; source cells are those whose own generated runoff changed, downstream cells only receive different water. Reach is straight-line distance to the nearest source cell.",
+                caveat: SPATIAL_DIFFERENCE_CAVEAT,
+              }
+            : null,
           nowRunoffM3: input.now.metadata.runoff_volume_m3 ?? null,
           possibleRunoffM3: input.possible.metadata.runoff_volume_m3 ?? null,
           avoidedRunoffM3:
@@ -145,7 +177,7 @@ export function buildExperimentExport(input: {
       possibleResult: input.possible ? evidenced(input.possible.metadata.runoff_volume_m3 ?? null, "counterfactual", input.possible.metadata.model ?? "routing engine", "m³ runoff") : null,
       unitCosts: evidenced(Object.fromEntries(Object.values(INTERVENTIONS).map((d) => [d.key, d.unitCostUSD])), "assumed", "assumption registry: cost.* (scenario assumptions, unsourced)", "USD per m²"),
     },
-    models: { ...modelVersions(), codeCommit: CODE_COMMIT },
+    models: { ...modelVersions(), rasterizer: MODIFIER_RASTERIZER_VERSION, codeCommit: CODE_COMMIT },
     coefficients: ABSORPTION_WEIGHTS,
     interventionAssumptions: INTERVENTIONS,
     assumptionRegistry: ASSUMPTIONS.map((a) => ({ id: a.id, value: a.value, unit: a.unit, basis: a.basis, source: a.source })),
@@ -159,15 +191,16 @@ export function buildExperimentExport(input: {
         : null,
     },
     substrate: input.substrate ?? null,
-    results: { now: input.now, possible: input.possible },
+    results: { now: exportableRun(input.now), possible: exportableRun(input.possible) },
     comparison,
     validationEvidence: EVIDENCE_LEDGER.map((e) => ({ component: e.component, evidence: e.evidence, validation: e.validation, finding: e.finding, experiments: e.experiments })),
     reproducibility: {
       replayable,
       how: replayable
-        ? `npm run replay -- <this file>: verifies the evidence hash, storm seal and elevation hash${input.substrate?.state.status === "loaded" ? ", reconstructs every recorded substrate tile from its hash" : ""}, re-routes NOW and POSSIBLE, and compares outputs.`
+        ? `npm run replay -- <this file>: verifies the evidence hash, storm seal and elevation hash${input.substrate?.state.status === "loaded" ? ", reconstructs every recorded substrate tile from its hash" : ""}, re-routes NOW and POSSIBLE, and compares every volume${spatial ? " and where the water moved" : ""}.`
         : "Not replayable: a routed pair, its extent and its elevation grid are all required.",
-      notEmbedded: ["captured imagery (the classification cannot be re-run from this file)"],
+      reopen: "Open this file in the Mannahatta workstation (Open an experiment file) to run the same verification there; the study is loaded only from inputs this build recomputed.",
+      notEmbedded: ["captured imagery (the classification cannot be re-run from this file)", "per-cell routed water (recomputed on replay, never read from the file)"],
     },
     limitations: [
       "Screening experiment; not validated against observed flooding.",

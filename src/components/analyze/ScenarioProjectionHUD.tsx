@@ -31,7 +31,7 @@ export function ScenarioProjectionHUD({
       icon: CloudRain,
     },
     {
-      label: "Risk",
+      label: "Band",
       value: riskLabel(metrics.estimatedRisk),
       icon: ShieldAlert,
     },

@@ -15,7 +15,7 @@ export default defineTool({
   name: "update_analysis",
   title: "Update terrain scan",
   description:
-    "Update a terrain scan owned by the signed-in user. Supplying a full land-cover mix recomputes the Urban Absorption Score and flood-risk band.",
+    "Update a terrain scan owned by the signed-in user. Supplying a full land-cover mix recomputes the Urban Absorption Score and score band.",
   inputSchema: {
     id: z.string().uuid().describe("The scan id to update."),
     name: z.string().trim().min(1).optional(),

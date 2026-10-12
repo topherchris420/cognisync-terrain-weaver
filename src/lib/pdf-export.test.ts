@@ -12,7 +12,7 @@ const record: AnalysisRecord = {
   bbox: null,
   image_data_url: null,
   land_cover: { vegetation: 18, soil: 6, water: 4, buildings: 41, pavement: 31 },
-  // 58 is the score that used to print VULNERABLE above "Flood Risk: Low".
+  // 58 is the score that used to print VULNERABLE above a "Low" band line.
   absorption_score: 58,
   flood_risk: "low",
   recommendations: [],
@@ -38,11 +38,12 @@ describe("PDF export", () => {
     expect(() => generatePDFReport(record)).not.toThrow();
   });
 
-  it("prints a status word that agrees with the risk band", () => {
+  it("prints a status word that agrees with the score band, named as runoff", () => {
     const text = textOf(generatePDFReport(record));
     expect(text).toContain("RESILIENT");
     expect(text).not.toContain("VULNERABLE");
-    expect(text).toContain("Flood Risk: Low");
+    expect(text).toContain("Runoff band: Low");
+    expect(text).not.toContain("Flood Risk");
   });
 
   it("carries the 1609 baseline section", () => {

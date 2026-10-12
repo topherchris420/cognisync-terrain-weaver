@@ -18,6 +18,10 @@ export function depthColor(depthM: number): string {
   return color;
 }
 
+/** Where the water moved: cells carrying less water on the redesigned surface, and cells carrying more. */
+export const DIFFERENCE_LESS = "#9fe26b";
+export const DIFFERENCE_MORE = "#f0a35e";
+
 export const FLOW_HEAD = "rgba(118, 205, 228, 0.28)";
 export const FLOW_MOUTH = "rgba(196, 244, 255, 1)";
 

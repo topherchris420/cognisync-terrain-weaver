@@ -6,9 +6,10 @@ export type {
   LocalStormInput,
   LocalStormResult,
   SimExtent,
+  StormCellGrid,
 } from "./types";
 export { decodeTerrarium, encodeTerrarium, chooseTileZoom, tilesForBBox } from "./terrarium";
-export { loadElevationGrid, syntheticElevation, clearElevationCache, cachedElevation } from "./dem";
+export { loadElevationGrid, syntheticElevation, clearElevationCache, cachedElevation, rememberElevation } from "./dem";
 export {
   designStormHydrograph,
   hydrographPeakM3s,

@@ -26,11 +26,17 @@ import { PlanningEnvelope } from "@/components/analyze/PlanningEnvelope";
 import { HowDoWeKnow } from "@/components/analyze/HowDoWeKnow";
 import { UrbanSubstratePanel } from "@/components/analyze/UrbanSubstratePanel";
 import { SubstrateLayer } from "@/components/analyze/SubstrateLayer";
-import { useUrbanSubstrate, type ResolvedSubstrate } from "@/hooks/useUrbanSubstrate";
-import { substrateRunKey } from "@/lib/urban-substrate/identity";
+import { DifferenceLayer } from "@/components/analyze/DifferenceLayer";
+import { WhereTheWaterMoved } from "@/components/analyze/WhereTheWaterMoved";
+import { ReplayReadout } from "@/components/analyze/ReplayReadout";
+import { useUrbanSubstrate } from "@/hooks/useUrbanSubstrate";
+import { substrateRunKey, type SubstrateEvidence } from "@/lib/urban-substrate/identity";
 import { substrateEvidence } from "@/lib/urban-substrate/evidence";
+import { publishedSubstrateBaseUrl } from "@/lib/urban-substrate/loader";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 import { controlledComparison } from "@/lib/counterfactual/controlled";
+import { spatialDifference } from "@/lib/counterfactual/difference";
+import { ExperimentImportError, importExperiment, readFileText, type ImportedStudy } from "@/lib/experiment-import";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
 import { solveForTarget, projectFuture, DEFAULT_TARGET_SCORE } from "@/lib/catalyst";
@@ -59,6 +65,7 @@ import {
   FileText,
   FileSpreadsheet,
   FileJson,
+  FolderOpen,
   ChevronLeft,
   ChevronRight,
   RotateCcw,
@@ -116,6 +123,7 @@ import { requiredEligibilityLayer } from "@/lib/counterfactual/eligibility";
 import {
   LOCAL_GRID,
   cachedElevation,
+  rememberElevation,
   runLocalStorm,
   type SimExtent,
 } from "@/lib/hydrology";
@@ -259,6 +267,9 @@ export default function Analyze() {
   // Layer visibility toggles
   const [showFlowVectors, setShowFlowVectors] = useState(true);
   const [showRiskHeatmap, setShowRiskHeatmap] = useState(true);
+  const [showDifference, setShowDifference] = useState(true);
+  /** An exported experiment reopened here: its verification travels with the study. */
+  const [reopened, setReopened] = useState<ImportedStudy | null>(null);
   const [eraId, setEraId] = useState<string>(DEFAULT_ERA_ID);
   const [compareEras, setCompareEras] = useState(false);
 
@@ -332,7 +343,7 @@ export default function Analyze() {
   }, [activeIntervention, workflow.state]);
 
   const requestGeneration = useRef(0);
-  const pendingRequest = useRef<"analysis" | "storm" | null>(null);
+  const pendingRequest = useRef<"analysis" | "storm" | "import" | null>(null);
   const invalidateRequests = useCallback(() => {
     requestGeneration.current += 1;
     pendingRequest.current = null;
@@ -361,8 +372,20 @@ export default function Analyze() {
   /** Compiled public-record substrate beneath the study extent, or an explicit reason there is none. */
   const substrate = useUrbanSubstrate(analyzedBBox);
   const [showSubstrate, setShowSubstrate] = useState(false);
-  // The substrate the current storm pair was routed with; exports describe exactly this one.
-  const [stormSubstrate, setStormSubstrate] = useState<ResolvedSubstrate | null>(null);
+  /**
+   * The substrate the current storm pair was routed with, settled once per
+   * study: `null` until a storm has run (the live substrate is consulted
+   * then), afterwards exactly what the runs recorded, including "none" for a
+   * reopened study whose runs consulted no substrate. Exports describe this
+   * and nothing else.
+   */
+  const [stormSubstrate, setStormSubstrate] = useState<{ evidence: SubstrateEvidence | null } | null>(null);
+
+  /** Where the water moved: the cell-by-cell difference of a controlled NOW / POSSIBLE pair. */
+  const difference = useMemo(
+    () => (simResult && futureSimResult ? spatialDifference(simResult, futureSimResult) : null),
+    [simResult, futureSimResult]
+  );
 
   /** What each tool has placed, counting only the part that can be modeled. */
   const drawnByType = useMemo(() => {
@@ -475,11 +498,71 @@ export default function Analyze() {
     setNowSeal(null);
     setPossibleSeal(null);
     setStormSubstrate(null);
+    setReopened(null);
     setActiveIntervention(null);
     setInterventionFeatures([]);
     setSimWarnings([]);
     setScenario(EMPTY_SCENARIO);
     workflow.reset();
+  };
+
+  /**
+   * Reopen an exported experiment. The file is verified and replayed first;
+   * the study then loads only from what this build recomputed, with the
+   * verification shown beside it. A file that fails a check still opens, and
+   * says which check.
+   */
+  const openExperimentFile = async (file: File) => {
+    if (pendingRequest.current) return;
+    resetScan();
+    const generation = requestGeneration.current;
+    pendingRequest.current = "import";
+    try {
+      const text = await readFileText(file);
+      if (generation !== requestGeneration.current) return;
+      const study = await importExperiment(text, {
+        fetch: typeof fetch === "function" ? fetch.bind(globalThis) : null,
+        substrateBaseUrl: publishedSubstrateBaseUrl(),
+      });
+      if (generation !== requestGeneration.current) return;
+      // The routed grid the file carried becomes the grid any rerun here uses, so NOW keeps its identity.
+      if (study.elevation && study.extent) rememberElevation(study.elevation, study.extent);
+      const bounds = parseBBox(study.analysis.bbox);
+      setResult(study.analysis);
+      setName(study.analysis.name);
+      setLocationLabel(study.analysis.location_label ?? study.analysis.name);
+      if (bounds) mapRef.current?.fitBounds(bounds);
+      setScenario(study.scenario);
+      setInterventionFeatures(study.interventions);
+      setStormExtent(study.extent);
+      setStormSubstrate(study.now ? { evidence: study.substrate } : null);
+      setNowSeal(study.storm);
+      setPossibleSeal(study.possible && study.storm ? study.storm : null);
+      setSimResult(study.now);
+      setFutureSimResult(study.possible);
+      setSimWarnings([...(study.now?.warnings ?? []), ...(study.possible?.warnings ?? [])]);
+      if (study.possible) {
+        const areaM2 = bounds ? bboxAreaKm2(bounds) * 1e6 : 0;
+        setCatalystFuture({ scenario: study.scenario, future: projectFuture(study.analysis.land_cover, study.scenario, areaM2) });
+      }
+      setReopened(study);
+      workflow.advance(study.possible ? "REDESIGN" : study.now ? "STORM_COMPLETE" : "ANALYZED");
+      setActiveTab(study.possible ? "compare" : study.now ? "simulation" : "overview");
+      setDrawerOpen(true);
+      const failed = study.report.checks.filter((check) => !check.passed).length;
+      if (failed === 0) toast.success("Experiment reopened: every check held.");
+      else toast.warning(`Experiment reopened; ${failed} check${failed === 1 ? "" : "s"} did not hold. See Overview.`);
+    } catch (e) {
+      if (generation !== requestGeneration.current) return;
+      const message = e instanceof ExperimentImportError ? e.message : "The file could not be opened as an experiment.";
+      // A refused file is a normal outcome shown in the panel; only an unexpected failure is worth the console.
+      if (e instanceof ExperimentImportError) console.warn(message);
+      else console.error(e);
+      setAnalysisError(message);
+      toast.error(message);
+    } finally {
+      if (generation === requestGeneration.current) pendingRequest.current = null;
+    }
   };
 
   const openExample = () => {
@@ -578,9 +661,11 @@ export default function Analyze() {
     try {
       const extent = boundsToSimBBox(bounds);
       // NOW and POSSIBLE record the same settled substrate identity (or the same reason there is none).
-      const resolvedSubstrate = stormSubstrate ?? (await substrate.resolve());
+      const describedSubstrate: SubstrateEvidence | null = stormSubstrate
+        ? stormSubstrate.evidence
+        : await substrate.resolve().then((resolved) => substrateEvidence(resolved.state, resolved.view));
       if (generation !== requestGeneration.current) return;
-      const substrateHash = substrateRunKey(resolvedSubstrate.state);
+      const substrateHash = substrateRunKey(describedSubstrate?.state);
       const stormDefinition =
         nowSeal?.storm ?? buildStormDefinition(stormRainfallMm, stormResolution);
       const seal = createStormSeal(stormDefinition);
@@ -640,7 +725,7 @@ export default function Analyze() {
         const future = projectFuture(result.land_cover, scenario, areaM2);
         setSimResult(nowRun);
         setStormExtent(extent);
-        setStormSubstrate(resolvedSubstrate);
+        setStormSubstrate({ evidence: describedSubstrate });
         setSimWarnings([...nowRun.warnings, ...possibleRun.warnings]);
         setNowSeal(seal);
         setPossibleSeal(seal);
@@ -656,7 +741,7 @@ export default function Analyze() {
       } else {
         setSimResult(nowRun);
         setStormExtent(extent);
-        setStormSubstrate(resolvedSubstrate);
+        setStormSubstrate({ evidence: describedSubstrate });
         setSimWarnings(nowRun.warnings);
         setNowSeal(seal);
         workflow.advance("STORM_COMPLETE");
@@ -708,8 +793,15 @@ export default function Analyze() {
     try {
       const size = nowSeal ? LOCAL_GRID[nowSeal.storm.resolution] : 0;
       const elevation = stormExtent && size ? cachedElevation(stormExtent, size, size) : null;
-      const described = stormSubstrate ?? (substrate.status.phase === "ready" ? { state: substrate.status.state, view: substrate.status.view } : substrate.status.phase === "unavailable" ? { state: substrate.status.state, view: null } : null);
-      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult, extent: stormExtent, elevation, substrate: described ? substrateEvidence(described.state, described.view) : null });
+      // A routed study describes the substrate its runs recorded; before any storm, the live one.
+      const described = stormSubstrate
+        ? stormSubstrate.evidence
+        : substrate.status.phase === "ready"
+          ? substrateEvidence(substrate.status.state, substrate.status.view)
+          : substrate.status.phase === "unavailable"
+            ? substrateEvidence(substrate.status.state, null)
+            : null;
+      const evidence = buildExperimentExport({ analysis: result, scenario, interventions: interventionFeatures, storm: nowSeal, now: simResult, possible: futureSimResult, extent: stormExtent, elevation, substrate: described });
       downloadTextFile(exportFilename(name || "mannahatta-experiment", "json"), JSON.stringify(evidence, null, 2), "application/json");
       toast.success("Experiment evidence exported.");
     } catch {
@@ -794,6 +886,10 @@ export default function Analyze() {
               map={mapInstance}
               riskZones={simResult.risk_zones ?? []}
             />
+          )}
+          {/* Where the water moved: only for a controlled pair, and never under the split-screen */}
+          {difference?.status === "controlled" && showDifference && workflow.state !== "COMPARE" && (
+            <DifferenceLayer map={mapInstance} difference={difference} extent={stormExtent} />
           )}
 
           {/* Interactive Direct Map Editor for Mitigations */}
@@ -934,6 +1030,7 @@ export default function Analyze() {
           place={(result ? result.location_label : locationLabel) || "Custom map view"}
           showFlow={Boolean(simResult && showFlowVectors && simResult.flow_paths.length > 0)}
           showPonding={Boolean(simResult && showRiskHeatmap && (simResult.risk_zones?.length ?? 0) > 0)}
+          showDifference={difference?.status === "controlled" && showDifference && workflow.state !== "COMPARE"}
           rainfallMm={simResult ? nowSeal?.storm.rainfallDepthMm : undefined}
         />
         {!result && workflow.state !== "ANALYZING" && (
@@ -952,7 +1049,7 @@ export default function Analyze() {
             <div className="atlas-intro-action">
               <span className="atlas-eyebrow">02 / Read the landscape</span>
               {analysisError && <p role="alert" className="my-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-xs leading-relaxed">{analysisError}</p>}
-              <AnalysisLaunchPanel location={locationLabel || name} areaKm2={currentAreaKm2} mapReady={mapReady} onAnalyze={runAnalysis} onExample={openExample} />
+              <AnalysisLaunchPanel location={locationLabel || name} areaKm2={currentAreaKm2} mapReady={mapReady} onAnalyze={runAnalysis} onExample={openExample} onOpenFile={(file) => void openExperimentFile(file)} />
             </div>
             <div className="atlas-process"><span>Land cover</span><ArrowRight size={12} /><span>Rainfall</span><ArrowRight size={12} /><span>Possibilities</span></div>
           </aside>
@@ -1080,6 +1177,7 @@ export default function Analyze() {
                 <p className="atlas-results-meta">
                   {currentAreaKm2.toFixed(2)} km² · {Math.round(currentAreaKm2 * 100)} ha
                   {simResult ? ` · ${simResult.metadata.elevation_status === "observed" ? "observed" : "illustrative"} terrain` : ""}
+                  {reopened ? " · reopened evidence" : ""}
                 </p>
               </div>
 
@@ -1136,6 +1234,7 @@ export default function Analyze() {
               {activeTab === "overview" && (
                 <div className="atlas-tab">
                   {isExample && <p className="atlas-section-note">{result.ai_notes}</p>}
+                  {reopened && <ReplayReadout study={reopened} />}
 
                   <section className="atlas-section atlas-section--lead">
                     <AbsorptionScoreGauge score={Number(result.absorption_score)} />
@@ -1180,6 +1279,7 @@ export default function Analyze() {
 
               {activeTab === "simulation" && (
                 <div className="atlas-tab">
+                  {reopened && <ReplayReadout study={reopened} compact />}
                   <section className="atlas-section atlas-section--lead" aria-labelledby="storm-title">
                     <h3 id="storm-title" className="atlas-section-title">Where does the rain go?</h3>
                     <p className="atlas-section-note">
@@ -1441,6 +1541,7 @@ export default function Analyze() {
 
               {activeTab === "compare" && (
                 <div className="atlas-tab">
+                  {reopened && <ReplayReadout study={reopened} compact />}
                   <section className="atlas-section atlas-section--lead" aria-labelledby="compare-title">
                     <h3 id="compare-title" className="atlas-section-title">Same storm, two grounds</h3>
                     <p className="atlas-section-note">
@@ -1455,7 +1556,7 @@ export default function Analyze() {
                           <div>
                             <span>Today</span>
                             <strong>{catalystFuture.future.impact.baseScore.toFixed(0)}</strong>
-                            <em>{riskLabel(catalystFuture.future.impact.baseRisk)} risk</em>
+                            <em>{riskLabel(catalystFuture.future.impact.baseRisk)} runoff band</em>
                           </div>
                           <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                           <div data-future>
@@ -1529,6 +1630,7 @@ export default function Analyze() {
                       </div>
                     )}
                   </section>
+                  {catalystFuture && <WhereTheWaterMoved difference={difference} shown={showDifference} onShow={setShowDifference} />}
                 </div>
               )}
 
@@ -1544,7 +1646,7 @@ export default function Analyze() {
                     <div className="atlas-exports mt-5">
                       <button type="button" onClick={handleExportExperiment}>
                         <FileJson className="h-4 w-4" aria-hidden="true" />
-                        <span><strong>Experiment evidence (JSON)</strong><small>Question, inputs with evidence status, drawings, assumptions, sealed storm, elevation grid, urban substrate identity and routed outputs — replayable</small></span>
+                        <span><strong>Experiment evidence (JSON)</strong><small>Question, inputs with evidence status, drawings, assumptions, sealed storm, elevation grid, urban substrate identity, routed outputs and where the water moved — replayable here or on the command line</small></span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <button type="button" onClick={handleExportPDF}>
@@ -1571,6 +1673,25 @@ export default function Analyze() {
                         </span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </button>
+                      <label>
+                        <FolderOpen className="h-4 w-4" aria-hidden="true" />
+                        <span>
+                          <strong>Open an experiment file</strong>
+                          <small>Verify a JSON export against this build — evidence hash, storm seal, elevation, substrate tiles, every routed volume and where the water moved — then reopen it. Nothing is shown that this build did not recompute.</small>
+                        </span>
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          className="sr-only"
+                          aria-label="Open an experiment file"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) void openExperimentFile(file);
+                            event.target.value = "";
+                          }}
+                        />
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </label>
                     </div>
                   </section>
                 </div>
