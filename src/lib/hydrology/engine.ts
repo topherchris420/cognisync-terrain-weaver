@@ -15,7 +15,7 @@ import type {
 } from "./types";
 import { LOCAL_GRID, LOCAL_HYDROLOGY_MODEL } from "./types";
 import { loadElevationGrid } from "./dem";
-import { designStormHydrograph, hydrographPeakM3s } from "./hydrograph";
+import { designStormHydrograph, observedStormHydrograph, hydrographPeakM3s } from "./hydrograph";
 import { fillAndSpill } from "./conditioning";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 import { SUBSTRATE_NONE } from "@/lib/urban-substrate/identity";
@@ -194,6 +194,14 @@ export function routeWatershed(
   if (!sameModifierExtent(input.modifiers, bbox, rows, cols)) {
     throw new Error("Surface modifier grid must match the simulation extent and resolution.");
   }
+  const drainage = input.drainage;
+  if (
+    drainage &&
+    (drainage.capacityM3.length !== rows ||
+      drainage.capacityM3.some((row) => row.length !== cols))
+  ) {
+    throw new Error("Drainage grid must match the simulation resolution.");
+  }
 
   const compositeC = clamp(runoffCoefficient(input.landCover), 0, 1);
   const baselineRetention = 1 - compositeC;
@@ -212,6 +220,7 @@ export function routeWatershed(
   let rainfallM3 = 0;
   let infiltratedM3 = 0;
   let storedM3 = 0;
+  let drainedM3 = 0;
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -228,10 +237,14 @@ export function routeWatershed(
         Math.max(0, modifier?.storageDeltaMm ?? 0)
       );
       const stored = (storageDepthMm / 1000) * cellAreaM2;
-      const runoff = Math.max(0, rainfallPerCellM3 - infiltrated - stored);
+      let runoff = Math.max(0, rainfallPerCellM3 - infiltrated - stored);
+      // Real drainage (catch basins) intercepts runoff before it routes overland.
+      const drained = drainage ? Math.min(runoff, drainage.capacityM3[row][col]) : 0;
+      runoff -= drained;
       rainfallM3 += rainfallPerCellM3;
       infiltratedM3 += infiltrated;
       storedM3 += stored;
+      drainedM3 += drained;
       generatedRunoff[row][col] = runoff;
       roughness[row][col] = Math.max(0, modifier?.roughnessDelta ?? 0);
     }
@@ -318,15 +331,31 @@ export function routeWatershed(
     };
   });
 
-  const runoffM3 = Math.max(0, rainfallM3 - infiltratedM3 - storedM3);
-  const closureErrorM3 = Math.abs(rainfallM3 - infiltratedM3 - storedM3 - runoffM3);
-  const hydrograph = designStormHydrograph(
-    runoffM3,
-    input.rainfallDepthMm,
-    input.durationMinutes
-  );
+  const runoffM3 = Math.max(0, rainfallM3 - infiltratedM3 - storedM3 - drainedM3);
+  const closureErrorM3 = Math.abs(rainfallM3 - infiltratedM3 - storedM3 - drainedM3 - runoffM3);
+  const hydrograph = input.hyetograph && input.hyetograph.length > 0
+    ? observedStormHydrograph(runoffM3, input.hyetograph)
+    : designStormHydrograph(
+        runoffM3,
+        input.rainfallDepthMm,
+        input.durationMinutes
+      );
   const peakDischargeM3s = hydrographPeakM3s(hydrograph);
   const warnings = [...elevation.warnings, "D8 accumulation is a routing index, not standing flood depth. Cell-area equivalents and relative severity ranks are uncalibrated; the hydrograph shape is prescribed, not a discharge forecast.", "Surface depressions fill and spill statically: ponded volume is end-of-event storage below each depression's spill level, with no timing, sewer inflow or pond infiltration.", ROUTED_ZONES_CAVEAT];
+  if (input.hyetograph && input.hyetograph.length > 0) {
+    warnings.push(
+      "Rainfall is a real recorded event (Open-Meteo archive, reanalysis blended with stations); the hydrograph follows the recorded hourly distribution, scaled to the routed volume."
+    );
+  }
+  if (drainage?.status === "observed" && drainage.basins > 0) {
+    warnings.push(
+      `Drainage: ${drainage.basins} real catch basins (${drainage.sourceLabel}) each intercept up to ~10 m³ per event — an upper-bound estimate that assumes every basin is unclogged.`
+    );
+  } else if (drainage) {
+    warnings.push(
+      "No drainage inventory is wired for this area: every drop routes overland, which overstates flooding in served areas."
+    );
+  }
   if (elevation.status === "illustrative") {
     warnings.push(
       "Optimization claims are disabled while the terrain surface is illustrative."
@@ -338,6 +367,9 @@ export function routeWatershed(
     cells_analyzed: cells,
     computation_time_ms: Date.now() - start,
     runoff_volume_m3: runoffM3,
+    drained_volume_m3: drainedM3,
+    drainage_basins: drainage?.status === "observed" ? drainage.basins : 0,
+    rainfall_source: input.hyetograph && input.hyetograph.length > 0 ? "observed" : "design",
     ponded_volume_m3: routed.pondedVolume,
     outflow_volume_m3: routed.outflowVolume,
     infiltrated_volume_m3: infiltratedM3,
@@ -372,6 +404,7 @@ export function routeWatershed(
       runoffM3,
       closureErrorM3,
       pondedM3: routed.pondedVolume,
+      drainedM3,
     },
     hydrograph,
     peakDischargeM3s,

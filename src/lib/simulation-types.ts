@@ -65,6 +65,12 @@ export interface SimulationResponse {
     modifier_hash?: string;
     /** Urban substrate identity the run was made with ("substrate:none" when none was consulted). */
     substrate_hash?: string;
+    /** Runoff intercepted by real drainage infrastructure before routing. */
+    drained_volume_m3?: number;
+    /** Drainage structures (catch basins) inside the extent, when wired. */
+    drainage_basins?: number;
+    /** "observed" when rainfall came from a real recorded storm. */
+    rainfall_source?: "design" | "observed";
   };
 }
 
