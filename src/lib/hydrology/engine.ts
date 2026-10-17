@@ -15,7 +15,7 @@ import type {
 } from "./types";
 import { LOCAL_GRID, LOCAL_HYDROLOGY_MODEL } from "./types";
 import { loadElevationGrid } from "./dem";
-import { designStormHydrograph, hydrographPeakM3s } from "./hydrograph";
+import { designStormHydrograph, observedStormHydrograph, hydrographPeakM3s } from "./hydrograph";
 import { fillAndSpill } from "./conditioning";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 import { SUBSTRATE_NONE } from "@/lib/urban-substrate/identity";
@@ -194,6 +194,14 @@ export function routeWatershed(
   if (!sameModifierExtent(input.modifiers, bbox, rows, cols)) {
     throw new Error("Surface modifier grid must match the simulation extent and resolution.");
   }
+  const drainage = input.drainage;
+  if (
+    drainage &&
+    (drainage.capacityM3.length !== rows ||
+      drainage.capacityM3.some((row) => row.length !== cols))
+  ) {
+    throw new Error("Drainage grid must match the simulation resolution.");
+  }
 
   const compositeC = clamp(runoffCoefficient(input.landCover), 0, 1);
   const baselineRetention = 1 - compositeC;
@@ -212,6 +220,7 @@ export function routeWatershed(
   let rainfallM3 = 0;
   let infiltratedM3 = 0;
   let storedM3 = 0;
+  let drainedM3 = 0;
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -228,10 +237,14 @@ export function routeWatershed(
         Math.max(0, modifier?.storageDeltaMm ?? 0)
       );
       const stored = (storageDepthMm / 1000) * cellAreaM2;
-      const runoff = Math.max(0, rainfallPerCellM3 - infiltrated - stored);
+      let runoff = Math.max(0, rainfallPerCellM3 - infiltrated - stored);
+      // Real drainage (catch basins) intercepts runoff before it routes overland.
+      const drained = drainage ? Math.min(runoff, drainage.capacityM3[row][col]) : 0;
+      runoff -= drained;
       rainfallM3 += rainfallPerCellM3;
       infiltratedM3 += infiltrated;
       storedM3 += stored;
+      drainedM3 += drained;
       generatedRunoff[row][col] = runoff;
       roughness[row][col] = Math.max(0, modifier?.roughnessDelta ?? 0);
     }
