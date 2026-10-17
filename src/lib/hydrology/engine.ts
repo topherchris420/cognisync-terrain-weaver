@@ -362,7 +362,7 @@ export function routeWatershed(
     );
   }
 
-  const metadata = {
+  const metadata: LocalStormResult["metadata"] = {
     processed_area_km2: Math.round(extentAreaKm2(bbox) * 1000) / 1000,
     cells_analyzed: cells,
     computation_time_ms: Date.now() - start,
