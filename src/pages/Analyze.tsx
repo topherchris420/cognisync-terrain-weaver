@@ -200,7 +200,15 @@ export function buildRealitySimulationRequest(
   }
   return {
     bbox,
-    storm,
+    storm: {
+      id: storm.id,
+      rainfallDepthMm: storm.rainfallDepthMm,
+      durationMinutes: storm.durationMinutes,
+      distribution: "uniform",
+      resolution: storm.resolution,
+      includeDrainage: false,
+      hash: storm.hash,
+    },
     surface: {
       id: surface.id,
       surfaceHash: surface.surfaceHash,
