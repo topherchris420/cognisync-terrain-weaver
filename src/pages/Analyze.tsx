@@ -195,6 +195,9 @@ export function buildRealitySimulationRequest(
   surface: RealitySurface,
   expectedElevationHash?: string
 ): SimulationRequestV2 {
+  if (storm.distribution !== "uniform" || storm.includeDrainage !== false) {
+    throw new Error("V2 simulation requests require a uniform storm without drainage.");
+  }
   return {
     bbox,
     storm,
