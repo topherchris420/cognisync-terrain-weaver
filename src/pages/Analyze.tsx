@@ -127,6 +127,11 @@ import {
   runLocalStorm,
   type SimExtent,
 } from "@/lib/hydrology";
+import {
+  fetchRealStorms,
+  type RealStormEvent,
+} from "@/lib/hydrology/real-storms";
+import { fetchDrainageGrid } from "@/lib/hydrology/drainage";
 import type { InterventionFeature } from "@/lib/counterfactual/types";
 
 const STORM_RAINFALL_MM = 50;
@@ -172,15 +177,30 @@ const UNAVAILABLE_TOOLS: Partial<Record<InterventionKey, string>> = Object.fromE
 
 export function buildStormDefinition(
   rainfallDepthMm: number,
-  resolution: "low" | "medium" | "high"
+  resolution: "low" | "medium" | "high",
+  realStorm?: RealStormEvent | null,
+  includeDrainage = false
 ): StormDefinition {
-  const definition = {
-    rainfallDepthMm,
-    durationMinutes: 60,
-    distribution: "uniform" as const,
-    resolution,
-    includeDrainage: false as const,
-  };
+  const definition = realStorm
+    ? {
+        rainfallDepthMm: realStorm.totalDepthMm,
+        durationMinutes: realStorm.durationMinutes,
+        distribution: "observed" as const,
+        resolution,
+        includeDrainage,
+        source: "observed" as const,
+        eventLabel: realStorm.label,
+        eventStart: realStorm.start,
+        hyetograph: realStorm.hyetograph,
+      }
+    : {
+        rainfallDepthMm,
+        durationMinutes: 60,
+        distribution: "uniform" as const,
+        resolution,
+        includeDrainage,
+        source: "design" as const,
+      };
   const hash = stableHash(definition);
   return {
     id: `storm:${hash}`,
@@ -257,6 +277,13 @@ export default function Analyze() {
   const [liveRelief, setLiveRelief] = useState<number | null>(null);
   const [stormRainfallMm, setStormRainfallMm] = useState(STORM_RAINFALL_MM);
   const [stormResolution, setStormResolution] = useState<"low" | "medium" | "high">(STORM_RESOLUTION);
+  const [realStorms, setRealStorms] = useState<RealStormEvent[]>([]);
+  const [realStormsStatus, setRealStormsStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  const [selectedRealStormId, setSelectedRealStormId] = useState<string | null>(null);
+  const selectedRealStorm = useMemo(
+    () => realStorms.find((event) => event.id === selectedRealStormId) ?? null,
+    [realStorms, selectedRealStormId]
+  );
   const [simWarnings, setSimWarnings] = useState<string[]>([]);
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(null);
@@ -635,6 +662,20 @@ export default function Analyze() {
     }
   };
 
+  const loadRealStorms = async () => {
+    const lat = result?.center_lat ?? view.lat;
+    const lng = result?.center_lng ?? view.lng;
+    setRealStormsStatus("loading");
+    const found = await fetchRealStorms(lat, lng);
+    if (found.status === "observed" && found.events.length > 0) {
+      setRealStorms(found.events);
+      setRealStormsStatus("ready");
+    } else {
+      setRealStorms([]);
+      setRealStormsStatus("unavailable");
+    }
+  };
+
   const runSimulation = async (isRerun = false) => {
     if (!result || pendingRequest.current) return;
 
@@ -669,8 +710,18 @@ export default function Analyze() {
         : await substrate.resolve().then((resolved) => substrateEvidence(resolved.state, resolved.view));
       if (generation !== requestGeneration.current) return;
       const substrateHash = substrateRunKey(describedSubstrate?.state);
+      const sealedStorm = nowSeal?.storm;
+      const gridSize = LOCAL_GRID[(sealedStorm ?? { resolution: stormResolution }).resolution];
+      // Real drainage inventory (NYC catch basins) — shared by NOW and POSSIBLE.
+      const drainage =
+        !sealedStorm || sealedStorm.includeDrainage
+          ? await fetchDrainageGrid(extent, gridSize, gridSize)
+          : undefined;
+      const drainageObserved = drainage && drainage.status === "observed" && drainage.basins > 0;
+      if (generation !== requestGeneration.current) return;
       const stormDefinition =
-        nowSeal?.storm ?? buildStormDefinition(stormRainfallMm, stormResolution);
+        sealedStorm ??
+        buildStormDefinition(stormRainfallMm, stormResolution, selectedRealStorm, Boolean(drainageObserved));
       const seal = createStormSeal(stormDefinition);
 
       const size = LOCAL_GRID[stormDefinition.resolution];
@@ -696,6 +747,8 @@ export default function Analyze() {
         stormHash: stormDefinition.hash,
         surfaceHash: nowSurface.surfaceHash,
         substrateHash,
+        hyetograph: stormDefinition.hyetograph,
+        drainage: drainageObserved ? drainage : undefined,
       });
       if (generation !== requestGeneration.current) return;
 
@@ -722,6 +775,8 @@ export default function Analyze() {
           surfaceHash: possibleSurface.surfaceHash,
           expectedElevationHash: nowRun.elevationHash,
           substrateHash,
+          hyetograph: stormDefinition.hyetograph,
+          drainage: drainageObserved ? drainage : undefined,
         });
         if (generation !== requestGeneration.current) return;
         const areaM2 = bboxAreaKm2(bounds) * 1e6;
@@ -1300,7 +1355,7 @@ export default function Analyze() {
                         <div className="atlas-sealed mt-5">
                           <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                           <div className="min-w-0 flex-1">
-                            <strong>{nowSeal.storm.rainfallDepthMm} mm in {nowSeal.storm.durationMinutes} min</strong>
+                            <strong>{nowSeal.storm.rainfallDepthMm} mm in {nowSeal.storm.durationMinutes} min{nowSeal.storm.eventLabel ? ` — ${nowSeal.storm.eventLabel} (recorded)` : ""}</strong>
                             <span>
                               {nowSeal.storm.resolution.charAt(0).toUpperCase() + nowSeal.storm.resolution.slice(1)} grid · {LOCAL_GRID[nowSeal.storm.resolution]}² cells
                             </span>
@@ -1311,6 +1366,77 @@ export default function Analyze() {
                       </>
                     ) : (
                       <>
+                      <div className="atlas-control mt-5">
+                        <span className="atlas-control-label" id="real-storms-label">
+                          <span>Real recorded storms</span>
+                          {selectedRealStorm && (
+                            <span className="atlas-control-value">{selectedRealStorm.label}</span>
+                          )}
+                        </span>
+                        {realStormsStatus === "idle" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={loadRealStorms}
+                          >
+                            Find real storms for this place
+                          </Button>
+                        )}
+                        {realStormsStatus === "loading" && (
+                          <p className="atlas-section-note flex items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                            Reading two years of recorded rainfall…
+                          </p>
+                        )}
+                        {realStormsStatus === "unavailable" && (
+                          <p className="atlas-section-note">
+                            No recorded storm archive answered for this place — the design storm below still works.
+                          </p>
+                        )}
+                        {realStormsStatus === "ready" && (
+                          <div role="radiogroup" aria-labelledby="real-storms-label" className="mt-2 space-y-1.5">
+                            <button
+                              type="button"
+                              role="radio"
+                              aria-checked={selectedRealStormId === null}
+                              onClick={() => setSelectedRealStormId(null)}
+                              className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                                selectedRealStormId === null
+                                  ? "border-primary bg-primary/10 text-foreground"
+                                  : "border-border/70 bg-muted/30 text-muted-foreground hover:border-border"
+                              }`}
+                            >
+                              <strong>Design storm</strong> — your own depth, one uniform hour
+                            </button>
+                            {realStorms.map((event) => (
+                              <button
+                                key={event.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={selectedRealStormId === event.id}
+                                onClick={() => {
+                                  setSelectedRealStormId(event.id);
+                                  setStormRainfallMm(Math.round(event.totalDepthMm));
+                                }}
+                                className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                                  selectedRealStormId === event.id
+                                    ? "border-primary bg-primary/10 text-foreground"
+                                    : "border-border/70 bg-muted/30 text-muted-foreground hover:border-border"
+                                }`}
+                              >
+                                <strong>{event.label}</strong> — {event.totalDepthMm} mm over{" "}
+                                {Math.round(event.durationMinutes / 60)} h, peak {event.peakIntensityMmH} mm/h
+                              </button>
+                            ))}
+                            <p className="atlas-section-note">
+                              Recorded hourly rainfall from the Open-Meteo archive (reanalysis blended with
+                              station observations), last two years near this place.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="atlas-control mt-5">
                         <label htmlFor="storm-rainfall" className="atlas-control-label">
                           <span>Rainfall depth</span>
@@ -1326,7 +1452,7 @@ export default function Analyze() {
                           max="200"
                           step="5"
                           value={stormRainfallMm}
-                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM" || selectedRealStorm !== null}
                           onChange={(event) => setStormRainfallMm(Number(event.target.value))}
                           className="atlas-range"
                           style={{ "--fill": `${((stormRainfallMm - 5) / 195) * 100}%` } as CSSProperties}
@@ -1377,7 +1503,7 @@ export default function Analyze() {
                         className="atlas-primary mt-5 w-full h-11 text-sm font-medium gap-2"
                       >
                         {workflow.state === "STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                        {workflow.state === "STORM" ? "Routing storm…" : `Route ${stormRainfallMm} mm storm`}
+                        {workflow.state === "STORM" ? "Routing storm…" : `Route ${stormRainfallMm} mm ${selectedRealStorm ? "recorded storm" : "storm"}`}
                       </Button>
                     )}
                   </section>

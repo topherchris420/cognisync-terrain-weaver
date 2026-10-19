@@ -369,7 +369,7 @@ export function routeWatershed(
     runoff_volume_m3: runoffM3,
     drained_volume_m3: drainedM3,
     drainage_basins: drainage?.status === "observed" ? drainage.basins : 0,
-    rainfall_source: input.hyetograph && input.hyetograph.length > 0 ? "observed" : "design",
+    rainfall_source: input.hyetograph && input.hyetograph.length > 0 ? ("observed" as const) : ("design" as const),
     ponded_volume_m3: routed.pondedVolume,
     outflow_volume_m3: routed.outflowVolume,
     infiltrated_volume_m3: infiltratedM3,
