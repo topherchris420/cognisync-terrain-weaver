@@ -72,7 +72,7 @@ describe("routeWatershed with real drainage", () => {
     sourceId: "test",
     warnings: [],
   };
-  const baseInput: LocalStormInput = {
+  const baseInput: LocalStormInput & { elevation: ElevationGrid } = {
     bbox: NYC_BBOX,
     rainfallDepthMm: 50,
     durationMinutes: 60,
