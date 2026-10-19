@@ -1355,7 +1355,7 @@ export default function Analyze() {
                         <div className="atlas-sealed mt-5">
                           <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                           <div className="min-w-0 flex-1">
-                            <strong>{nowSeal.storm.rainfallDepthMm} mm in {nowSeal.storm.durationMinutes} min</strong>
+                            <strong>{nowSeal.storm.rainfallDepthMm} mm in {nowSeal.storm.durationMinutes} min{nowSeal.storm.eventLabel ? ` — ${nowSeal.storm.eventLabel} (recorded)` : ""}</strong>
                             <span>
                               {nowSeal.storm.resolution.charAt(0).toUpperCase() + nowSeal.storm.resolution.slice(1)} grid · {LOCAL_GRID[nowSeal.storm.resolution]}² cells
                             </span>
@@ -1452,7 +1452,7 @@ export default function Analyze() {
                           max="200"
                           step="5"
                           value={stormRainfallMm}
-                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM" || selectedRealStorm !== null}
                           onChange={(event) => setStormRainfallMm(Number(event.target.value))}
                           className="atlas-range"
                           style={{ "--fill": `${((stormRainfallMm - 5) / 195) * 100}%` } as CSSProperties}
@@ -1503,7 +1503,7 @@ export default function Analyze() {
                         className="atlas-primary mt-5 w-full h-11 text-sm font-medium gap-2"
                       >
                         {workflow.state === "STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                        {workflow.state === "STORM" ? "Routing storm…" : `Route ${stormRainfallMm} mm storm`}
+                        {workflow.state === "STORM" ? "Routing storm…" : `Route ${stormRainfallMm} mm ${selectedRealStorm ? "recorded storm" : "storm"}`}
                       </Button>
                     )}
                   </section>
