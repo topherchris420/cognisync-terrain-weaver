@@ -52,7 +52,8 @@ function completeHourlySeries(times: string[], rain: Array<number | null>): rain
     if (!Number.isFinite(timestamp) || (i > 0 && timestamp - previous !== 3_600_000)) {
       return false;
     }
-    if (typeof rain[i] !== "number" || !Number.isFinite(rain[i]) || rain[i] < 0) {
+    const amount = rain[i];
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) {
       return false;
     }
     previous = timestamp;
