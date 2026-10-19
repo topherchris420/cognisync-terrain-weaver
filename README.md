@@ -19,7 +19,7 @@ This is a reproducible calculation, not a measured site outcome or a screenshot.
 5. Rerun the sealed storm and compare **NOW / POSSIBLE** with the synchronized map view. Then read **where the water moved**: the cells that carry less water on the redesigned surface, the drawing's own footprint on the grid, and how far downstream the change reaches.
 6. Export the study or its **experiment evidence JSON**, including inputs, drawings, coefficients, forcing, routed results and the spatial difference. **Open an experiment file** reopens it: every identity is verified and the pair is routed again by the running build before anything is shown.
 
-Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. Example land cover never becomes a measurement merely because the terrain loaded successfully.
+Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. The terrain loader also rejects partially downloaded tiles or non-finite samples rather than filling missing cells with the regional mean and calling the result observed. Historical storm events are drawn from complete, contiguous UTC hourly records; missing precipitation is not silently replaced with zero, and drizzle within an event contributes to the same depth used by its hyetograph. Unavailable archive requests can be retried. Example land cover never becomes a measurement merely because the terrain loaded successfully.
 
 ## Three questions, different evidence
 
