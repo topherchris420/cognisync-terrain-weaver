@@ -10,6 +10,9 @@ vi.mock("@/lib/hydrology", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/hydrology")>();
   return { ...original, runLocalStorm: (input: import("@/lib/hydrology").LocalStormInput) => original.runLocalStorm(input, async () => new Response(null, { status: 503 })) };
 });
+vi.mock("@/lib/hydrology/drainage", () => ({
+  fetchDrainageGrid: async () => ({ status: "unavailable" as const, basins: 0, capacityM3: [], sourceLabel: "test" }),
+}));
 vi.mock("@/hooks/useWelikia1609", () => ({ useWelikia1609: () => ({ status: "idle" }) }));
 vi.mock("@/components/historical/Historical1609Panel", () => ({ Historical1609Panel: () => null }));
 vi.mock("@/components/MapView", async () => {
