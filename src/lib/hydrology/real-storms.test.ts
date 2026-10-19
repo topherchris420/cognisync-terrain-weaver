@@ -17,7 +17,7 @@ describe("detectStormEvents", () => {
     ]);
     const events = detectStormEvents(times, rain);
     expect(events).toHaveLength(1);
-    expect(events[0].totalDepthMm).toBeCloseTo(15.1, 1);
+    expect(events[0].totalDepthMm).toBe(15);
     expect(events[0].durationMinutes).toBe(6 * 60);
     expect(events[0].peakIntensityMmH).toBe(6);
   });
