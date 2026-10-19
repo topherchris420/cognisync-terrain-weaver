@@ -127,6 +127,11 @@ import {
   runLocalStorm,
   type SimExtent,
 } from "@/lib/hydrology";
+import {
+  fetchRealStorms,
+  type RealStormEvent,
+} from "@/lib/hydrology/real-storms";
+import { fetchDrainageGrid } from "@/lib/hydrology/drainage";
 import type { InterventionFeature } from "@/lib/counterfactual/types";
 
 const STORM_RAINFALL_MM = 50;
@@ -172,15 +177,30 @@ const UNAVAILABLE_TOOLS: Partial<Record<InterventionKey, string>> = Object.fromE
 
 export function buildStormDefinition(
   rainfallDepthMm: number,
-  resolution: "low" | "medium" | "high"
+  resolution: "low" | "medium" | "high",
+  realStorm?: RealStormEvent | null,
+  includeDrainage = false
 ): StormDefinition {
-  const definition = {
-    rainfallDepthMm,
-    durationMinutes: 60,
-    distribution: "uniform" as const,
-    resolution,
-    includeDrainage: false as const,
-  };
+  const definition = realStorm
+    ? {
+        rainfallDepthMm: realStorm.totalDepthMm,
+        durationMinutes: realStorm.durationMinutes,
+        distribution: "observed" as const,
+        resolution,
+        includeDrainage,
+        source: "observed" as const,
+        eventLabel: realStorm.label,
+        eventStart: realStorm.start,
+        hyetograph: realStorm.hyetograph,
+      }
+    : {
+        rainfallDepthMm,
+        durationMinutes: 60,
+        distribution: "uniform" as const,
+        resolution,
+        includeDrainage,
+        source: "design" as const,
+      };
   const hash = stableHash(definition);
   return {
     id: `storm:${hash}`,
@@ -195,9 +215,12 @@ export function buildRealitySimulationRequest(
   surface: RealitySurface,
   expectedElevationHash?: string
 ): SimulationRequestV2 {
+  if (storm.distribution !== "uniform" || storm.includeDrainage !== false) {
+    throw new Error("V2 simulation requests require a uniform storm without drainage.");
+  }
   return {
     bbox,
-    storm,
+    storm: storm as SimulationRequestV2["storm"],
     surface: {
       id: surface.id,
       surfaceHash: surface.surfaceHash,
@@ -254,6 +277,13 @@ export default function Analyze() {
   const [liveRelief, setLiveRelief] = useState<number | null>(null);
   const [stormRainfallMm, setStormRainfallMm] = useState(STORM_RAINFALL_MM);
   const [stormResolution, setStormResolution] = useState<"low" | "medium" | "high">(STORM_RESOLUTION);
+  const [realStorms, setRealStorms] = useState<RealStormEvent[]>([]);
+  const [realStormsStatus, setRealStormsStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  const [selectedRealStormId, setSelectedRealStormId] = useState<string | null>(null);
+  const selectedRealStorm = useMemo(
+    () => realStorms.find((event) => event.id === selectedRealStormId) ?? null,
+    [realStorms, selectedRealStormId]
+  );
   const [simWarnings, setSimWarnings] = useState<string[]>([]);
   const [scenario, setScenario] = useState<Scenario>(EMPTY_SCENARIO);
   const [scenarioExport, setScenarioExport] = useState<ScenarioExport | null>(null);
