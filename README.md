@@ -138,7 +138,7 @@ The same verification runs in the browser. **Open an experiment file** (on the i
 | Sensitivity | `src/lib/land-cover-sensitivity.ts` |
 | Spatial constraints, identity and the spatial difference | `src/lib/counterfactual/` (`controlled.ts`, `difference.ts`) |
 | Local terrain routing | `src/lib/hydrology/` |
-| Historical reconstruction | `src/lib/historical/`, `public/data/welikia-1609-blocks.json` |
+| Historical reconstruction and era imagery | `src/lib/historical/`, `public/data/welikia-1609-blocks.json`; sources and verification in [docs/historical-imagery.md](docs/historical-imagery.md) |
 | Evidence that travels and returns | `experiment-export.ts`, `experiment-replay.ts`, `experiment-import.ts`, `geo.ts`, `pdf-export.ts` |
 | Validation harness | `src/lib/validation/`, `experiments/`, `scripts/experiment.ts` |
 | Evidence status, ledger, assumption registry | `src/lib/evidence/`, `src/lib/assumptions/registry.ts` |
