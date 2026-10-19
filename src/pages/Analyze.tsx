@@ -696,8 +696,18 @@ export default function Analyze() {
         : await substrate.resolve().then((resolved) => substrateEvidence(resolved.state, resolved.view));
       if (generation !== requestGeneration.current) return;
       const substrateHash = substrateRunKey(describedSubstrate?.state);
+      const sealedStorm = nowSeal?.storm;
+      const gridSize = LOCAL_GRID[(sealedStorm ?? { resolution: stormResolution }).resolution];
+      // Real drainage inventory (NYC catch basins) — shared by NOW and POSSIBLE.
+      const drainage =
+        !sealedStorm || sealedStorm.includeDrainage
+          ? await fetchDrainageGrid(extent, gridSize, gridSize)
+          : undefined;
+      const drainageObserved = drainage && drainage.status === "observed" && drainage.basins > 0;
+      if (generation !== requestGeneration.current) return;
       const stormDefinition =
-        nowSeal?.storm ?? buildStormDefinition(stormRainfallMm, stormResolution);
+        sealedStorm ??
+        buildStormDefinition(stormRainfallMm, stormResolution, selectedRealStorm, Boolean(drainageObserved));
       const seal = createStormSeal(stormDefinition);
 
       const size = LOCAL_GRID[stormDefinition.resolution];
@@ -723,6 +733,8 @@ export default function Analyze() {
         stormHash: stormDefinition.hash,
         surfaceHash: nowSurface.surfaceHash,
         substrateHash,
+        hyetograph: stormDefinition.hyetograph,
+        drainage: drainageObserved ? drainage : undefined,
       });
       if (generation !== requestGeneration.current) return;
 
@@ -749,6 +761,8 @@ export default function Analyze() {
           surfaceHash: possibleSurface.surfaceHash,
           expectedElevationHash: nowRun.elevationHash,
           substrateHash,
+          hyetograph: stormDefinition.hyetograph,
+          drainage: drainageObserved ? drainage : undefined,
         });
         if (generation !== requestGeneration.current) return;
         const areaM2 = bboxAreaKm2(bounds) * 1e6;
