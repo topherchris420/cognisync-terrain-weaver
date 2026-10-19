@@ -662,6 +662,20 @@ export default function Analyze() {
     }
   };
 
+  const loadRealStorms = async () => {
+    const lat = result?.center_lat ?? view.lat;
+    const lng = result?.center_lng ?? view.lng;
+    setRealStormsStatus("loading");
+    const found = await fetchRealStorms(lat, lng);
+    if (found.status === "observed" && found.events.length > 0) {
+      setRealStorms(found.events);
+      setRealStormsStatus("ready");
+    } else {
+      setRealStorms([]);
+      setRealStormsStatus("unavailable");
+    }
+  };
+
   const runSimulation = async (isRerun = false) => {
     if (!result || pendingRequest.current) return;
 
@@ -1352,6 +1366,77 @@ export default function Analyze() {
                       </>
                     ) : (
                       <>
+                      <div className="atlas-control mt-5">
+                        <span className="atlas-control-label" id="real-storms-label">
+                          <span>Real recorded storms</span>
+                          {selectedRealStorm && (
+                            <span className="atlas-control-value">{selectedRealStorm.label}</span>
+                          )}
+                        </span>
+                        {realStormsStatus === "idle" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={loadRealStorms}
+                          >
+                            Find real storms for this place
+                          </Button>
+                        )}
+                        {realStormsStatus === "loading" && (
+                          <p className="atlas-section-note flex items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                            Reading two years of recorded rainfall…
+                          </p>
+                        )}
+                        {realStormsStatus === "unavailable" && (
+                          <p className="atlas-section-note">
+                            No recorded storm archive answered for this place — the design storm below still works.
+                          </p>
+                        )}
+                        {realStormsStatus === "ready" && (
+                          <div role="radiogroup" aria-labelledby="real-storms-label" className="mt-2 space-y-1.5">
+                            <button
+                              type="button"
+                              role="radio"
+                              aria-checked={selectedRealStormId === null}
+                              onClick={() => setSelectedRealStormId(null)}
+                              className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                                selectedRealStormId === null
+                                  ? "border-primary bg-primary/10 text-foreground"
+                                  : "border-border/70 bg-muted/30 text-muted-foreground hover:border-border"
+                              }`}
+                            >
+                              <strong>Design storm</strong> — your own depth, one uniform hour
+                            </button>
+                            {realStorms.map((event) => (
+                              <button
+                                key={event.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={selectedRealStormId === event.id}
+                                onClick={() => {
+                                  setSelectedRealStormId(event.id);
+                                  setStormRainfallMm(Math.round(event.totalDepthMm));
+                                }}
+                                className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                                  selectedRealStormId === event.id
+                                    ? "border-primary bg-primary/10 text-foreground"
+                                    : "border-border/70 bg-muted/30 text-muted-foreground hover:border-border"
+                                }`}
+                              >
+                                <strong>{event.label}</strong> — {event.totalDepthMm} mm over{" "}
+                                {Math.round(event.durationMinutes / 60)} h, peak {event.peakIntensityMmH} mm/h
+                              </button>
+                            ))}
+                            <p className="atlas-section-note">
+                              Recorded hourly rainfall from the Open-Meteo archive (reanalysis blended with
+                              station observations), last two years near this place.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="atlas-control mt-5">
                         <label htmlFor="storm-rainfall" className="atlas-control-label">
                           <span>Rainfall depth</span>
