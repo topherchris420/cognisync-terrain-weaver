@@ -18,7 +18,8 @@ import { useWelikia1609 } from "@/hooks/useWelikia1609";
 import { EraRasterLayer } from "@/components/historical/EraRasterLayer";
 import { EraTimeline } from "@/components/historical/EraTimeline";
 import { EraCompare } from "@/components/historical/EraCompare";
-import { DEFAULT_ERA_ID, getEra } from "@/lib/historical/eras";
+import { DEFAULT_ERA_ID, getEra, isPastEra } from "@/lib/historical/eras";
+import type { ImageryStatus } from "@/lib/historical/era-imagery";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { StormComparison } from "@/components/StormComparison";
 import { EvidencePanel } from "@/components/analyze/EvidencePanel";
@@ -301,6 +302,15 @@ export default function Analyze() {
   /** An exported experiment reopened here: its verification travels with the study. */
   const [reopened, setReopened] = useState<ImportedStudy | null>(null);
   const [eraId, setEraId] = useState<string>(DEFAULT_ERA_ID);
+  const activeEra = getEra(eraId);
+  // Keyed by era so a late report from the year just left is never shown
+  // against the year now selected.
+  const [eraStatus, setEraStatus] = useState<{ eraId: string; status: ImageryStatus } | null>(null);
+  const [eraRetry, setEraRetry] = useState(0);
+  const onEraStatus = useCallback(
+    (status: ImageryStatus) => setEraStatus({ eraId, status }),
+    [eraId]
+  );
   const [compareEras, setCompareEras] = useState(false);
 
   // Workbench drawer state
@@ -893,6 +903,7 @@ export default function Analyze() {
             terrainEnabled={terrainEnabled}
             terrainExaggeration={terrainExaggeration ?? undefined}
             onReliefChange={setLiveRelief}
+            presentDayBuildings={activeEra.presentDayBuildings}
             onReady={() => {
               setMapReady(true);
               const bounds = mapRef.current?.getBounds();
@@ -903,8 +914,13 @@ export default function Analyze() {
           />
 
           {/* Era layer for the selected point on the timeline */}
-          {eraId !== "today" && (
-            <EraRasterLayer map={mapInstance} era={getEra(eraId)} />
+          {activeEra.kind !== "live" && (
+            <EraRasterLayer
+              map={mapInstance}
+              era={activeEra}
+              onStatusChange={onEraStatus}
+              retryToken={eraRetry}
+            />
           )}
 
           {/* Historical timeline: 1609 → today → projected future */}
@@ -914,6 +930,14 @@ export default function Analyze() {
               onChange={setEraId}
               onCompare={() => setCompareEras(true)}
               center={{ lat: view.lat, lng: view.lng }}
+              status={
+                activeEra.kind === "live"
+                  ? undefined
+                  : eraStatus?.eraId === eraId
+                    ? eraStatus.status
+                    : { phase: "loading" }
+              }
+              onRetry={() => setEraRetry((n) => n + 1)}
             />
           </div>
 
@@ -922,6 +946,7 @@ export default function Analyze() {
             onClose={() => setCompareEras(false)}
             center={{ lat: view.lat, lng: view.lng }}
             zoom={view.zoom}
+            terrainEnabled={terrainEnabled}
           />
 
           {showSubstrate && substrate.status.phase === "ready" && (
@@ -1130,6 +1155,8 @@ export default function Analyze() {
                   ? "True scale: relief at its measured height."
                   : `Relief stretched ${terrainExaggeration}× vertically. Buildings keep their real height.`}
               {simResult && " Flood columns follow modeled depth at the same scale."}
+              {isPastEra(activeEra) &&
+                ` ${activeEra.label} is a flat ${activeEra.provenance === "reconstruction" ? "reconstruction" : "aerial photograph"} draped over today's terrain, not a 3D model of the city then. Today's buildings are hidden.`}
             </p>
           )}
           <div className="flex items-center gap-2">
@@ -1574,6 +1601,24 @@ export default function Analyze() {
                           />
                         )}
 
+                        <dl className="atlas-stats mt-4" data-testid="storm-real-inputs">
+                          <div>
+                            <dt>Rainfall</dt>
+                            <dd className="text-sm">
+                              {simResult.metadata.rainfall_source === "observed"
+                                ? `Recorded${nowSeal?.storm.eventLabel ? ` · ${nowSeal.storm.eventLabel}` : ""}`
+                                : "Design storm"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Drainage</dt>
+                            <dd className="text-sm">
+                              {(simResult.metadata.drainage_basins ?? 0) > 0
+                                ? `${simResult.metadata.drainage_basins} catch basins took ${Math.round(simResult.metadata.drained_volume_m3 ?? 0).toLocaleString()} m³`
+                                : "No drain data here"}
+                            </dd>
+                          </div>
+                        </dl>
                         {simWarnings.filter((warning) => warning !== ROUTED_ZONES_CAVEAT).length > 0 && (
                           <p className="atlas-section-note mt-4">{simWarnings.filter((warning) => warning !== ROUTED_ZONES_CAVEAT)[0]}</p>
                         )}
