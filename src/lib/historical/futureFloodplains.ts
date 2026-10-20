@@ -61,16 +61,31 @@ const TOLERANCE = 0.0002;
 
 const cache = new Map<string, Promise<GeoJSON.FeatureCollection>>();
 
-function round(value: number) {
-  // Snap the request box to a coarse grid so panning reuses one cached fetch.
-  return Math.round(value * 20) / 20;
+/** Grid the request box snaps to, in cells per degree: 0.05°, about 5 km. */
+const GRID = 20;
+
+/**
+ * The box actually requested: the view snapped *outward* to a coarse grid, so
+ * panning within a cell reuses one cached fetch and the request always
+ * contains the whole view.
+ *
+ * Rounding each edge to the nearest grid line did not: a view narrower than a
+ * cell (any block-scale zoom) could collapse to a line or a sliver beside the
+ * view, and the city then answered with nothing, or with polygons for a strip
+ * the user was not looking at, while the layer reported the floodplain absent.
+ */
+export function requestBoxFor(box: BBox): BBox {
+  const west = Math.floor(box.west * GRID) / GRID;
+  const south = Math.floor(box.south * GRID) / GRID;
+  let east = Math.ceil(box.east * GRID) / GRID;
+  let north = Math.ceil(box.north * GRID) / GRID;
+  if (east <= west) east = west + 1 / GRID;
+  if (north <= south) north = south + 1 / GRID;
+  return { west, south, east, north };
 }
 
 function polygonFor(box: BBox) {
-  const w = round(box.west);
-  const s = round(box.south);
-  const e = round(box.east);
-  const n = round(box.north);
+  const { west: w, south: s, east: e, north: n } = requestBoxFor(box);
   return `POLYGON((${w} ${s},${e} ${s},${e} ${n},${w} ${n},${w} ${s}))`;
 }
 
@@ -90,6 +105,21 @@ export function loadFloodplain(
   const hit = cache.get(key);
   if (hit) return hit;
 
+  const request = fetchAllPages(scenario, shape).catch((error) => {
+    cache.delete(key);
+    throw error;
+  });
+
+  cache.set(key, request);
+  return request;
+}
+
+/** Rows per request. The 2050s floodplain alone has over a thousand polygons in one block-scale cell. */
+const PAGE_SIZE = 2000;
+/** Hard ceiling on pages per box, so a misbehaving service can never be polled forever. */
+const MAX_PAGES = 10;
+
+function pageUrl(scenario: FloodplainScenario, shape: string, page: number): string {
   const url = new URL(
     `https://data.cityofnewyork.us/resource/${scenario.dataset}.geojson`
   );
@@ -98,21 +128,32 @@ export function loadFloodplain(
     `simplify_preserve_topology(the_geom,${TOLERANCE}) as the_geom`
   );
   url.searchParams.set("$where", `intersects(the_geom,'${shape}')`);
-  url.searchParams.set("$limit", "800");
+  // A fixed order makes the pages a partition of the result, not a shuffle.
+  url.searchParams.set("$order", ":id");
+  url.searchParams.set("$limit", String(PAGE_SIZE));
+  url.searchParams.set("$offset", String(page * PAGE_SIZE));
+  return url.toString();
+}
 
-  const request = fetch(url.toString())
-    .then(async (response) => {
-      if (!response.ok) throw new Error(`Floodplain request failed: ${response.status}`);
-      const data = (await response.json()) as GeoJSON.FeatureCollection;
-      return data?.features ? data : EMPTY;
-    })
-    .catch((error) => {
-      cache.delete(key);
-      throw error;
-    });
-
-  cache.set(key, request);
-  return request;
+/**
+ * Every polygon overlapping the box, fetched in pages until a short page
+ * arrives. A single capped request silently dropped whatever fell past the
+ * cap, which for the 2050s floodplain was most of a zoomed-out view.
+ */
+async function fetchAllPages(
+  scenario: FloodplainScenario,
+  shape: string
+): Promise<GeoJSON.FeatureCollection> {
+  const features: GeoJSON.Feature[] = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const response = await fetch(pageUrl(scenario, shape, page));
+    if (!response.ok) throw new Error(`Floodplain request failed: ${response.status}`);
+    const data = (await response.json()) as Partial<GeoJSON.FeatureCollection> | null;
+    const batch = Array.isArray(data?.features) ? data.features : [];
+    features.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return features.length ? { type: "FeatureCollection", features } : EMPTY;
 }
 
 export function resetFloodplainCache() {

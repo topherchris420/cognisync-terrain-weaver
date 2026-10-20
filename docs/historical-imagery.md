@@ -17,6 +17,7 @@ with `npm run eras:check` (opt-in, needs network; never run in CI).
 | Modern towers standing in 1924 | The 3D view extruded present-day OpenStreetMap buildings for every era. | `presentDayBuildings` is false for every past era; MapView hides the extrusions and the 3D caption says the photograph is draped over today's terrain. |
 | Land-cover analysis could classify historical imagery as today | `captureImage()` captured era overlays. | The capture hides every era layer and restores the base imagery's colour, then puts both back. |
 | Stale or racing layers | Probe and data responses were not tied to the request that asked for them. | Each layer effect ignores answers after cleanup; 1609 blocks and floodplains discard out-of-order responses. Cleanup removes the source, layer, listeners and timers. |
+| 2050s, 2080s and 2100 floodplains showed nothing at block scale, or only a strip | The request box snapped each edge to the nearest 0.05° grid line, so a view narrower than a cell collapsed to a line (the default Lower Manhattan view at z15 became a zero-height strip at 40.70°), and one capped request of 800 rows dropped most of the 2050s polygons in a zoomed-out view. | `requestBoxFor` snaps the box outward so it always contains the view, and `loadFloodplain` pages through the result in a fixed order until a short page arrives. |
 | Comparison panes leaked listeners and were always flat | Camera-sync listeners were never removed; panes ignored 3D and buildings. | Listeners belong to an effect with cleanup; panes follow the main view's 3D (flat on screens under 640 px, to spare GPU memory) and each pane's era decides buildings. |
 
 ## Sources
@@ -81,6 +82,11 @@ and keeps the base imagery greyed; nothing is substituted.
   chosen. The three-pane comparison synced cameras and labelled each pane.
   Viewed from Denver, 1951 explained that it covers the city only and
   requested no tiles beyond the two-tile probe.
+- 2026-10-20: the repair above had been discarded by a merge and was
+  re-applied. Headless Chromium reached Ready for all 12 entries at the
+  default Lower Manhattan view (z15) and for the three floodplains at a
+  coastal view (z14) once the request-box fix landed;
+  `src/lib/historical/futureFloodplains.test.ts` covers the box and paging.
 - Tests: `src/lib/historical/eras.test.ts`, `era-imagery.test.ts`,
   `src/components/historical/*.test.tsx`, and "MapView historical integrity"
   in `MapView.test.tsx`.
