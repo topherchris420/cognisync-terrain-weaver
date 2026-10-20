@@ -926,7 +926,6 @@ export default function Analyze() {
             onClose={() => setCompareEras(false)}
             center={{ lat: view.lat, lng: view.lng }}
             zoom={view.zoom}
-            terrainEnabled={terrainEnabled}
           />
 
           {showSubstrate && substrate.status.phase === "ready" && (
