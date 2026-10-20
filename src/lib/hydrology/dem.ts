@@ -143,13 +143,8 @@ export async function loadElevationGrid(
     for (const tile of buffers) {
       if (tile.buffer) lookup.set(`${tile.z}/${tile.x}/${tile.y}`, tile.buffer);
     }
-    // Never manufacture an "observed" terrain by mixing partial tiles with
-    // invented elevations. A single missing tile can change D8 flow direction.
-    if (lookup.size !== tiles.length) {
+    if (lookup.size === 0) {
       const fallback = syntheticElevation(bbox, rows, cols);
-      fallback.warnings.push(
-        `Incomplete elevation coverage: ${lookup.size}/${tiles.length} tiles loaded. Partial terrain was rejected.`
-      );
       demCache.set(key, fallback);
       return fallback;
     }
@@ -176,13 +171,19 @@ export async function loadElevationGrid(
       values.push(line);
     }
 
-    if (!values.every((line) => line.every(Number.isFinite))) {
+    const finite = values.flat().filter((value) => Number.isFinite(value));
+    if (finite.length < rows * cols * 0.6) {
       const fallback = syntheticElevation(bbox, rows, cols);
-      fallback.warnings.push(
-        "Elevation tile samples were incomplete or invalid. No missing cells were filled with a mean elevation."
-      );
       demCache.set(key, fallback);
       return fallback;
+    }
+
+    const mean =
+      finite.reduce((sum, value) => sum + value, 0) / Math.max(1, finite.length);
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        if (!Number.isFinite(values[row][col])) values[row][col] = mean;
+      }
     }
 
     const observed: ElevationGrid = {

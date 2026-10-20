@@ -1,21 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import {
+  WELIKIA_TILE_URL,
   loadWelikia1609Features,
   type Welikia1609BlockProperties,
 } from "@/lib/historical/welikia1609";
-import {
-  eraLayerAnchor,
-  hasLayer,
-  hasSource,
-  removeLayers,
-  removeSource,
-  styleReady,
-} from "@/lib/map-layers";
 
-const WELIKIA_BLOCK_SOURCE = "welikia-1609-blocks";
-const WELIKIA_BLOCK_FILL = "welikia-1609-blocks-fill";
-const WELIKIA_BLOCK_LINE = "welikia-1609-blocks-line";
+const RASTER_SOURCE = "welikia-1609-raster";
+const RASTER_LAYER = "welikia-1609-raster-layer";
+const BLOCK_SOURCE = "welikia-1609-blocks";
+const BLOCK_FILL = "welikia-1609-blocks-fill";
+const BLOCK_LINE = "welikia-1609-blocks-line";
 
 const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
@@ -24,78 +19,133 @@ const EMPTY: GeoJSON.FeatureCollection = {
 
 interface Welikia1609LayerProps {
   map: MLMap | null;
+  /** Raster opacity, 0-1. */
+  opacity?: number;
 }
 
 /**
- * The 1609 reconstruction's blocks, drawn as clickable shapes over the
- * reconstruction raster (which `EraRasterLayer` draws and tracks like every
- * other era). Blocks are reloaded for the visible area as the map moves, so
- * the whole city index never has to be drawn at once.
+ * The 1609 reconstruction drawn on the live map: the georeferenced historical
+ * raster underneath, and the reconstructed blocks on top as clickable shapes.
+ * Blocks are reloaded for the visible area as the map moves, so the whole city
+ * index never has to be drawn at once.
  */
-export function Welikia1609Layer({ map }: Welikia1609LayerProps) {
+function safeHasStyle(map: MLMap | null | undefined): boolean {
+  if (!map) return false;
+  try {
+    return Boolean(!map.getStyle || map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
+function safeGetLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getLayer(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return undefined;
+  try {
+    if (map.getStyle && !map.getStyle()) return undefined;
+    return map.getSource(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getLayer(id)) map.removeLayer(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+function safeRemoveSource(map: MLMap | null | undefined, id: string) {
+  if (!map) return;
+  try {
+    if (map.getStyle && !map.getStyle()) return;
+    if (map.getSource(id)) map.removeSource(id);
+  } catch {
+    // Ignore if map or style was already destroyed
+  }
+}
+
+export function Welikia1609Layer({ map, opacity = 0.65 }: Welikia1609LayerProps) {
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const [, setReady] = useState(false);
 
   useEffect(() => {
     if (!map) return;
     let removed = false;
-    // Only the newest request may write: a slow response for a view the user
-    // has already left must not replace the blocks for where they are now.
-    let generation = 0;
 
     const install = () => {
-      if (removed || !styleReady(map)) return;
-      try {
-        let added = false;
-        if (!hasSource(map, WELIKIA_BLOCK_SOURCE)) {
-          map.addSource(WELIKIA_BLOCK_SOURCE, { type: "geojson", data: EMPTY });
-          added = true;
-        }
-        const anchor = eraLayerAnchor(map, "overlay");
-        if (!hasLayer(map, WELIKIA_BLOCK_FILL)) {
-          map.addLayer(
-            {
-              id: WELIKIA_BLOCK_FILL,
-              type: "fill",
-              source: WELIKIA_BLOCK_SOURCE,
-              paint: {
-                "fill-color": [
-                  "match",
-                  ["get", "landCover"],
-                  "water",
-                  "hsl(200, 75%, 55%)",
-                  "soil",
-                  "hsl(35, 35%, 55%)",
-                  "hsl(130, 45%, 42%)",
-                ],
-                "fill-opacity": 0.28,
-              },
-            },
-            anchor
-          );
-        }
-        if (!hasLayer(map, WELIKIA_BLOCK_LINE)) {
-          map.addLayer(
-            {
-              id: WELIKIA_BLOCK_LINE,
-              type: "line",
-              source: WELIKIA_BLOCK_SOURCE,
-              paint: {
-                "line-color": "rgba(255,255,255,0.35)",
-                "line-width": 0.6,
-              },
-            },
-            anchor
-          );
-        }
-        if (added) void refresh();
-      } catch (error) {
-        console.warn("1609 blocks not installed yet", error);
+      if (removed) return;
+      if (!safeHasStyle(map) || !map.isStyleLoaded()) return;
+      if (!safeGetSource(map, RASTER_SOURCE)) {
+        map.addSource(RASTER_SOURCE, {
+          type: "raster",
+          tiles: [WELIKIA_TILE_URL],
+          tileSize: 256,
+          maxzoom: 16,
+          attribution:
+            "1609 reconstruction © Welikia Project, Wildlife Conservation Society",
+        });
       }
+      if (!safeGetLayer(map, RASTER_LAYER)) {
+        map.addLayer({
+          id: RASTER_LAYER,
+          type: "raster",
+          source: RASTER_SOURCE,
+          paint: { "raster-opacity": opacity },
+        });
+      }
+      if (!safeGetSource(map, BLOCK_SOURCE)) {
+        map.addSource(BLOCK_SOURCE, { type: "geojson", data: EMPTY });
+      }
+      if (!safeGetLayer(map, BLOCK_FILL)) {
+        map.addLayer({
+          id: BLOCK_FILL,
+          type: "fill",
+          source: BLOCK_SOURCE,
+          paint: {
+            "fill-color": [
+              "match",
+              ["get", "landCover"],
+              "water",
+              "hsl(200, 75%, 55%)",
+              "soil",
+              "hsl(35, 35%, 55%)",
+              "hsl(130, 45%, 42%)",
+            ],
+            "fill-opacity": 0.28,
+          },
+        });
+      }
+      if (!safeGetLayer(map, BLOCK_LINE)) {
+        map.addLayer({
+          id: BLOCK_LINE,
+          type: "line",
+          source: BLOCK_SOURCE,
+          paint: {
+            "line-color": "rgba(255,255,255,0.35)",
+            "line-width": 0.6,
+          },
+        });
+      }
+      setReady(true);
+      void refresh();
     };
 
     const refresh = async () => {
-      if (removed || !styleReady(map)) return;
-      const request = ++generation;
+      if (removed || !safeHasStyle(map)) return;
       const b = map.getBounds();
       try {
         const data = await loadWelikia1609Features({
@@ -104,8 +154,8 @@ export function Welikia1609Layer({ map }: Welikia1609LayerProps) {
           east: b.getEast(),
           north: b.getNorth(),
         });
-        if (removed || request !== generation) return;
-        const source = map.getSource(WELIKIA_BLOCK_SOURCE) as GeoJSONSource | undefined;
+        if (removed || !safeHasStyle(map)) return;
+        const source = safeGetSource(map, BLOCK_SOURCE) as GeoJSONSource | undefined;
         source?.setData(data);
       } catch {
         // The panel already reports a failed index load; the map just stays bare.
@@ -155,26 +205,41 @@ export function Welikia1609Layer({ map }: Welikia1609LayerProps) {
 
     install();
     map.on("styledata", install);
-    map.on("style.load", install);
+    map.on("load", install);
+    map.on("idle", install);
 
-    on("click", WELIKIA_BLOCK_FILL, handleClick as unknown as (e: never) => void);
-    on("mouseenter", WELIKIA_BLOCK_FILL, onEnter as unknown as (e: never) => void);
-    on("mouseleave", WELIKIA_BLOCK_FILL, onLeave as unknown as (e: never) => void);
+    on("click", BLOCK_FILL, handleClick as unknown as (e: never) => void);
+    on("mouseenter", BLOCK_FILL, onEnter as unknown as (e: never) => void);
+    on("mouseleave", BLOCK_FILL, onLeave as unknown as (e: never) => void);
     map.on("moveend", refresh);
 
     return () => {
       removed = true;
       map.off("styledata", install);
-      map.off("style.load", install);
+      map.off("load", install);
+      map.off("idle", install);
       popupRef.current?.remove();
-      off("click", WELIKIA_BLOCK_FILL, handleClick as unknown as (e: never) => void);
-      off("mouseenter", WELIKIA_BLOCK_FILL, onEnter as unknown as (e: never) => void);
-      off("mouseleave", WELIKIA_BLOCK_FILL, onLeave as unknown as (e: never) => void);
+      off("click", BLOCK_FILL, handleClick as unknown as (e: never) => void);
+      off("mouseenter", BLOCK_FILL, onEnter as unknown as (e: never) => void);
+      off("mouseleave", BLOCK_FILL, onLeave as unknown as (e: never) => void);
       map.off("moveend", refresh);
-      removeLayers(map, [WELIKIA_BLOCK_LINE, WELIKIA_BLOCK_FILL]);
-      removeSource(map, WELIKIA_BLOCK_SOURCE);
+      for (const id of [BLOCK_LINE, BLOCK_FILL, RASTER_LAYER]) {
+        safeRemoveLayer(map, id);
+      }
+      for (const id of [BLOCK_SOURCE, RASTER_SOURCE]) {
+        safeRemoveSource(map, id);
+      }
     };
-  }, [map]);
+  }, [map, opacity]);
+
+  useEffect(() => {
+    if (!map || !safeGetLayer(map, RASTER_LAYER)) return;
+    try {
+      map.setPaintProperty(RASTER_LAYER, "raster-opacity", opacity);
+    } catch {
+      // Ignore if map or style was destroyed
+    }
+  }, [map, opacity]);
 
   return null;
 }

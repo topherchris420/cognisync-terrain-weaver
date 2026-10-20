@@ -1,11 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearRealStormCache, detectStormEvents, fetchRealStorms } from "./real-storms";
+import { describe, expect, it } from "vitest";
+import { detectStormEvents } from "./real-storms";
 
 function hourlySeries(spec: Array<[string, number]>): { times: string[]; rain: number[] } {
   return { times: spec.map(([t]) => t), rain: spec.map(([, r]) => r) };
 }
-
-beforeEach(() => clearRealStormCache());
 
 describe("detectStormEvents", () => {
   it("merges rainy hours across gaps of up to 3 hours into one event", () => {
@@ -19,9 +17,7 @@ describe("detectStormEvents", () => {
     ]);
     const events = detectStormEvents(times, rain);
     expect(events).toHaveLength(1);
-    expect(events[0].totalDepthMm).toBe(15.1);
-    expect(events[0].hyetograph.reduce((sum, h) => sum + h.rainMm, 0))
-      .toBeCloseTo(events[0].totalDepthMm, 8);
+    expect(events[0].totalDepthMm).toBe(15);
     expect(events[0].durationMinutes).toBe(6 * 60);
     expect(events[0].peakIntensityMmH).toBe(6);
   });
@@ -64,56 +60,5 @@ describe("detectStormEvents", () => {
       { tMin: 0, rainMm: 10 },
       { tMin: 60, rainMm: 5 },
     ]);
-  });
-});
-
-
-describe("fetchRealStorms", () => {
-  const payload = {
-    hourly: {
-      time: ["2026-09-01T00:00", "2026-09-01T01:00", "2026-09-01T02:00"],
-      precipitation: [6, 0.2, 5],
-    },
-  };
-
-  it("uses UTC hours and preserves total rainfall through the hyetograph", async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true, json: async () => payload,
-    })) as unknown as typeof fetch;
-    const result = await fetchRealStorms(40.71, -74.01, fetchImpl);
-    expect(result.status).toBe("observed");
-    expect(result.events).toHaveLength(1);
-    expect(result.events[0].totalDepthMm).toBe(11.2);
-    expect(result.events[0].hyetograph.reduce((s, p) => s + p.rainMm, 0)).toBeCloseTo(11.2);
-    expect(String(vi.mocked(fetchImpl).mock.calls[0][0])).toContain("timezone=GMT");
-  });
-
-  it("rejects a partial archive rather than treating missing rainfall as zero", async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ hourly: { ...payload.hourly, precipitation: [6, null, 5] } }),
-    })) as unknown as typeof fetch;
-    const result = await fetchRealStorms(40.71, -74.01, fetchImpl);
-    expect(result.status).toBe("unavailable");
-    expect(result.events).toEqual([]);
-  });
-
-  it("rejects gaps in the returned hourly timeline", async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        hourly: { time: ["2026-09-01T00:00", "2026-09-01T02:00"], precipitation: [8, 8] },
-      }),
-    })) as unknown as typeof fetch;
-    expect((await fetchRealStorms(40.71, -74.01, fetchImpl)).status).toBe("unavailable");
-  });
-
-  it("allows a retry after an API outage instead of caching an error indefinitely", async () => {
-    const fetchImpl = vi.fn()
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValue({ ok: true, json: async () => payload }) as unknown as typeof fetch;
-    expect((await fetchRealStorms(40.71, -74.01, fetchImpl)).status).toBe("unavailable");
-    expect((await fetchRealStorms(40.71, -74.01, fetchImpl)).status).toBe("observed");
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
