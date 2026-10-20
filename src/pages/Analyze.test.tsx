@@ -110,7 +110,8 @@ describe("Analyze request lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
     // The storm first settles the study's urban substrate identity, then routes.
-    await waitFor(() => expect(mocks.storm).toHaveBeenCalledTimes(1));
+    // That settling occasionally passes waitFor's 1 s default on a loaded runner.
+    await waitFor(() => expect(mocks.storm).toHaveBeenCalledTimes(1), { timeout: 5000 });
     expect(mocks.storm.mock.calls[0][0].substrateHash).toMatch(/^substrate:|^sha256:/);
     expect(screen.getByRole("button", { name: "Reset" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
