@@ -29,6 +29,13 @@ import {
 } from "@/lib/terrain-scene";
 import { RELIEF_RISE_FROM, TerrainRelief } from "@/lib/terrain-relief";
 import { registerTerrariumProtocol } from "@/lib/terrarium-protocol";
+import {
+  BASE_IMAGERY_LAYER_ID,
+  baseImageryRole,
+  isEraLayerId,
+  layerOrder,
+  setBaseImageryRole,
+} from "@/lib/map-layers";
 
 registerTerrariumProtocol(maplibregl);
 
@@ -67,6 +74,12 @@ export interface MapViewProps {
   terrainExaggeration?: number;
   /** The mesh scale each time the relief settles, Auto included. */
   onReliefChange?: (exaggeration: number) => void;
+  /**
+   * Whether today's 3D building extrusions may stand in the 3D view. Off for
+   * any view of the past: they are present-day geometry, and no sourced
+   * historical building model exists to replace them.
+   */
+  presentDayBuildings?: boolean;
 }
 
 function overlaySourceId(event: unknown): string | undefined {
@@ -114,7 +127,8 @@ function styleParsed(map: MLMap): boolean {
 export function applyElevationOverlays(
   map: MLMap,
   terrainEnabled: boolean,
-  exaggeration?: number
+  exaggeration?: number,
+  { buildings = true }: { buildings?: boolean } = {}
 ) {
   try {
     if (typeof map.getSource !== "function" || typeof map.addSource !== "function") {
@@ -171,10 +185,14 @@ export function applyElevationOverlays(
         exaggeration: requested ?? terrainExaggerationForZoom(zoom),
       });
     }
-    if (!map.getSource(BUILDINGS_SOURCE_ID)) {
+    if (buildings && !map.getSource(BUILDINGS_SOURCE_ID)) {
       map.addSource(BUILDINGS_SOURCE_ID, buildingsSource());
     }
-    if (typeof map.getLayer === "function" && !map.getLayer(BUILDINGS_LAYER_ID)) {
+    if (
+      buildings &&
+      typeof map.getLayer === "function" &&
+      !map.getLayer(BUILDINGS_LAYER_ID)
+    ) {
       map.addLayer(
         buildingsLayer(),
         layerBefore(map, [
@@ -186,7 +204,7 @@ export function applyElevationOverlays(
         ])
       );
     }
-    setLayerVisibility(map, BUILDINGS_LAYER_ID, "visible");
+    setLayerVisibility(map, BUILDINGS_LAYER_ID, buildings ? "visible" : "none");
     setLayerVisibility(map, FLOOD_VOLUME_LAYER_ID, "visible");
     if (typeof map.setSky === "function") map.setSky(terrainSky());
     if (typeof map.setLight === "function") map.setLight(terrainLight());
@@ -266,7 +284,7 @@ function styleFor(p: ImageryProvider): maplibregl.StyleSpecification {
       },
     },
     layers: [
-      { id: "satellite", type: "raster", source: "satellite" },
+      { id: BASE_IMAGERY_LAYER_ID, type: "raster", source: "satellite" },
       {
         id: LABELS_LAYER_ID,
         type: "raster",
@@ -294,6 +312,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     terrainEnabled = false,
     terrainExaggeration,
     onReliefChange,
+    presentDayBuildings = true,
   },
   ref
 ) {
@@ -319,6 +338,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   terrainExaggerationRef.current = terrainExaggeration;
   const onReliefChangeRef = useRef(onReliefChange);
   onReliefChangeRef.current = onReliefChange;
+  const buildingsRef = useRef(presentDayBuildings);
+  buildingsRef.current = presentDayBuildings;
   const viewRef = useRef<MapCameraState>({
     center: initialCenter,
     zoom: initialZoom,
@@ -384,7 +405,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       applyElevationOverlays(
         map,
         enabled,
-        hadTerrain ? undefined : relief.settledValue ?? explicit
+        hadTerrain ? undefined : relief.settledValue ?? explicit,
+        { buildings: buildingsRef.current }
       );
       if (!enabled) {
         relief.dispose();
@@ -487,10 +509,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     const hadTerrain = Boolean(map.getTerrain?.());
     if (terrainEnabled && !hadTerrain) {
       // Lay the mesh down nearly flat, then let the ground rise into place.
-      applyElevationOverlays(map, true, RELIEF_RISE_FROM);
+      applyElevationOverlays(map, true, RELIEF_RISE_FROM, {
+        buildings: buildingsRef.current,
+      });
       if (map.getTerrain?.()) relief.rise(explicit);
     } else if (terrainEnabled) {
-      applyElevationOverlays(map, true);
+      applyElevationOverlays(map, true, undefined, { buildings: buildingsRef.current });
       relief.retarget(explicit);
     } else if (hadTerrain) {
       relief.sink(() => {
@@ -516,6 +540,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       map.easeTo({ pitch: 0, duration: 700 });
     }
   }, [terrainEnabled, terrainExaggeration]);
+
+  // Switching between the past and the present shows or hides today's
+  // buildings without touching the terrain or the camera.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !terrainEnabledRef.current) return;
+    applyElevationOverlays(map, true, undefined, { buildings: presentDayBuildings });
+  }, [presentDayBuildings]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -582,9 +614,18 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         if (hadTerrain && typeof map.setTerrain === "function") {
           map.setTerrain(null);
         }
-        // Shading tints the imagery the classifier reads as land cover.
+        // Shading tints the imagery the classifier reads as land cover, and an
+        // era overlay would have it classify 1924 photography as today.
         const hiddenReliefLayers: string[] = [];
-        for (const layerId of [HILLSHADE_LAYER_ID, BUILDINGS_LAYER_ID, FLOOD_VOLUME_LAYER_ID]) {
+        const eraLayers = layerOrder(map).filter(isEraLayerId);
+        const baseRole = baseImageryRole(map);
+        if (baseRole !== "present") setBaseImageryRole(map, "present");
+        for (const layerId of [
+          HILLSHADE_LAYER_ID,
+          BUILDINGS_LAYER_ID,
+          FLOOD_VOLUME_LAYER_ID,
+          ...eraLayers,
+        ]) {
           if (typeof map.getLayer !== "function" || !map.getLayer(layerId)) continue;
           let visibility: string | undefined;
           try {
@@ -634,6 +675,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           for (const layerId of hiddenReliefLayers) {
             setLayerVisibility(map, layerId, "visible");
           }
+          if (baseRole !== "present") setBaseImageryRole(map, baseRole);
           if (
             (prevPitch > 0.4 || Math.abs(prevBearing) > 0.4) &&
             typeof map.jumpTo === "function"
