@@ -26,6 +26,11 @@ export class FakeMap {
   bearing = 0;
   pitch = 0;
   removed = false;
+  container = document.createElement("div");
+  resizeCount = 0;
+
+  getContainer() { return this.container; }
+  resize() { this.resizeCount += 1; return this; }
 
   constructor(baseLayers: string[] = ["satellite", "hillshade", "place-labels"]) {
     this.resetStyle(baseLayers);

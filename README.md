@@ -21,6 +21,14 @@ This is a reproducible calculation, not a measured site outcome or a screenshot.
 
 Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. The terrain loader also rejects partially downloaded tiles or non-finite samples rather than filling missing cells with the regional mean and calling the result observed. Historical storm events are drawn from complete, contiguous UTC hourly records; missing precipitation is not silently replaced with zero, and drizzle within an event contributes to the same depth used by its hyetograph. Unavailable archive requests can be retried. Example land cover never becomes a measurement merely because the terrain loaded successfully.
 
+### Explore and share a historical view
+
+The timeline keeps the selected era in view. Use its previous/next buttons, arrow keys, or Home/End to move through the published years. **Compare** opens a full-screen, synchronized three-map view starting with the selected era. Each pane reports its own imagery status and coverage as you pan; a late-loading pane joins the current camera. Escape closes comparison and returns keyboard focus to its opening control. Narrow screens use flat comparison maps to limit terrain memory.
+
+**Share** copies the location, zoom, selected era, 3D setting and relief scale. A map link does not contain the analysis, drawings or storm results; use experiment JSON for those. Older location-only links still open normally.
+
+PDF generation and the storm hydrograph load on demand. A failed PDF export can be retried, and a failed chart load leaves the rest of the study available.
+
 ## Three questions, different evidence
 
 | Frame | What it contains | What it does not establish |

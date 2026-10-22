@@ -1,4 +1,5 @@
-import { AlertTriangle, Columns3, History, Loader2, RefreshCw } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Columns3, History, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ERAS,
@@ -38,11 +39,23 @@ export function EraTimeline({
 }: Props) {
   const active: MapEra = getEra(eraId);
   const covered = eraCoversPoint(active, center.lng, center.lat);
+  const groupRef = useRef<HTMLDivElement>(null);
+  const activeIndex = ERAS.findIndex((era) => era.id === active.id);
+
+  useEffect(() => {
+    groupRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active.id]);
+
+  const select = (index: number, focus = false) => {
+    const next = ERAS[index];
+    if (!next) return;
+    onChange(next.id);
+    if (focus) groupRef.current?.querySelectorAll<HTMLElement>('[role="radio"]')[index]?.focus();
+  };
 
   const step = (delta: number) => {
-    const i = ERAS.findIndex((e) => e.id === active.id);
-    const next = ERAS[Math.min(ERAS.length - 1, Math.max(0, i + delta))];
-    if (next) onChange(next.id);
+    select(Math.min(ERAS.length - 1, Math.max(0, activeIndex + delta)));
   };
 
   return (
@@ -54,17 +67,22 @@ export function EraTimeline({
     >
       <div className="flex items-center gap-2">
         <History className="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <button type="button" aria-label="Previous era" disabled={activeIndex === 0}
+          onClick={() => step(-1)} className="shrink-0 rounded p-2 hover:bg-muted disabled:opacity-30">
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        </button>
         <div
+          ref={groupRef}
           role="radiogroup"
           aria-label="Historical timeline"
           onKeyDown={(e) => {
-            if (e.key === "ArrowRight") {
-              e.preventDefault();
-              step(1);
-            } else if (e.key === "ArrowLeft") {
-              e.preventDefault();
-              step(-1);
-            }
+            const target = e.key === "Home" ? 0 : e.key === "End" ? ERAS.length - 1
+              : e.key === "ArrowRight" || e.key === "ArrowDown" ? (activeIndex + 1) % ERAS.length
+              : e.key === "ArrowLeft" || e.key === "ArrowUp" ? (activeIndex - 1 + ERAS.length) % ERAS.length
+              : null;
+            if (target === null) return;
+            e.preventDefault();
+            select(target, true);
           }}
           className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
         >
@@ -82,7 +100,7 @@ export function EraTimeline({
                   tabIndex={isActive ? 0 : -1}
                   onClick={() => onChange(era.id)}
                   className={cn(
-                    "rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-widest transition-colors",
+                    "rounded-md px-2.5 py-2 font-mono text-[11px] font-semibold uppercase tracking-widest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary",
                     isActive
                       ? era.provenance === "projection"
                         ? "bg-accent/20 text-accent"
@@ -96,8 +114,13 @@ export function EraTimeline({
             );
           })}
         </div>
+        <button type="button" aria-label="Next era" disabled={activeIndex === ERAS.length - 1}
+          onClick={() => step(1)} className="shrink-0 rounded p-2 hover:bg-muted disabled:opacity-30">
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </button>
         <button
           type="button"
+          aria-label="Compare historical eras"
           onClick={onCompare}
           className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
         >

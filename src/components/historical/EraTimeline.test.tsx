@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ERAS } from "@/lib/historical/eras";
 import { EraTimeline } from "./EraTimeline";
@@ -72,5 +73,43 @@ describe("EraTimeline", () => {
     renderTimeline({ eraId: "1609" });
     expect(screen.getByText("Reconstruction")).toBeInTheDocument();
     expect(screen.getByText(/not a photograph/)).toBeInTheDocument();
+  });
+});
+
+function InteractiveTimeline() {
+  const [era, setEra] = useState("today");
+  return <EraTimeline eraId={era} onChange={setEra} onCompare={() => {}} center={MIDTOWN} />;
+}
+
+describe("timeline navigation", () => {
+  it("moves selection and keyboard focus together, including both endpoints", () => {
+    render(<InteractiveTimeline />);
+    const today = screen.getByRole("radio", { name: "Today" });
+    today.focus();
+    fireEvent.keyDown(today, { key: "ArrowLeft" });
+    const previous = screen.getByRole("radio", { name: "2024" });
+    expect(previous).toHaveFocus();
+    expect(previous).toHaveAttribute("aria-checked", "true");
+    fireEvent.keyDown(previous, { key: "Home" });
+    const first = screen.getByRole("radio", { name: "1609" });
+    expect(first).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Previous era" })).toBeDisabled();
+    fireEvent.keyDown(first, { key: "ArrowLeft" });
+    const last = screen.getByRole("radio", { name: "+3 ft" });
+    expect(last).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Next era" })).toBeDisabled();
+    fireEvent.keyDown(last, { key: "ArrowRight" });
+    expect(first).toHaveFocus();
+    fireEvent.keyDown(first, { key: "End" });
+    expect(last).toHaveFocus();
+  });
+
+  it("offers named touch controls even when Compare's text is hidden", () => {
+    render(<InteractiveTimeline />);
+    fireEvent.click(screen.getByRole("button", { name: "Previous era" }));
+    expect(screen.getByRole("radio", { name: "2024" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Next era" }));
+    expect(screen.getByRole("radio", { name: "Today" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "Compare historical eras" })).toBeEnabled();
   });
 });

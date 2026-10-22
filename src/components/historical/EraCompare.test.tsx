@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useEffect } from "react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeMap } from "@/test/fake-map";
 import type { MapViewProps } from "@/components/MapView";
@@ -9,6 +9,8 @@ import { EraCompare } from "./EraCompare";
 const panes = vi.hoisted(() => ({
   maps: [] as FakeMap[],
   props: [] as MapViewProps[],
+  delayed: false,
+  release: null as (() => void) | null,
   verdict: new Map<string, ProbeResult>(),
 }));
 
@@ -21,7 +23,9 @@ vi.mock("@/components/MapView", () => ({
     useEffect(() => {
       const map = new FakeMap();
       panes.maps[index] = map;
-      props.onReady?.({ map: map.asMap(), handle: {} as never });
+      const ready = () => props.onReady?.({ map: map.asMap(), handle: {} as never });
+      if (panes.delayed && index === 2) panes.release = ready;
+      else ready();
       return () => {
         map.removed = true;
       };
@@ -73,6 +77,8 @@ beforeEach(() => {
   panes.maps = [];
   panes.props = [];
   panes.verdict.clear();
+  panes.delayed = false;
+  panes.release = null;
 });
 
 describe("EraCompare", () => {
@@ -145,5 +151,71 @@ describe("EraCompare", () => {
     expect(eraLayers(panes.maps[0])).toEqual([]);
     expect(screen.getByTestId("era-pane-0")).toHaveTextContent(/Unavailable.*answered 404/);
     expect(eraLayers(panes.maps[2])).toEqual(["era-2018-layer"]);
+  });
+});
+
+describe("comparison recovery and accessibility", () => {
+  it("aligns a late-loading pane with the camera already in use", async () => {
+    panes.delayed = true;
+    renderCompare();
+    await flush();
+    act(() => panes.maps[0].jumpTo({ center: { lng: -74.02, lat: 40.72 }, zoom: 17, bearing: 32, pitch: 45 }));
+    act(() => panes.release?.());
+    await flush();
+    expect(panes.maps[2].getCenter()).toEqual({ lng: -74.02, lat: 40.72 });
+    expect(panes.maps[2].getZoom()).toBe(17);
+    expect(panes.maps[2].getBearing()).toBe(32);
+    expect(panes.maps[2].getPitch()).toBe(45);
+  });
+
+  it("updates coverage when a synchronized camera leaves and returns to NYC", async () => {
+    renderCompare();
+    await flush();
+    act(() => {
+      panes.maps[0].jumpTo({ center: { lng: -104.99, lat: 39.74 } });
+      panes.maps[0].emit("moveend");
+    });
+    expect(screen.getByTestId("era-pane-0")).toHaveTextContent(/covers the city only/);
+    expect(screen.getByTestId("era-pane-2")).toHaveTextContent(/covers the city only/);
+    expect(screen.getByTestId("era-pane-1")).not.toHaveTextContent(/covers the city only/);
+    act(() => {
+      panes.maps[1].jumpTo({ center: { lng: -73.985, lat: 40.758 } });
+      panes.maps[1].emit("moveend");
+    });
+    expect(screen.getByTestId("era-pane-0")).not.toHaveTextContent(/covers the city only/);
+  });
+
+  it("closes with Escape and returns focus to the opening control", async () => {
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return <><button onClick={() => setOpen(true)}>Compare eras</button>
+        {open && <EraCompare open onClose={() => setOpen(false)} center={{ lat: 40.758, lng: -73.985 }} zoom={14} />}</>;
+    }
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: "Compare eras" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await flush();
+    expect(screen.getByRole("dialog", { name: /Same place/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("switches to flat terrain when the viewport becomes narrow", async () => {
+    let resize = () => {};
+    const media = { matches: false, addEventListener: vi.fn((_event, callback) => { resize = callback; }), removeEventListener: vi.fn() };
+    const spy = vi.spyOn(window, "matchMedia").mockReturnValue(media as unknown as MediaQueryList);
+    try {
+      const view = renderCompare({ terrainEnabled: true, terrainExaggeration: 3 });
+      await flush();
+      expect(panes.props.slice(-3).map((p) => p.terrainExaggeration)).toEqual([3, 3, 3]);
+      act(() => { media.matches = true; resize(); });
+      expect(panes.props.slice(-3).map((p) => p.terrainEnabled)).toEqual([false, false, false]);
+      expect(screen.getByText(/flat on small screens/)).toBeVisible();
+      view.unmount();
+      expect(media.removeEventListener).toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
   });
 });

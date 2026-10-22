@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
   children: ReactNode;
+  /** Optional local fallback, keeping the surrounding study mounted. */
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -31,6 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.error) return this.props.children;
+    if (this.props.fallback !== undefined) return this.props.fallback;
 
     return (
       <div className="flex min-h-screen items-center justify-center p-6">

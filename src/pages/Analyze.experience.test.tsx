@@ -1,10 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { SensorOpticsProvider } from "@/lib/sensor-optics-context";
 import Analyze from "./Analyze";
 
 const invoke = vi.hoisted(() => vi.fn());
+const pdf = vi.hoisted(() => ({ generate: vi.fn(), save: vi.fn() }));
+vi.mock("@/lib/pdf-export", () => ({ generatePDFReport: pdf.generate }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke } } }));
 vi.mock("@/lib/hydrology", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/hydrology")>();
@@ -58,5 +60,49 @@ describe("atlas first-use experience", () => {
     expect(screen.getByRole("button", { name: /rerun the same storm/i })).toBeDisabled();
     expect(screen.getByText(/draw at least one shape/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /green roofs/i })).toBeDisabled();
+  });
+});
+
+describe("share and export experience", () => {
+  it("reopens the selected era and relief, then shares the changed view", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<MemoryRouter initialEntries={["/?lat=40.71&lng=-74.01&zoom=14&era=2018&terrain=1&relief=3"]}>
+      <SensorOpticsProvider><Analyze /></SensorOpticsProvider>
+    </MemoryRouter>);
+    expect(screen.getByRole("radio", { name: "2018" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "3×" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("radio", { name: "2024" }));
+    fireEvent.click(screen.getByRole("button", { name: "6×" }));
+    fireEvent.click(screen.getByRole("button", { name: "Share map view" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    const params = new URL(writeText.mock.calls[0][0]).searchParams;
+    expect(params.get("era")).toBe("2024");
+    expect(params.get("relief")).toBe("6");
+    expect(params.get("lat")).toBe("40.71000");
+    expect(params.get("terrain")).toBe("1");
+    fireEvent.click(screen.getByRole("button", { name: "Compare historical eras" }));
+    expect(screen.getByLabelText("Era for pane 1")).toHaveValue("2024");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("radio", { name: "2018" }));
+    fireEvent.click(screen.getByRole("button", { name: "Compare historical eras" }));
+    expect(screen.getByLabelText("Era for pane 1")).toHaveValue("2018");
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("generates a PDF on demand and recovers after a failed export", async () => {
+    pdf.generate.mockReset().mockImplementationOnce(() => { throw new Error("Export unavailable"); })
+      .mockReturnValue({ save: pdf.save });
+    pdf.save.mockClear();
+    render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
+    expect(pdf.generate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Export" }), { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("button", { name: /PDF resilience dossier/ }));
+    await waitFor(() => expect(pdf.generate).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByRole("button", { name: /PDF resilience dossier/ })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /PDF resilience dossier/ }));
+    await waitFor(() => expect(pdf.save).toHaveBeenCalledOnce());
+    expect(pdf.generate).toHaveBeenLastCalledWith(expect.objectContaining({ status: "example" }), expect.any(Object));
   });
 });

@@ -1,9 +1,10 @@
 import { validateLandCover } from "../../supabase/functions/_shared/land-cover";
 import { computeAbsorptionScore, classifyFloodRisk } from "@/lib/absorption";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { AppNav } from "@/components/AppNav";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MapView, type MapViewHandle } from "@/components/MapView";
 import { AbsorptionScoreGauge } from "@/components/AbsorptionScoreGauge";
 import { LocationSearch } from "@/components/LocationSearch";
@@ -18,7 +19,7 @@ import { useWelikia1609 } from "@/hooks/useWelikia1609";
 import { EraRasterLayer } from "@/components/historical/EraRasterLayer";
 import { EraTimeline } from "@/components/historical/EraTimeline";
 import { EraCompare } from "@/components/historical/EraCompare";
-import { DEFAULT_ERA_ID, getEra, isPastEra } from "@/lib/historical/eras";
+import { getEra, isPastEra } from "@/lib/historical/eras";
 import type { ImageryStatus } from "@/lib/historical/era-imagery";
 import { RecommendationsList } from "@/components/RecommendationsList";
 import { StormComparison } from "@/components/StormComparison";
@@ -97,7 +98,7 @@ import {
 } from "@/lib/geo";
 import { boundsToSimBBox, estimateRunoffVolumeM3 } from "@/lib/simulation";
 import { buildExperimentExport } from "@/lib/experiment-export";
-import { generatePDFReport } from "@/lib/pdf-export";
+import { mapViewUrl, readMapView } from "@/lib/map-view-link";
 import { toast } from "sonner";
 import { TacticalHUD } from "@/components/tactical/TacticalHUD";
 import { CommandPalette } from "@/components/tactical/CommandPalette";
@@ -117,7 +118,6 @@ import {
   type DeterminismReport,
 } from "@/lib/storm-identity";
 import { StormTelemetryReadout } from "@/components/studio/StormTelemetryReadout";
-import { StormHydrograph } from "@/components/studio/StormHydrograph";
 import { WaterBalanceMeter } from "@/components/studio/WaterBalanceMeter";
 import { buildRealitySurface } from "@/lib/counterfactual/modifiers";
 import { requiredEligibilityLayer } from "@/lib/counterfactual/eligibility";
@@ -134,6 +134,10 @@ import {
 } from "@/lib/hydrology/real-storms";
 import { fetchDrainageGrid } from "@/lib/hydrology/drainage";
 import type { InterventionFeature } from "@/lib/counterfactual/types";
+
+const StormHydrograph = lazy(() =>
+  import("@/components/studio/StormHydrograph").then((module) => ({ default: module.StormHydrograph }))
+);
 
 const STORM_RAINFALL_MM = 50;
 const STORM_RESOLUTION = "medium" as const;
@@ -161,7 +165,6 @@ const SURFACE_PROVENANCE = [
   },
 ];
 
-const DEFAULT_VIEW = { lat: 40.7075, lng: -74.009, zoom: 15 };
 
 /**
  * This page loads no mapped footprints, so tools whose shapes must land on
@@ -233,37 +236,21 @@ export function buildRealitySimulationRequest(
   };
 }
 
-function viewFromParams(params: URLSearchParams) {
-  const rawLat = params.get("lat");
-  const rawLng = params.get("lng");
-  if (!rawLat || !rawLng) return null;
-  const lat = Number(rawLat);
-  const lng = Number(rawLng);
-  const zoom = Number(params.get("zoom") || NaN);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-  return {
-    lat,
-    lng,
-    zoom: Number.isFinite(zoom) ? Math.min(19, Math.max(2, zoom)) : DEFAULT_VIEW.zoom,
-  };
-}
-
 export default function Analyze() {
   usePageTitle("Analyze");
   const mapRef = useRef<MapViewHandle>(null);
   const editorRef = useRef<MapEditorHandle>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = useMemo(
-    () => viewFromParams(searchParams) ?? DEFAULT_VIEW,
+    () => readMapView(searchParams),
     [searchParams]
   );
 
   const [name, setName] = useState("Lower Manhattan Watershed");
   const [viewportArea, setViewportArea] = useState(0);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [locationLabel, setLocationLabel] = useState(viewFromParams(searchParams) ? "Shared map view" : "Lower Manhattan, NY");
-  const [view, setView] = useState(initialView);
+  const [locationLabel, setLocationLabel] = useState(initialView.hasLocation ? "Shared map view" : "Lower Manhattan, NY");
+  const [view, setView] = useState<{ lat: number; lng: number; zoom: number }>(initialView);
   const [mapReady, setMapReady] = useState(false);
   const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
   
@@ -272,9 +259,9 @@ export default function Analyze() {
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
   const [activeIntervention, setActiveIntervention] = useState<InterventionKey | null>(null);
   const [interventionFeatures, setInterventionFeatures] = useState<InterventionFeature[]>([]);
-  const [terrainEnabled, setTerrainEnabled] = useState(false);
+  const [terrainEnabled, setTerrainEnabled] = useState(initialView.terrainEnabled);
   /** null follows the local relief in view. */
-  const [terrainExaggeration, setTerrainExaggeration] = useState<number | null>(null);
+  const [terrainExaggeration, setTerrainExaggeration] = useState<number | null>(initialView.terrainExaggeration);
   const [liveRelief, setLiveRelief] = useState<number | null>(null);
   const [stormRainfallMm, setStormRainfallMm] = useState(STORM_RAINFALL_MM);
   const [stormResolution, setStormResolution] = useState<"low" | "medium" | "high">(STORM_RESOLUTION);
@@ -301,7 +288,7 @@ export default function Analyze() {
   const [showDifference, setShowDifference] = useState(true);
   /** An exported experiment reopened here: its verification travels with the study. */
   const [reopened, setReopened] = useState<ImportedStudy | null>(null);
-  const [eraId, setEraId] = useState<string>(DEFAULT_ERA_ID);
+  const [eraId, setEraId] = useState<string>(initialView.eraId);
   const activeEra = getEra(eraId);
   // Keyed by era so a late report from the year just left is never shown
   // against the year now selected.
@@ -312,6 +299,8 @@ export default function Analyze() {
     [eraId]
   );
   const [compareEras, setCompareEras] = useState(false);
+  const pdfPending = useRef(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -494,10 +483,12 @@ export default function Analyze() {
       const bounds = mapRef.current?.getBounds();
       if (bounds) setViewportArea(bboxAreaKm2(bounds));
       setSearchParams(
-        {
-          lat: v.lat.toFixed(5),
-          lng: v.lng.toFixed(5),
-          zoom: v.zoom.toFixed(1),
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          next.set("lat", v.lat.toFixed(5));
+          next.set("lng", v.lng.toFixed(5));
+          next.set("zoom", v.zoom.toFixed(1));
+          return next;
         },
         { replace: true }
       );
@@ -506,13 +497,10 @@ export default function Analyze() {
   );
 
   const copyShareLink = async () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("lat", view.lat.toFixed(5));
-    url.searchParams.set("lng", view.lng.toFixed(5));
-    url.searchParams.set("zoom", view.zoom.toFixed(1));
+    const url = mapViewUrl(window.location.href, { ...view, eraId, terrainEnabled, terrainExaggeration });
     try {
       await navigator.clipboard.writeText(url.toString());
-      toast.success("Location link copied to clipboard");
+      toast.success("Map view copied, including era and relief. Export experiment JSON to share a study.");
     } catch {
       toast.error("Couldn't access clipboard.");
     }
@@ -831,9 +819,12 @@ export default function Analyze() {
     }
   };
 
-  const handleExportPDF = () => {
-    if (!result) return;
+  const handleExportPDF = async () => {
+    if (!result || pdfPending.current) return;
+    pdfPending.current = true;
+    setExportingPDF(true);
     try {
+      const { generatePDFReport } = await import("@/lib/pdf-export");
       const doc = generatePDFReport(result, {
         includeMapImage: Boolean(capturedTile),
         scenario: scenarioExport ?? undefined,
@@ -842,7 +833,10 @@ export default function Analyze() {
       toast.success("PDF Resilience Dossier generated.");
     } catch (e) {
       console.error(e);
-      toast.error("Error generating PDF dossier.");
+      toast.error("Error generating PDF dossier. Please retry.");
+    } finally {
+      pdfPending.current = false;
+      setExportingPDF(false);
     }
   };
 
@@ -941,13 +935,15 @@ export default function Analyze() {
             />
           </div>
 
-          <EraCompare
-            open={compareEras}
+          {compareEras && <EraCompare
+            open
+            initialEraIds={[eraId === "today" ? "1609" : eraId, "today", "slr-3ft"]}
             onClose={() => setCompareEras(false)}
             center={{ lat: view.lat, lng: view.lng }}
             zoom={view.zoom}
             terrainEnabled={terrainEnabled}
-          />
+            terrainExaggeration={terrainExaggeration ?? undefined}
+          />}
 
           {showSubstrate && substrate.status.phase === "ready" && (
             <SubstrateLayer map={mapInstance} view={substrate.status.view} />
@@ -1162,6 +1158,7 @@ export default function Analyze() {
           <div className="flex items-center gap-2">
           <button
             type="button"
+            aria-label="3D terrain"
             onClick={() => setTerrainEnabled((value) => !value)}
             title={
               terrainEnabled
@@ -1209,8 +1206,9 @@ export default function Analyze() {
             </div>
           )}
           <button
+            aria-label="Share map view"
             onClick={copyShareLink}
-            title="Copy coordinate link"
+            title="Copy map view, era and relief"
             className="flex items-center gap-1.5 rounded-md border border-border bg-card/90 backdrop-blur-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-md"
           >
             <Link2 className="h-3.5 w-3.5" />
@@ -1582,10 +1580,14 @@ export default function Analyze() {
 
                         {simResult.metadata.hydrograph &&
                           simResult.metadata.hydrograph.length > 1 && (
-                            <StormHydrograph
-                              series={simResult.metadata.hydrograph}
-                              peakM3s={simResult.metadata.peak_discharge_m3s ?? 0}
-                            />
+                            <ErrorBoundary fallback={<p role="alert" className="text-xs text-muted-foreground">The hydrograph could not load. Your storm results and experiment export remain available.</p>}>
+                              <Suspense fallback={<p role="status" className="text-xs text-muted-foreground">Loading hydrograph…</p>}>
+                                <StormHydrograph
+                                  series={simResult.metadata.hydrograph}
+                                  peakM3s={simResult.metadata.peak_discharge_m3s ?? 0}
+                                />
+                              </Suspense>
+                            </ErrorBoundary>
                           )}
 
                         {simResult.metadata.rainfall_volume_m3 != null && (
@@ -1823,10 +1825,10 @@ export default function Analyze() {
                         <span><strong>Experiment evidence (JSON)</strong><small>Question, inputs with evidence status, drawings, assumptions, sealed storm, elevation grid, urban substrate identity, routed outputs and where the water moved — replayable here or on the command line</small></span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </button>
-                      <button type="button" onClick={handleExportPDF}>
+                      <button type="button" onClick={handleExportPDF} disabled={exportingPDF} aria-busy={exportingPDF}>
                         <FileText className="h-4 w-4" aria-hidden="true" />
                         <span>
-                          <strong>PDF resilience dossier</strong>
+                          <strong>{exportingPDF ? "Preparing PDF…" : "PDF resilience dossier"}</strong>
                           <small>Formatted report with charts and recommendations</small>
                         </span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
