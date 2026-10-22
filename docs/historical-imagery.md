@@ -36,13 +36,17 @@ that cannot exist.
 | 2006 | `NYC_Orthos_2006` | NYS Orthoimagery Program, via NYC OTI | Spring 2006 |
 | 2016 | `NYC_Orthos_2016` | NYS Orthoimagery Program, via NYC OTI | 26 Mar – 5 Apr 2016 |
 | 2018 | `NYC_Orthos_2018` | NYS Orthoimagery Program, via NYC OTI | 14 Apr – 2 May 2018 |
+| 2020 | `NYC_Orthos_-_2020` | NYS Orthoimagery Program (service description), via NYC OTI | 21 Mar – 11 Apr 2020 |
+| 2022 | `NYC_Orthos_2022` | NYC OTI | 16 – 30 Mar 2022 |
+| 2024 | `NYC_Orthos_2024` | NYC OTI | 14 – 24 Mar 2024 |
 | Today | Esri World Imagery (EOX Sentinel-2 fallback) | Esri, Maxar | varies by tile |
 | 2050s / 2080s / 2100 | NYC Open Data `27ya-gqtm`, `ek8y-fsqz`, `rf9r-c4pz` | Mayor's Office of Climate & Environmental Justice — **projection** | — |
 | +3 ft | NOAA `dc_slr/slr_3ft` (z ≤ 16) | NOAA Office for Coastal Management — **projection** | — |
 
 Services are under `https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/`.
-The same organisation also publishes 2001–02, 2004, 2008, 2010, 2012, 2014,
-2020, 2022 and 2024, which could extend the timeline.
+The same organisation also publishes 2001–02, 2004, 2008, 2010, 2012 and
+2014, which could extend the timeline. Capture dates for 2020–2024 are from
+the City's [aerial imagery metadata](https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_AerialImagery.md).
 
 No year is unavailable today. If a publisher retires a service again, the
 probe marks that year **Unavailable** with the reason, draws nothing for it,

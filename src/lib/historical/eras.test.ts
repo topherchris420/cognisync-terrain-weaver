@@ -20,6 +20,9 @@ const TIMELINE = [
   "2006",
   "2016",
   "2018",
+  "2020",
+  "2022",
+  "2024",
   "today",
   "fp-2050",
   "fp-2080",
@@ -55,8 +58,10 @@ describe("era timeline catalogue", () => {
 
   const aerials = ERAS.filter((era) => era.kind === "raster");
 
-  it("covers the six aerial survey years", () => {
-    expect(aerials.map((era) => era.year)).toEqual([1924, 1951, 1996, 2006, 2016, 2018]);
+  it("covers the aerial survey years", () => {
+    expect(aerials.map((era) => era.year)).toEqual([
+      1924, 1951, 1996, 2006, 2016, 2018, 2020, 2022, 2024,
+    ]);
   });
 
   it.each(aerials.map((era) => [era.id, era] as const))(
@@ -64,7 +69,7 @@ describe("era timeline catalogue", () => {
     (_id, era) => {
       expect(era.tiles).toMatch(
         new RegExp(
-          `^${NYC_ORTHO_HOST.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/(NYC_Orthos|Ortho)_${era.year}(_Mosaic)?/MapServer/tile/\\{z\\}/\\{y\\}/\\{x\\}$`
+          `^${NYC_ORTHO_HOST.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/(NYC_Orthos|Ortho)_(-_)?${era.year}(_Mosaic)?/MapServer/tile/\\{z\\}/\\{y\\}/\\{x\\}$`
         )
       );
       expect(era.sourceUrl).toBe(era.tiles!.replace("/tile/{z}/{y}/{x}", ""));
@@ -107,7 +112,8 @@ describe("era timeline catalogue", () => {
 
   it("hides today's 3D buildings from every view of the past", () => {
     for (const era of ERAS) {
-      const past = era.year < 2020 && era.kind !== "live";
+      // Every photograph and reconstruction is the past, however recent.
+      const past = era.kind !== "live" && era.provenance !== "projection";
       expect(era.presentDayBuildings).toBe(!past);
       expect(isPastEra(era)).toBe(past);
     }
