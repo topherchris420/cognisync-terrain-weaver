@@ -33,7 +33,13 @@ that cannot exist.
 | 1924 | `Ortho_1924_Mosaic` | NYC OTI, from the Department of City Planning | 1924 |
 | 1951 | `NYC_Orthos_1951` | NYC OTI, from the Municipal Archives | 1951 |
 | 1996 | `Ortho_1996_Mosaic` | City of New York (OTI) | April 1996; Manhattan June 1996 |
+| 2001–02 | `NYC_Orthos_2001_2` | NYC OTI (the service credits "NYP DOS") | Manhattan and Staten Island 2001; Bronx, Brooklyn and Queens 4 Apr 2002 |
+| 2004 | `NYC_Ortho_2004` | NYC OTI (DoITT) | 19 Apr – 4 May 2004 |
 | 2006 | `NYC_Orthos_2006` | NYS Orthoimagery Program, via NYC OTI | Spring 2006 |
+| 2008 | `NYC_Orthos_2008` | NYS Orthoimagery Program, via NYC OTI | 10 Mar – 14 May 2008; Manhattan June 2008 |
+| 2010 | `NYC_Orthos_2010` | NYS Orthoimagery Program, via NYC OTI | 1 – 10 Apr 2010; Manhattan 15 Jun 2010 |
+| 2012 | `NYC_Orthos_2012` | NYS Orthoimagery Program, via NYC OTI | 30 Mar – 6 Apr 2012; Manhattan 15–20 Jun 2012 |
+| 2014 | `NYC_Orthos_2014` | NYS Orthoimagery Program, via NYC OTI | 1 – 3 Apr 2014; Manhattan 1 Jun 2014 |
 | 2016 | `NYC_Orthos_2016` | NYS Orthoimagery Program, via NYC OTI | 26 Mar – 5 Apr 2016 |
 | 2018 | `NYC_Orthos_2018` | NYS Orthoimagery Program, via NYC OTI | 14 Apr – 2 May 2018 |
 | 2020 | `NYC_Orthos_-_2020` | NYS Orthoimagery Program (service description), via NYC OTI | 21 Mar – 11 Apr 2020 |
@@ -44,9 +50,17 @@ that cannot exist.
 | +3 ft | NOAA `dc_slr/slr_3ft` (z ≤ 16) | NOAA Office for Coastal Management — **projection** | — |
 
 Services are under `https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/`.
-The same organisation also publishes 2001–02, 2004, 2008, 2010, 2012 and
-2014, which could extend the timeline. Capture dates for 2020–2024 are from
-the City's [aerial imagery metadata](https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_AerialImagery.md).
+Capture dates for 2001–2014 and 2020–2024 are from the City's
+[aerial imagery metadata](https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_AerialImagery.md).
+2001–02 is two flights: Manhattan and Staten Island in 2001 (the Manhattan
+orthos were flown on 3 and 21 July, so the World Trade Center stands), the
+Bronx, Brooklyn and Queens in 2002. Its Staten Island tiles stop at level 19,
+the map's own deepest zoom (`maxZoom` in `MapView.tsx`), so level 20 is never
+requested there; if it were, MapLibre treats a 404 as a missing tile and
+enlarges the level-19 one.
+For 2008–2012 the metadata and the service descriptions disagree on which
+buildings outside Manhattan were corrected for lean (over five stories, or
+over six), so the app says only "taller buildings".
 
 No year is unavailable today. If a publisher retires a service again, the
 probe marks that year **Unavailable** with the reason, draws nothing for it,
