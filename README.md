@@ -19,7 +19,7 @@ This is a reproducible calculation, not a measured site outcome or a screenshot.
 5. Rerun the sealed storm and compare **NOW / POSSIBLE** with the synchronized map view. Then read **where the water moved**: the cells that carry less water on the redesigned surface, the drawing's own footprint on the grid, and how far downstream the change reaches.
 6. Export the study or its **experiment evidence JSON**, including inputs, drawings, coefficients, forcing, routed results and the spatial difference. **Open an experiment file** reopens it: every identity is verified and the pair is routed again by the running build before anything is shown.
 
-Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. Example land cover never becomes a measurement merely because the terrain loaded successfully.
+Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. The terrain loader also rejects partially downloaded tiles or non-finite samples rather than filling missing cells with the regional mean and calling the result observed. Historical storm events are drawn from complete, contiguous UTC hourly records; missing precipitation is not silently replaced with zero, and drizzle within an event contributes to the same depth used by its hyetograph. Unavailable archive requests can be retried. Example land cover never becomes a measurement merely because the terrain loaded successfully.
 
 ## Three questions, different evidence
 
@@ -138,7 +138,7 @@ The same verification runs in the browser. **Open an experiment file** (on the i
 | Sensitivity | `src/lib/land-cover-sensitivity.ts` |
 | Spatial constraints, identity and the spatial difference | `src/lib/counterfactual/` (`controlled.ts`, `difference.ts`) |
 | Local terrain routing | `src/lib/hydrology/` |
-| Historical reconstruction | `src/lib/historical/`, `public/data/welikia-1609-blocks.json` |
+| Historical reconstruction and era imagery | `src/lib/historical/`, `public/data/welikia-1609-blocks.json`; sources and verification in [docs/historical-imagery.md](docs/historical-imagery.md) |
 | Evidence that travels and returns | `experiment-export.ts`, `experiment-replay.ts`, `experiment-import.ts`, `geo.ts`, `pdf-export.ts` |
 | Validation harness | `src/lib/validation/`, `experiments/`, `scripts/experiment.ts` |
 | Evidence status, ledger, assumption registry | `src/lib/evidence/`, `src/lib/assumptions/registry.ts` |
@@ -160,7 +160,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open `http://127.0.0.1:43147`. Configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and, for MCP, `VITE_SUPABASE_PROJECT_ID` for your Supabase project. Browser configuration must contain only public keys; classifier/service secrets belong in Supabase edge-function secrets. The 1924–2024 aerial eras need `VITE_NYC_TILES_KEY`, a free key from [NYC's API portal](https://api-portal.nyc.gov/) (subscribe to "GeoServer Tile Service User"); NYC's own tile examples put this key in the browser. Without it those eras draw nothing and say so. For live AI classification, set `GEMINI_API_KEY` to use Google's Gemini API directly; the default model is `gemini-3.8-flash` and can be overridden with `GEMINI_MODEL`. Existing deployments can continue using `LOVABLE_API_KEY` as a fallback through the Lovable gateway. The example skips the classifier request but the app still initializes its Supabase client. Deploying source changes to edge functions is a separate step from the frontend build.
+Open `http://127.0.0.1:43147`. Configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and, for MCP, `VITE_SUPABASE_PROJECT_ID` for your Supabase project. Browser configuration must contain only public keys; classifier/service secrets belong in Supabase edge-function secrets. For live AI classification, set `GEMINI_API_KEY` to use Google's Gemini API directly; the default model is `gemini-3.8-flash` and can be overridden with `GEMINI_MODEL`. Existing deployments can continue using `LOVABLE_API_KEY` as a fallback through the Lovable gateway. The example skips the classifier request but the app still initializes its Supabase client. Deploying source changes to edge functions is a separate step from the frontend build.
 
 ```bash
 npm test

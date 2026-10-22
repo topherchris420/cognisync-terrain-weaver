@@ -3,12 +3,14 @@ import { X } from "lucide-react";
 import type { Map as MLMap } from "maplibre-gl";
 import { MapView } from "@/components/MapView";
 import { EraRasterLayer } from "@/components/historical/EraRasterLayer";
+import { EraStatusLine } from "@/components/historical/EraTimeline";
 import {
   ERAS,
   PROVENANCE_LABEL,
   eraCoversPoint,
   getEra,
 } from "@/lib/historical/eras";
+import type { ImageryStatus } from "@/lib/historical/era-imagery";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -16,63 +18,95 @@ interface Props {
   onClose: () => void;
   center: { lat: number; lng: number };
   zoom: number;
+  /** Mirror the main view's 3D terrain in every pane. */
+  terrainEnabled?: boolean;
   /** Eras shown left to right. */
   initialEraIds?: [string, string, string];
+}
+
+type PaneStatus = { eraId: string; status: ImageryStatus } | null;
+
+/** Three terrain meshes at once is too much for a phone's GPU memory. */
+const NARROW_QUERY = "(max-width: 639px)";
+
+function isNarrow(): boolean {
+  try {
+    return typeof window !== "undefined" && window.matchMedia(NARROW_QUERY).matches;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Past, present and future in three synchronised panes.
  *
  * Panning or zooming any pane moves the others, so the same rooftops line up
- * across four centuries. Each pane names its own layer and whether it is an
- * observation, a reconstruction or a projection.
+ * across four centuries. Each pane names its own layer, its state, and
+ * whether it is an observation, a reconstruction or a projection.
  */
 export function EraCompare({
   open,
   onClose,
   center,
   zoom,
+  terrainEnabled = false,
   initialEraIds = ["1609", "today", "slr-3ft"],
 }: Props) {
   const [eraIds, setEraIds] = useState<string[]>(initialEraIds);
-  const maps = useRef<(MLMap | null)[]>([null, null, null]);
   const [mapList, setMapList] = useState<(MLMap | null)[]>([null, null, null]);
+  const [statuses, setStatuses] = useState<PaneStatus[]>([null, null, null]);
+  const [retries, setRetries] = useState<number[]>([0, 0, 0]);
+  const [narrow] = useState(isNarrow);
   const syncing = useRef(false);
 
   const register = useCallback((index: number, map: MLMap) => {
-    maps.current[index] = map;
     setMapList((prev) => {
+      if (prev[index] === map) return prev;
       const next = [...prev];
       next[index] = map;
       return next;
     });
-
-    const onMove = () => {
-      if (syncing.current) return;
-      syncing.current = true;
-      for (let i = 0; i < maps.current.length; i += 1) {
-        const other = maps.current[i];
-        if (!other || i === index) continue;
-        other.jumpTo({
-          center: map.getCenter(),
-          zoom: map.getZoom(),
-          bearing: map.getBearing(),
-          pitch: map.getPitch(),
-        });
-      }
-      syncing.current = false;
-    };
-
-    map.on("move", onMove);
   }, []);
+
+  // One camera for all three panes. Listeners are owned here and removed when
+  // a pane's map changes or the comparison closes.
+  useEffect(() => {
+    const live = mapList.filter((map): map is MLMap => Boolean(map));
+    const handlers = live.map((source) => {
+      const onMove = () => {
+        if (syncing.current) return;
+        syncing.current = true;
+        try {
+          for (const other of live) {
+            if (other === source) continue;
+            other.jumpTo({
+              center: source.getCenter(),
+              zoom: source.getZoom(),
+              bearing: source.getBearing(),
+              pitch: source.getPitch(),
+            });
+          }
+        } finally {
+          syncing.current = false;
+        }
+      };
+      source.on("move", onMove);
+      return { source, onMove };
+    });
+    return () => {
+      for (const { source, onMove } of handlers) source.off("move", onMove);
+    };
+  }, [mapList]);
 
   useEffect(() => {
     if (open) return;
-    maps.current = [null, null, null];
     setMapList([null, null, null]);
+    setStatuses([null, null, null]);
   }, [open]);
 
   if (!open) return null;
+
+  const paneTerrain = terrainEnabled && !narrow;
 
   return (
     <div
@@ -82,6 +116,9 @@ export function EraCompare({
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Same place · four centuries
+          {terrainEnabled && narrow && (
+            <span className="ml-2 normal-case tracking-normal">· flat on small screens</span>
+          )}
         </p>
         <button
           type="button"
@@ -97,14 +134,29 @@ export function EraCompare({
         {eraIds.map((id, index) => {
           const era = getEra(id);
           const covered = eraCoversPoint(era, center.lng, center.lat);
+          const paneStatus = statuses[index];
+          const status = paneStatus?.eraId === era.id ? paneStatus.status : undefined;
           return (
-            <div key={index} className="relative min-h-0">
+            <div key={index} className="relative min-h-0" data-testid={`era-pane-${index}`}>
               <MapView
                 initialCenter={[center.lng, center.lat]}
                 initialZoom={zoom}
+                terrainEnabled={paneTerrain}
+                presentDayBuildings={era.presentDayBuildings}
                 onReady={({ map }) => register(index, map)}
               />
-              <EraRasterLayer map={mapList[index]} era={era} />
+              <EraRasterLayer
+                map={mapList[index]}
+                era={era}
+                retryToken={retries[index]}
+                onStatusChange={(next) =>
+                  setStatuses((prev) => {
+                    const copy = [...prev];
+                    copy[index] = { eraId: era.id, status: next };
+                    return copy;
+                  })
+                }
+              />
 
               <div className="panel pointer-events-auto absolute left-2 top-2 z-20 max-w-[15rem] rounded-lg border border-border bg-card/90 p-2 backdrop-blur-md">
                 <div className="flex items-center gap-2">
@@ -138,11 +190,22 @@ export function EraCompare({
                   </span>
                 </div>
                 <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-                  {!covered
-                    ? `New York City (${era.label}) covers the city only — nothing is drawn here.`
-                    : era.unavailableReason
-                      ? `${era.caption} ${era.unavailableReason}`
-                      : era.caption}
+                  {covered
+                    ? era.caption
+                    : `New York City (${era.label}) covers the city only — nothing is drawn here.`}
+                </p>
+                {covered && status && (
+                  <EraStatusLine
+                    era={era}
+                    status={status}
+                    compact
+                    onRetry={() =>
+                      setRetries((prev) => prev.map((n, i) => (i === index ? n + 1 : n)))
+                    }
+                  />
+                )}
+                <p className="mt-1 text-[9px] leading-snug text-muted-foreground/80">
+                  {era.attribution ?? era.agency}
                 </p>
               </div>
             </div>
