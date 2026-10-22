@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { Map as MLMap } from "maplibre-gl";
 import { Welikia1609Layer } from "@/components/historical/Welikia1609Layer";
 import { FloodplainLayer } from "@/components/historical/FloodplainLayer";
-import type { MapEra } from "@/lib/historical/eras";
+import { NYC_EXTENT, type MapEra } from "@/lib/historical/eras";
 
 interface Props {
   map: MLMap | null;
@@ -69,6 +69,8 @@ export function EraRasterLayer({ map, era }: Props) {
   const sourceId = `era-${era.id}-src`;
   const layerId = `era-${era.id}-layer`;
   const tiles = era.tiles;
+  const scheme = era.scheme ?? "xyz";
+  const cityOnly = era.coverage === "nyc";
   const opacity = era.opacity ?? 1;
 
   useEffect(() => {
@@ -82,9 +84,14 @@ export function EraRasterLayer({ map, era }: Props) {
         map.addSource(sourceId, {
           type: "raster",
           tiles: [tiles],
+          scheme,
           tileSize: 256,
           maxzoom: era.maxzoom ?? 19,
           attribution: era.attribution ?? era.agency,
+          // City-only layers have nothing outside the city; don't ask for it.
+          ...(cityOnly && {
+            bounds: [NYC_EXTENT.west, NYC_EXTENT.south, NYC_EXTENT.east, NYC_EXTENT.north],
+          }),
         });
       }
       if (!safeGetLayer(map, layerId)) {
@@ -110,7 +117,7 @@ export function EraRasterLayer({ map, era }: Props) {
       safeRemoveLayer(map, layerId);
       safeRemoveSource(map, sourceId);
     };
-  }, [map, tiles, sourceId, layerId, opacity, era.maxzoom, era.attribution, era.agency]);
+  }, [map, tiles, scheme, cityOnly, sourceId, layerId, opacity, era.maxzoom, era.attribution, era.agency]);
 
   if (era.kind === "reconstruction") {
     return <Welikia1609Layer map={map} opacity={opacity} />;

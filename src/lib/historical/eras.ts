@@ -24,6 +24,10 @@ export interface MapEra {
   kind: "reconstruction" | "raster" | "live" | "projection" | "floodplain";
   /** XYZ template, or ArcGIS `{z}/{y}/{x}` for the NOAA service. */
   tiles?: string;
+  /** Tile row order: `xyz` counts rows from the north, `tms` from the south. */
+  scheme?: "xyz" | "tms";
+  /** Set when this build can't draw the layer; says why in plain words. */
+  unavailableReason?: string;
   maxzoom?: number;
   attribution?: string;
   /** Who publishes the layer. */
@@ -42,8 +46,32 @@ export const NYC_EXTENT = {
   north: 40.94,
 } as const;
 
+/**
+ * The City's aerial tiles. The old maps.nyc.gov/xyz service now answers many
+ * requests with a "Map Tile Service has moved" image; the tiles live behind
+ * api.nyc.gov, as TMS, and need a free key from api-portal.nyc.gov
+ * (product "GeoServer Tile Service User"). Without a key nothing is drawn and
+ * the era says so.
+ */
+export function nycPhotoLayer(
+  year: number,
+  key: string | undefined
+): Pick<MapEra, "tiles" | "scheme" | "unavailableReason"> {
+  const trimmed = key?.trim();
+  if (!trimmed) {
+    return {
+      unavailableReason:
+        "Not shown: the City's aerial tile service needs an API key, and this site hasn't set one.",
+    };
+  }
+  return {
+    tiles: `https://api.nyc.gov/geoserver/gwc/service/tms/1.0.0/photo%3A${year}@EPSG%3A900913@png8/{z}/{x}/{y}.png8?Key=${encodeURIComponent(trimmed)}`,
+    scheme: "tms",
+  };
+}
+
 const NYC_PHOTO = (year: number) =>
-  `https://maps.nyc.gov/xyz/1.0.0/photo/${year}/{z}/{x}/{y}.png8`;
+  nycPhotoLayer(year, import.meta.env.VITE_NYC_TILES_KEY);
 
 export const ERAS: MapEra[] = [
   {
@@ -64,7 +92,7 @@ export const ERAS: MapEra[] = [
     label: "1924",
     caption: "The city's first complete aerial survey, flown in 1924.",
     kind: "raster",
-    tiles: NYC_PHOTO(1924),
+    ...NYC_PHOTO(1924),
     maxzoom: 19,
     attribution: "1924 aerial survey — NYC Department of Information Technology",
     agency: "City of New York",
@@ -78,7 +106,7 @@ export const ERAS: MapEra[] = [
     label: "1951",
     caption: "Post-war aerial survey: the expressway era arriving.",
     kind: "raster",
-    tiles: NYC_PHOTO(1951),
+    ...NYC_PHOTO(1951),
     maxzoom: 19,
     attribution: "1951 aerial survey — NYC Department of Information Technology",
     agency: "City of New York",
@@ -92,7 +120,7 @@ export const ERAS: MapEra[] = [
     label: "1996",
     caption: "The first city-wide digital orthophoto series.",
     kind: "raster",
-    tiles: NYC_PHOTO(1996),
+    ...NYC_PHOTO(1996),
     maxzoom: 20,
     attribution: "1996 orthoimagery — NYC Department of Information Technology",
     agency: "City of New York",
@@ -106,7 +134,7 @@ export const ERAS: MapEra[] = [
     label: "2006",
     caption: "Mid-2000s orthoimagery, before the current wave of rezoning.",
     kind: "raster",
-    tiles: NYC_PHOTO(2006),
+    ...NYC_PHOTO(2006),
     maxzoom: 20,
     attribution: "2006 orthoimagery — NYC Department of Information Technology",
     agency: "City of New York",
@@ -120,7 +148,7 @@ export const ERAS: MapEra[] = [
     label: "2016",
     caption: "Orthoimagery flown after Hurricane Sandy's rebuilding began.",
     kind: "raster",
-    tiles: NYC_PHOTO(2016),
+    ...NYC_PHOTO(2016),
     maxzoom: 20,
     attribution: "2016 orthoimagery — NYC Department of Information Technology",
     agency: "City of New York",
@@ -134,7 +162,7 @@ export const ERAS: MapEra[] = [
     label: "2018",
     caption: "The most recent city orthoimagery published as open tiles.",
     kind: "raster",
-    tiles: NYC_PHOTO(2018),
+    ...NYC_PHOTO(2018),
     maxzoom: 20,
     attribution: "2018 orthoimagery — NYC Department of Information Technology",
     agency: "City of New York",
