@@ -17,7 +17,13 @@ const TIMELINE = [
   "1924",
   "1951",
   "1996",
+  "2001-02",
+  "2004",
   "2006",
+  "2008",
+  "2010",
+  "2012",
+  "2014",
   "2016",
   "2018",
   "2020",
@@ -60,16 +66,19 @@ describe("era timeline catalogue", () => {
 
   it("covers the aerial survey years", () => {
     expect(aerials.map((era) => era.year)).toEqual([
-      1924, 1951, 1996, 2006, 2016, 2018, 2020, 2022, 2024,
+      1924, 1951, 1996, 2001, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018,
+      2020, 2022, 2024,
     ]);
   });
 
   it.each(aerials.map((era) => [era.id, era] as const))(
     "%s reads the city service named for its own year, row-first",
     (_id, era) => {
+      // The City's own names: NYC_Orthos_2018, NYC_Ortho_2004, NYC_Orthos_-_2020,
+      // NYC_Orthos_2001_2 (2001–02) and Ortho_1924_Mosaic.
       expect(era.tiles).toMatch(
         new RegExp(
-          `^${NYC_ORTHO_HOST.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/(NYC_Orthos|Ortho)_(-_)?${era.year}(_Mosaic)?/MapServer/tile/\\{z\\}/\\{y\\}/\\{x\\}$`
+          `^${NYC_ORTHO_HOST.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/(NYC_Orthos?|Ortho)_(-_)?${era.year}(_2|_Mosaic)?/MapServer/tile/\\{z\\}/\\{y\\}/\\{x\\}$`
         )
       );
       expect(era.sourceUrl).toBe(era.tiles!.replace("/tile/{z}/{y}/{x}", ""));
