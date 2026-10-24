@@ -42,13 +42,17 @@ describe("atlas first-use experience", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /explore an example/i })); });
     const overview = screen.getByRole("tab", { name: "Overview" });
     expect(screen.getByRole("tabpanel", { name: "Overview" })).toHaveAttribute("id", overview.getAttribute("aria-controls"));
+    expect(screen.getByRole("tabpanel", { name: "Overview" })).not.toContainElement(screen.getByRole("group", { name: "Next study step" }));
     fireEvent.click(screen.getByRole("button", { name: "Choose a storm" }));
     expect(screen.getByRole("tab", { name: "Storm" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("slider", { name: /rainfall depth/i })).toHaveValue("50");
+    fireEvent.click(within(screen.getByRole("group", { name: "Quick rainfall amounts" })).getByRole("button", { name: "100 mm" }));
+    expect(screen.getByRole("slider", { name: /rainfall depth/i })).toHaveValue("100");
+    expect(screen.getByRole("button", { name: "Route 100 mm storm" })).toBeEnabled();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Compare" }), { button: 0, ctrlKey: false });
     const guidance = screen.getByRole("region", { name: "Study guidance" });
     expect(guidance).toHaveTextContent(/start by routing a storm/i);
-    fireEvent.click(within(guidance).getByRole("button", { name: "Choose a storm" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Next study step" })).getByRole("button", { name: "Choose a storm" }));
     const storm = screen.getByRole("tab", { name: "Storm" });
     expect(screen.getByRole("tabpanel", { name: "Storm" })).toHaveAttribute("id", storm.getAttribute("aria-controls"));
   });
@@ -68,8 +72,9 @@ describe("atlas first-use experience", () => {
   it("keeps a routed study until the user confirms starting over", async () => {
     render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose a storm" }));
     fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
-    await screen.findByText(/of the rain ran off instead of soaking in/i);
+    await screen.findByText(/of modeled rainfall became surface runoff/i);
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(screen.getByRole("alertdialog")).toBeVisible();
     expect(screen.getByRole("button", { name: /export current study/i })).toBeEnabled();
@@ -106,8 +111,10 @@ describe("atlas first-use experience", () => {
   it("leads a routed storm with its answer and holds the rerun until something is drawn", async () => {
     render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose a storm" }));
     fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
-    expect(await screen.findByText(/of the rain ran off instead of soaking in/i)).toBeInTheDocument();
+    expect(await screen.findByText(/of modeled rainfall became surface runoff/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What the storm did" })).toHaveFocus();
     expect(screen.getByText("50 mm in 60 min")).toBeInTheDocument();
     expect(screen.queryByRole("slider", { name: /rainfall depth/i })).not.toBeInTheDocument();
 

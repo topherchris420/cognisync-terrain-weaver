@@ -9,10 +9,11 @@ interface StudyGuideProps {
   hasComparison: boolean;
   busy: boolean;
   onNavigate: (tab: StudyTab) => void;
+  showAction?: boolean;
 }
 
 /** Navigation help follows the actual study, including tabs visited out of order. */
-export function StudyGuide({ tab, hasStorm, hasDrawings, hasComparison, busy, onNavigate }: StudyGuideProps) {
+export function StudyGuide({ tab, hasStorm, hasDrawings, hasComparison, busy, onNavigate, showAction = true }: StudyGuideProps) {
   let title: string;
   let description: string;
   let action: { label: string; tab: StudyTab } | undefined;
@@ -67,7 +68,7 @@ export function StudyGuide({ tab, hasStorm, hasDrawings, hasComparison, busy, on
     <section className="atlas-guide" aria-label="Study guidance">
       <h3>{title}</h3>
       <p>{description}</p>
-      {action && (
+      {action && showAction && (
         <button type="button" disabled={busy} onClick={() => onNavigate(action.tab)}>
           {action.label} <ArrowRight size={14} aria-hidden="true" />
         </button>

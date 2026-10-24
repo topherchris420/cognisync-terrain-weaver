@@ -174,6 +174,24 @@ describe("MapView camera contract", () => {
     maplibre.MockMap.instances.length = 0;
   });
 
+  it("reports loading, imagery failure and a successful retry to the surrounding workflow", () => {
+    vi.useFakeTimers();
+    const availability = vi.fn();
+    try {
+      const view = render(<MapView onAvailabilityChange={availability} />);
+      expect(availability).toHaveBeenLastCalledWith("loading");
+      act(() => { vi.advanceTimersByTime(30_000); });
+      expect(availability).toHaveBeenLastCalledWith("unavailable");
+      const reconnect = view.getByRole("button", { name: "Reconnect map" });
+      act(() => { reconnect.click(); });
+      expect(availability).toHaveBeenLastCalledWith("loading");
+      act(() => currentMap().emit("sourcedata", { tile: {} }));
+      expect(availability).toHaveBeenLastCalledWith("ready");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports the live map and imperative handle when imagery is ready", () => {
     const onReady = vi.fn();
     const ref = createRef<MapViewHandle>();

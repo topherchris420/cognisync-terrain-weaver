@@ -12,6 +12,8 @@ This is a reproducible calculation, not a measured site outcome or a screenshot.
 
 ## Start with a place
 
+The workspace follows one question: **could this place absorb more rain?** Each step keeps its next action visible beneath the scrolling panel. Overview leads with the estimated surface mix; storm results lead with runoff; comparison leads with the amount and direction of change under identical inputs. Score calculations, sources, terrain detail, recorded rainfall and aggregate planning remain available in expandable sections. Failed map initialization is reported in setup, and map-dependent drawing controls explain why they are unavailable.
+
 New visitors can open **Explore an example** before the satellite feed is ready. **Explore the map** clears the setup panel; **Choose a study area** brings it back. Place search announces loading, clears old results when you type a new query, and offers a retry if the service fails or times out.
 
 1. Open the map and choose **Explore an example**. The fixture works without an AI classification request; its status stays visible in exports.

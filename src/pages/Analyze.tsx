@@ -108,6 +108,8 @@ import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
 import "@/styles/atlas.css";
 import { AnalysisLaunchPanel } from "@/components/analyze/AnalysisLaunchPanel";
 import { StudyGuide, type StudyTab } from "@/components/analyze/StudyGuide";
+import { StudyActionBar } from "@/components/analyze/StudyActionBar";
+import { ComparisonReading, GroundReading, StormReading } from "@/components/analyze/StudyReading";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -263,8 +265,9 @@ export default function Analyze() {
   const [locationLabel, setLocationLabel] = useState(initialView.hasLocation ? "Shared map view" : "Lower Manhattan, NY");
   const [view, setView] = useState<{ lat: number; lng: number; zoom: number }>(initialView);
   const [mapReady, setMapReady] = useState(false);
+  const [mapAvailability, setMapAvailability] = useState<"loading" | "ready" | "unavailable">("loading");
   const [mapInstance, setMapInstance] = useState<MLMap | null>(null);
-  
+
   const [result, setResult] = useState<AnalysisRecord | null>(null);
   const isExample = result?.status === "example";
   const [capturedTile, setCapturedTile] = useState<string | null>(null);
@@ -374,7 +377,7 @@ export default function Analyze() {
     () => (nowSeal && possibleSeal ? checkStormDeterminism(nowSeal, possibleSeal) : null),
     [nowSeal, possibleSeal]
   );
-  
+
   const [catalystFuture, setCatalystFuture] = useState<{
     scenario: Scenario;
     future: FutureState;
@@ -396,6 +399,7 @@ export default function Analyze() {
         if (activeIntervention) {
           editorRef.current?.cancelDraft();
           setActiveIntervention(null);
+          setDrawerOpen(true);
           toast.info("Drawing cancelled");
         }
       }
@@ -916,6 +920,44 @@ export default function Analyze() {
     toast.success("CSV attribute table exported.");
   };
 
+  const stormBusy = workflow.state === "STORM" || workflow.state === "RERUN_STORM";
+  const wasRouting = useRef(false);
+  useEffect(() => {
+    if (stormBusy) wasRouting.current = true;
+    else if (wasRouting.current) {
+      wasRouting.current = false;
+      workbenchRef.current?.querySelector<HTMLElement>("[data-study-result]")?.focus({ preventScroll: true });
+    }
+  }, [stormBusy]);
+  const navigateStudy = (tab: StudyTab) => {
+    if (tab !== "mitigation" && activeIntervention) {
+      editorRef.current?.cancelDraft();
+      setActiveIntervention(null);
+    }
+    setActiveTab(tab);
+    workbenchRef.current?.querySelector<HTMLElement>(`[data-study-step="${tab}"]`)?.focus({ preventScroll: true });
+    if (tab === "mitigation" && !stormBusy) workflow.advance("REDESIGN");
+  };
+  const nextAction = (() => {
+    if (activeTab === "overview") return { step: 1, label: "Choose a storm", hint: "Next: choose how much rain to test.", run: () => navigateStudy("simulation") };
+    if (activeTab === "simulation") return simResult
+      ? { step: 2, label: "Redesign the ground", hint: "Next: draw a change and test it with the same rain.", run: () => navigateStudy("mitigation") }
+      : { step: 2, label: stormBusy ? "Routing storm…" : `Route ${stormRainfallMm} mm ${selectedRealStorm ? "recorded storm" : "storm"}`, hint: "This run establishes the baseline for your comparison.", run: () => void runSimulation(false) };
+    if (activeTab === "mitigation") {
+      if (!simResult) return { step: 3, label: "Choose a storm", hint: "Run a baseline storm before testing your drawings.", run: () => navigateStudy("simulation") };
+      if (catalystFuture) return { step: 3, label: "Review comparison", hint: "Your redesign has been tested against the baseline.", run: () => navigateStudy("compare") };
+      return { step: 3, label: stormBusy ? "Routing the same storm…" : "Rerun the same storm on the redesign", hint: hasEligibleDrawing ? `${interventionFeatures.filter((f) => f.eligibility.eligible && f.eligibility.validAreaM2 > 0).length} eligible drawings ready to test.` : "Draw at least one shape inside the study area to unlock the rerun.", disabled: !hasEligibleDrawing, run: () => void runSimulation(true) };
+    }
+    if (activeTab === "compare") {
+      if (catalystFuture) return { step: 4, label: "Save or export", hint: "Keep a copy you can reopen or share as a report.", run: () => navigateStudy("export") };
+      if (!simResult) return { step: 4, label: "Choose a storm", hint: "First, route rainfall over the current ground.", run: () => navigateStudy("simulation") };
+      return hasEligibleDrawing
+        ? { step: 4, label: "Test the redesign", hint: "Rerun the baseline storm over your drawings.", run: () => void runSimulation(true) }
+        : { step: 4, label: "Draw interventions", hint: "Next: choose a drawing tool in Mitigation.", run: () => navigateStudy("mitigation") };
+    }
+    return { step: 5, label: "Save experiment (JSON)", hint: "Reopen this file here to restore and verify your study.", run: handleExportExperiment };
+  })();
+
   return (
     <div className="atlas-app flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
       {/* 1. Permanent Professional Workstation Topbar */}
@@ -940,6 +982,10 @@ export default function Analyze() {
               setMapInstance(mapRef.current?.getMap() ?? null);
             }}
             onViewChange={onViewChange}
+            onAvailabilityChange={(state) => {
+              setMapAvailability(state);
+              if (state !== "ready") setMapReady(false);
+            }}
           />
 
           {/* Era layer for the selected point on the timeline */}
@@ -1045,7 +1091,7 @@ export default function Analyze() {
                         {INTERVENTIONS[activeIntervention].label}
                       </p>
                       <p className="text-[12px] leading-snug text-muted-foreground">
-                        Click to place points; click the first point to close.{" "}
+                        Tap or click at least 3 points, then the first point to close.{" "}
                         <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">Esc</kbd> cancels.
                       </p>
                     </div>
@@ -1068,6 +1114,7 @@ export default function Analyze() {
                       onClick={() => {
                         editorRef.current?.cancelDraft();
                         setActiveIntervention(null);
+                        setDrawerOpen(true);
                       }}
                       className="h-8 text-xs flex-1 sm:flex-none"
                     >
@@ -1076,6 +1123,7 @@ export default function Analyze() {
                     <Button
                       size="sm"
                       onClick={() => {
+                        editorRef.current?.cancelDraft();
                         setActiveIntervention(null);
                         setDrawerOpen(true);
                       }}
@@ -1153,8 +1201,8 @@ export default function Analyze() {
               <Compass size={16} aria-hidden="true" /> Explore the map <ChevronLeft size={14} aria-hidden="true" />
             </button>
             <div>
-              <h1>A better future <br />starts with <br /><em>the ground.</em></h1>
-              <p className="atlas-intro-copy">See how your city absorbs rain.{" "}<br />Explore the changes that could help it absorb more.</p>
+              <h1>Could this place <br /><em>absorb more rain?</em></h1>
+              <p className="atlas-intro-copy">Choose a place. Test a storm. Draw trees or rain gardens and see how the modeled runoff changes.</p>
             </div>
             <div className="atlas-search">
               <label htmlFor="location-search" className="atlas-eyebrow">01 / Find your place</label>
@@ -1166,7 +1214,7 @@ export default function Analyze() {
             <div className="atlas-intro-action">
               <span className="atlas-eyebrow">02 / Read the landscape</span>
               {analysisError && <p role="alert" className="my-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-xs leading-relaxed">{analysisError}</p>}
-              <AnalysisLaunchPanel location={locationLabel || name} areaKm2={currentAreaKm2} mapReady={mapReady} onAnalyze={runAnalysis} onExample={openExample} onOpenFile={(file) => void openExperimentFile(file)} />
+              <AnalysisLaunchPanel location={locationLabel || name} areaKm2={currentAreaKm2} mapReady={mapReady} mapUnavailable={mapAvailability === "unavailable"} onAnalyze={runAnalysis} onExample={openExample} onOpenFile={(file) => void openExperimentFile(file)} />
             </div>
             <div className="atlas-process"><span>Land cover</span><ArrowRight size={12} /><span>Rainfall</span><ArrowRight size={12} /><span>Possibilities</span></div>
           </aside>
@@ -1346,7 +1394,7 @@ export default function Analyze() {
 
             <Tabs
               value={activeTab}
-              onValueChange={(val) => setActiveTab(val as typeof activeTab)}
+              onValueChange={(val) => navigateStudy(val as StudyTab)}
               className="atlas-workbench flex min-h-0 flex-1 flex-col"
             >
               <div className="atlas-steps shrink-0">
@@ -1375,22 +1423,13 @@ export default function Analyze() {
                 hasDrawings={hasEligibleDrawing}
                 hasComparison={Boolean(catalystFuture)}
                 busy={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                onNavigate={(tab) => {
-                  setActiveTab(tab);
-                  workbenchRef.current?.querySelector<HTMLElement>(`[data-study-step="${tab}"]`)?.focus({ preventScroll: true });
-                  if (tab === "mitigation") workflow.advance("REDESIGN");
-                }}
+                showAction={false}
+                onNavigate={navigateStudy}
               />
               {activeTab === "overview" && (
                 <div className="atlas-tab">
-                  {isExample && <p className="atlas-section-note">{result.ai_notes}</p>}
                   {reopened && <ReplayReadout study={reopened} />}
-
-                  <section className="atlas-section atlas-section--lead">
-                    <AbsorptionScoreGauge score={Number(result.absorption_score)} />
-                  </section>
-
-                  <BaselineComparison score={Number(result.absorption_score)} className="atlas-section" />
+                  <GroundReading analysis={result} />
 
                   <section className="atlas-section" aria-labelledby="land-cover-title">
                     <h3 id="land-cover-title" className="atlas-section-title">What the ground is made of</h3>
@@ -1398,49 +1437,34 @@ export default function Analyze() {
                     <LandCoverBreakdown cover={result.land_cover} />
                   </section>
 
-                  <EvidencePanel analysis={result} image={capturedTile ?? result.image_data_url} />
-                  <HowDoWeKnow />
-                  <UrbanSubstratePanel status={substrate.status} showOnMap={showSubstrate} onShowOnMap={setShowSubstrate} />
-
-                  <Historical1609Panel
-                    state={welikia1609}
-                    presentScore={Number(result.absorption_score)}
-                  />
+                  <details className="atlas-disclosure">
+                    <summary>Explore the score, sources and limitations</summary>
+                    <section className="atlas-section"><AbsorptionScoreGauge score={Number(result.absorption_score)} /></section>
+                    <BaselineComparison score={Number(result.absorption_score)} className="atlas-section" />
+                    <EvidencePanel analysis={result} image={capturedTile ?? result.image_data_url} />
+                    <HowDoWeKnow />
+                    <UrbanSubstratePanel status={substrate.status} showOnMap={showSubstrate} onShowOnMap={setShowSubstrate} />
+                    <Historical1609Panel state={welikia1609} presentScore={Number(result.absorption_score)} />
+                  </details>
 
                   <section className="atlas-section" aria-labelledby="recs-title">
                     <h3 id="recs-title" className="atlas-section-title mb-4">Where to start</h3>
                     <RecommendationsList items={result.recommendations ?? []} />
                   </section>
 
-                  <div className="atlas-tab-footer">
-                    <Button
-                      onClick={() => {
-                        setActiveTab("simulation");
-                        runSimulation(false);
-                      }}
-                      disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                      className="atlas-primary w-full h-11 text-sm font-medium gap-2"
-                    >
-                      <Droplets className="h-4 w-4" /> Route {nowSeal?.storm.rainfallDepthMm ?? stormRainfallMm} mm design storm
-                    </Button>
-                  </div>
+
                 </div>
               )}
 
               {activeTab === "simulation" && (
                 <div className="atlas-tab">
                   {reopened && <ReplayReadout study={reopened} compact />}
+                  {simResult && <StormReading result={simResult} illustrativeCover={Boolean(isExample)} />}
+                  <details key={simResult ? "result" : "setup"} open={!simResult} data-setup={!simResult || undefined} className="atlas-disclosure">
+                    <summary>{simResult ? "Storm inputs, water balance and map layers" : "Rainfall settings"}</summary>
                   <section className="atlas-section atlas-section--lead" aria-labelledby="storm-title">
-                    <h3 id="storm-title" className="atlas-section-title">Where does the rain go?</h3>
-                    <p className="atlas-section-note">
-                      One hour of uniform rain, routed cell to cell down the steepest slope (D8) on{" "}
-                      {simResult?.metadata.elevation_status === "observed"
-                        ? "observed Terrarium terrain"
-                        : simResult
-                          ? "illustrative terrain"
-                          : "Terrarium elevation"}
-                      , with land cover setting how much each cell holds back.
-                    </p>
+                    <h3 id="storm-title" className={cn("atlas-section-title", !simResult && "sr-only")}>Where does the rain go?</h3>
+
 
                     {nowSeal ? (
                       <>
@@ -1458,6 +1482,52 @@ export default function Analyze() {
                       </>
                     ) : (
                       <>
+                      <div className="atlas-control mt-5">
+                        <label htmlFor="storm-rainfall" className="atlas-control-label">
+                          <span>Rainfall depth</span>
+                          <span className="atlas-control-value">
+                            {stormRainfallMm}
+                            <small>mm</small>
+                          </span>
+                        </label>
+                        <input
+                          id="storm-rainfall"
+                          type="range"
+                          min="5"
+                          max="200"
+                          step="5"
+                          value={stormRainfallMm}
+                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM" || selectedRealStorm !== null}
+                          onChange={(event) => setStormRainfallMm(Number(event.target.value))}
+                          className="atlas-range"
+                          style={{ "--fill": `${((stormRainfallMm - 5) / 195) * 100}%` } as CSSProperties}
+                        />
+                        <div className="atlas-range-ticks" aria-hidden="true"><span>5 mm</span><span>200 mm</span></div>
+                        <div className="atlas-rain-presets" role="group" aria-label="Quick rainfall amounts">
+                          {[25, 50, 100].map((depth) => <button key={depth} type="button" aria-pressed={stormRainfallMm === depth && !selectedRealStorm} disabled={stormBusy || Boolean(selectedRealStorm)} onClick={() => setStormRainfallMm(depth)}>{depth} mm</button>)}
+                        </div>
+                      </div>
+
+                      <details className="atlas-disclosure mt-5"><summary>Terrain detail and recorded rainfall</summary>
+                      <div className="atlas-control mt-5">
+                        <span className="atlas-control-label" id="storm-resolution-label">Terrain resolution</span>
+                        <div role="radiogroup" aria-labelledby="storm-resolution-label" className="atlas-segmented">
+                          {(["low", "medium", "high"] as const).map((level) => (
+                            <button
+                              key={level}
+                              type="button"
+                              role="radio"
+                              aria-checked={stormResolution === level}
+                              disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                              onClick={() => setStormResolution(level)}
+                            >
+                              {level.charAt(0).toUpperCase() + level.slice(1)}
+                              <small>{LOCAL_GRID[level]}²</small>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="atlas-control mt-5">
                         <span className="atlas-control-label" id="real-storms-label">
                           <span>Real recorded storms</span>
@@ -1529,47 +1599,7 @@ export default function Analyze() {
                         )}
                       </div>
 
-                      <div className="atlas-control mt-5">
-                        <label htmlFor="storm-rainfall" className="atlas-control-label">
-                          <span>Rainfall depth</span>
-                          <span className="atlas-control-value">
-                            {stormRainfallMm}
-                            <small>mm</small>
-                          </span>
-                        </label>
-                        <input
-                          id="storm-rainfall"
-                          type="range"
-                          min="5"
-                          max="200"
-                          step="5"
-                          value={stormRainfallMm}
-                          disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM" || selectedRealStorm !== null}
-                          onChange={(event) => setStormRainfallMm(Number(event.target.value))}
-                          className="atlas-range"
-                          style={{ "--fill": `${((stormRainfallMm - 5) / 195) * 100}%` } as CSSProperties}
-                        />
-                        <div className="atlas-range-ticks" aria-hidden="true"><span>5 mm</span><span>200 mm</span></div>
-                      </div>
-
-                      <div className="atlas-control mt-5">
-                        <span className="atlas-control-label" id="storm-resolution-label">Terrain resolution</span>
-                        <div role="radiogroup" aria-labelledby="storm-resolution-label" className="atlas-segmented">
-                          {(["low", "medium", "high"] as const).map((level) => (
-                            <button
-                              key={level}
-                              type="button"
-                              role="radio"
-                              aria-checked={stormResolution === level}
-                              disabled={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                              onClick={() => setStormResolution(level)}
-                            >
-                              {level.charAt(0).toUpperCase() + level.slice(1)}
-                              <small>{LOCAL_GRID[level]}²</small>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                      </details>
 
                       {analyzedBBox && (() => {
                         const depth = stormRainfallMm;
@@ -1588,35 +1618,22 @@ export default function Analyze() {
                       </>
                     )}
 
-                    {!simResult && (
-                      <Button
-                        onClick={() => runSimulation(false)}
-                        disabled={workflow.state === "STORM"}
-                        className="atlas-primary mt-5 w-full h-11 text-sm font-medium gap-2"
-                      >
-                        {workflow.state === "STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                        {workflow.state === "STORM" ? "Routing storm…" : `Route ${stormRainfallMm} mm ${selectedRealStorm ? "recorded storm" : "storm"}`}
-                      </Button>
-                    )}
+
+                    <p className="atlas-section-note">
+                      Rainfall is routed downhill on{" "}
+                      {simResult?.metadata.elevation_status === "observed"
+                        ? "observed Terrarium terrain"
+                        : simResult
+                          ? "illustrative terrain"
+                          : "Terrarium elevation"}
+                      . Surface cover sets how much water the model holds back. These are modeled results, not a flood forecast.
+                    </p>
                   </section>
 
                   {simResult && (
                     <>
                       <section className="atlas-section" aria-labelledby="storm-result-title">
-                        <h3 id="storm-result-title" className="atlas-section-title">What the storm did</h3>
-                        {(simResult.metadata.rainfall_volume_m3 ?? 0) > 0 && (
-                          <div className="atlas-headline mt-4">
-                            <span className="atlas-headline-figure">
-                              {Math.round(((simResult.metadata.runoff_volume_m3 ?? 0) / simResult.metadata.rainfall_volume_m3!) * 100)}
-                              <small>%</small>
-                            </span>
-                            <p>
-                              of the rain ran off instead of soaking in. That is{" "}
-                              <strong>{Math.round(simResult.metadata.runoff_volume_m3 ?? 0).toLocaleString()} m³</strong> heading
-                              for the drains, about {Math.max(1, Math.round((simResult.metadata.runoff_volume_m3 ?? 0) / 2500)).toLocaleString()} Olympic pools.
-                            </p>
-                          </div>
-                        )}
+                        <h3 id="storm-result-title" className="atlas-section-title">Detailed storm results</h3>
                         <dl className="atlas-stats mt-4">
                           <div>
                             <dt>Runoff</dt>
@@ -1719,19 +1736,10 @@ export default function Analyze() {
                         </div>
                       </section>
 
-                      <div className="atlas-tab-footer">
-                        <Button
-                          onClick={() => {
-                            workflow.advance("REDESIGN");
-                            setActiveTab("mitigation");
-                          }}
-                          className="atlas-primary w-full h-11 text-sm font-medium gap-2"
-                        >
-                          <Paintbrush className="h-4 w-4" /> Redesign the ground
-                        </Button>
-                      </div>
+
                     </>
                   )}
+                  </details>
                 </div>
               )}
 
@@ -1740,7 +1748,7 @@ export default function Analyze() {
                   <section className="atlas-section atlas-section--lead" aria-labelledby="mitigation-title">
                     <h3 id="mitigation-title" className="atlas-section-title mb-2">Give the water somewhere to go</h3>
 
-                    <PlanningEnvelope cover={result.land_cover} areaM2={recordAreaM2(result)} />
+                    {!mapReady && <p role="status" className="atlas-study-reading-basis mb-4">{mapAvailability === "unavailable" ? "The live map is unavailable." : "The live map is loading."} Drawing needs a working map. You can still explore planning assumptions below or reopen a saved experiment.</p>}
                     <ScenarioStudio
                       cover={result.land_cover}
                       bbox={result.bbox}
@@ -1755,30 +1763,24 @@ export default function Analyze() {
                       onClearDrawings={() => editorRef.current?.clear()}
                       onScenarioExport={setScenarioExport}
                       drawn={drawnByType}
-                      unavailable={UNAVAILABLE_TOOLS}
+                      unavailable={mapReady ? UNAVAILABLE_TOOLS : Object.fromEntries(INTERVENTION_ORDER.map((key) => [key, "Reconnect the live map to draw an intervention."]))}
                     />
                   </section>
 
-                  <section className="atlas-section">
+                  <details className="atlas-disclosure">
+                    <summary>Explore a target and installation budget</summary>
+                    <PlanningEnvelope cover={result.land_cover} areaM2={recordAreaM2(result)} />
+                  </details>
+
+                  <details className="atlas-disclosure">
+                    <summary>Explore other rainfall amounts</summary>
                     <p className="atlas-section-note mb-4">
                       Explore rainfall sensitivity with a land-cover estimate, then route the same storm to compare drawn geometry with D8 terrain flow.
                     </p>
                     <StormComparison cover={result.land_cover} scenario={scenario} areaM2={currentAreaKm2 * 1e6} />
-                  </section>
+                  </details>
 
-                  <div className="atlas-tab-footer">
-                    {!hasEligibleDrawing && (
-                      <p className="atlas-footer-hint">Draw at least one shape inside the study area to unlock the rerun.</p>
-                    )}
-                    <Button
-                      disabled={!hasEligibleDrawing || workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
-                      onClick={() => runSimulation(true)}
-                      className="atlas-primary w-full h-11 text-sm font-medium gap-2"
-                    >
-                      {workflow.state === "RERUN_STORM" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                      {workflow.state === "RERUN_STORM" ? "Routing the same storm…" : "Rerun the same storm on the redesign"}
-                    </Button>
-                  </div>
+
                 </div>
               )}
 
@@ -1786,6 +1788,7 @@ export default function Analyze() {
                 <div className="atlas-tab">
                   {reopened && <ReplayReadout study={reopened} compact />}
                   <section className="atlas-section atlas-section--lead" aria-labelledby="compare-title">
+                    {simResult && futureSimResult && catalystFuture && <ComparisonReading now={simResult} possible={futureSimResult} illustrativeCover={Boolean(isExample)} costUSD={catalystFuture.future.impact.capexUSD} />}
                     <h3 id="compare-title" className="atlas-section-title">Same storm, two grounds</h3>
                     <p className="atlas-section-note">
                       {isExample
@@ -1795,6 +1798,7 @@ export default function Analyze() {
 
                     {catalystFuture ? (
                       <>
+                        <details className="atlas-disclosure"><summary>Detailed scores and comparison conditions</summary>
                         <div className="atlas-versus mt-5">
                           <div>
                             <span>Today</span>
@@ -1856,17 +1860,20 @@ export default function Analyze() {
                           );
                         })()}
 
+                        </details>
                         <Button
+                          disabled={!mapReady}
                           onClick={() => workflow.advance("COMPARE")}
                           className="atlas-primary mt-6 w-full h-11 text-sm font-medium gap-2"
                         >
                           <Compass className="h-4 w-4" /> Open split-screen comparison
                         </Button>
+                        {!mapReady && <p className="atlas-section-note mt-3">Split-screen maps need a working live map. Your numerical comparison and exports are still available.</p>}
                       </>
                     ) : (
                       <div className="atlas-empty mt-5">
                         <p>Nothing to compare yet.</p>
-                        <p>{!simResult ? "Route a baseline storm first, then draw interventions and rerun the same storm. Follow the next step above to get started." : "Draw at least one intervention in Mitigation, then rerun the same storm on the redesign. Follow the next step above to continue."}</p>
+                        <p>{!simResult ? "Route a baseline storm first, then draw interventions and rerun the same storm. Use the next step below to get started." : "Draw at least one intervention in Mitigation, then rerun the same storm on the redesign. Use the next step below to continue."}</p>
                       </div>
                     )}
                   </section>
@@ -1879,7 +1886,7 @@ export default function Analyze() {
                   <section className="atlas-section atlas-section--lead" aria-labelledby="export-title">
                     <h3 id="export-title" className="atlas-section-title">Take the study with you</h3>
                     <p className="atlas-section-note">
-                      Resilience dossiers and geospatial layers for policy, GIS, and civil engineering workflows.
+                      Save a file to reopen this study, or download a readable report to share.
                       {isExample ? " Example exports are labelled as illustrative." : ""}
                     </p>
 
@@ -1937,6 +1944,7 @@ export default function Analyze() {
                 </div>
               )}
             </TabsContent>
+            <StudyActionBar step={nextAction.step} label={nextAction.label} hint={nextAction.hint} disabled={nextAction.disabled} busy={stormBusy} onAction={nextAction.run} />
             </Tabs>
           </aside>
         )}

@@ -120,6 +120,7 @@ describe("Analyze request lifecycle", () => {
     mocks.storm.mockReturnValue(storm.promise);
     mount();
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose a storm" }));
     fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
     // The storm first settles the study's urban substrate identity, then routes.
     await waitFor(() => expect(mocks.storm).toHaveBeenCalledTimes(1), { timeout: 5000 });
