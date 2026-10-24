@@ -63,6 +63,7 @@ export interface MapViewProps {
   initialZoom?: number;
   camera?: MapCameraState;
   onReady?: (payload: MapViewReadyPayload) => void;
+  onAvailabilityChange?: (state: "loading" | "ready" | "unavailable") => void;
   onCameraChange?: (camera: MapCameraState) => void;
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
   /** Extra-dimensional terrain from Mapzen Terrarium tiles. */
@@ -307,6 +308,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     initialZoom = 15,
     camera,
     onReady,
+    onAvailabilityChange,
     onCameraChange,
     onViewChange,
     terrainEnabled = false,
@@ -323,6 +325,11 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   const applyingControlledCameraRef = useRef(false);
   const [status, setStatus] = useState<Status>({ kind: "connecting", provider: 0 });
   const [attempt, setAttempt] = useState(0);
+  const availabilityRef = useRef(onAvailabilityChange);
+  availabilityRef.current = onAvailabilityChange;
+  useEffect(() => {
+    availabilityRef.current?.(status.kind === "ready" ? "ready" : status.kind === "failed" ? "unavailable" : "loading");
+  }, [status.kind]);
 
   // Kept in refs so the map effect never re-runs for a new callback identity,
   // and so a Retry recreates the map at the view the user was last on.

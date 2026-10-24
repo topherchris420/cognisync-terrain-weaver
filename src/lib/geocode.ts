@@ -30,16 +30,26 @@ export async function searchLocations(
   query: string,
   signal?: AbortSignal
 ): Promise<GeocodeResult[]> {
+  return (await lookupLocations(query, signal)).results;
+}
+
+export interface LocationLookup {
+  status: "ready" | "unavailable";
+  results: GeocodeResult[];
+}
+
+/** Preserve service failures so the UI can offer recovery instead of "no matches". */
+export async function lookupLocations(query: string, signal?: AbortSignal): Promise<LocationLookup> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { status: "ready", results: [] };
 
   const url = `${NOMINATIM_URL}?q=${encodeURIComponent(trimmed)}&format=json&limit=5`;
 
   try {
     const res = await fetch(url, { signal });
-    if (!res.ok) return [];
+    if (!res.ok) return { status: "unavailable", results: [] };
     const items = (await res.json()) as NominatimItem[];
-    return items
+    const results = items
       // Nominatim returns coordinates as strings. A malformed entry yields NaN,
       // and Number("") coerces an empty string to 0 -- a deceptively
       // "in-range" point -- either of which would fly the map to a broken
@@ -58,7 +68,8 @@ export async function searchLocations(
         lat: Number(item.lat),
         lng: Number(item.lon),
       }));
+    return { status: "ready", results };
   } catch {
-    return [];
+    return { status: "unavailable", results: [] };
   }
 }

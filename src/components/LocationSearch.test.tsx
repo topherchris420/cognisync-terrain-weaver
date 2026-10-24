@@ -288,4 +288,64 @@ describe("LocationSearch", () => {
 
     expect(input).not.toHaveAttribute("aria-activedescendant");
   });
+
+  it("never selects an old place while a replacement query is loading", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => [
+      { display_name: "Berlin, Germany", lat: "52.52", lon: "13.405" },
+    ] } as Response);
+    const onSelect = vi.fn();
+    render(<LocationSearch onSelect={onSelect} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "berlin" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(screen.getByRole("option", { name: "Berlin, Germany" })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "jakarta" } });
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status")).toHaveTextContent(/searching/i);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("offers a retry after a service failure and renders the recovered results", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({
+      ok: true, json: async () => [{ display_name: "Berlin, Germany", lat: "52.52", lon: "13.405" }],
+    } as Response);
+    render(<LocationSearch onSelect={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "berlin" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(screen.getByRole("status")).toHaveTextContent(/search is unavailable/i);
+    expect(screen.queryByText(/no matches/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try search again" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(screen.getByRole("option", { name: "Berlin, Germany" })).toBeInTheDocument();
+  });
+
+  it("recovers from a stalled search and ignores its late response", async () => {
+    vi.useFakeTimers();
+    let finish: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(<LocationSearch onSelect={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "berlin" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(8_400); });
+    expect(screen.getByRole("button", { name: "Try search again" })).toBeInTheDocument();
+    await act(async () => { finish({ ok: true, json: async () => [{ display_name: "Late result", lat: "1", lon: "1" }] } as Response); });
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("reopens a dismissed list with arrow keys and clears the active descendant on Escape", () => {
+    render(<LocationSearch onSelect={vi.fn()} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input).not.toHaveAttribute("aria-activedescendant");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getByRole("listbox")).toBeVisible();
+    expect(input).toHaveAttribute("aria-activedescendant", "location-option-0");
+  });
 });
