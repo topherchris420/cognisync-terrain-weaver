@@ -7,6 +7,10 @@ import { SensorOpticsProvider } from "@/lib/sensor-optics-context";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), capture: vi.fn(), storm: vi.fn(), remember: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
 vi.mock("@/lib/hydrology", () => ({ LOCAL_GRID: { low: 30, medium: 60, high: 90 }, runLocalStorm: mocks.storm, rememberElevation: mocks.remember, cachedElevation: () => null }));
+// Request-lifecycle tests must not wait for the live NYC drainage service.
+vi.mock("@/lib/hydrology/drainage", () => ({
+  fetchDrainageGrid: async () => ({ status: "unavailable", basins: 0, capacityM3: [], sourceLabel: "test" }),
+}));
 vi.mock("@/hooks/useWelikia1609", () => ({ useWelikia1609: () => ({ status: "idle" }) }));
 vi.mock("@/components/historical/Historical1609Panel", () => ({ Historical1609Panel: () => null }));
 vi.mock("@/components/MapView", async () => {
@@ -42,6 +46,14 @@ describe("Analyze request lifecycle", () => {
     fireEvent.keyDown(window, { key: "Enter", ctrlKey: true });
     page.unmount();
     await act(async () => { capture.resolve("data:image/png;base64,test"); });
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+  it("does not replace an open study when the launch shortcut is pressed", async () => {
+    mount();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /explore an example/i })); });
+    fireEvent.keyDown(window, { key: "Enter", ctrlKey: true });
+    expect(screen.getByText("Illustrative example")).toBeVisible();
+    expect(mocks.capture).not.toHaveBeenCalled();
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
   it("keeps a newly opened example when cancelled classification completes", async () => {
@@ -110,7 +122,6 @@ describe("Analyze request lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
     // The storm first settles the study's urban substrate identity, then routes.
-    // That settling occasionally passes waitFor's 1 s default on a loaded runner.
     await waitFor(() => expect(mocks.storm).toHaveBeenCalledTimes(1), { timeout: 5000 });
     expect(mocks.storm.mock.calls[0][0].substrateHash).toMatch(/^substrate:|^sha256:/);
     expect(screen.getByRole("button", { name: "Reset" })).toBeEnabled();

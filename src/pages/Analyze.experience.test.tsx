@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { SensorOpticsProvider } from "@/lib/sensor-optics-context";
@@ -26,6 +26,61 @@ vi.mock("@/components/MapView", async () => {
 });
 
 describe("atlas first-use experience", () => {
+  it("lets visitors use the map and return to setup without starting a request", () => {
+    render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /explore the map/i }));
+    expect(screen.queryByRole("complementary", { name: /start a resilience study/i })).not.toBeInTheDocument();
+    const reopen = screen.getByRole("button", { name: /choose a study area/i });
+    expect(reopen).toHaveFocus();
+    fireEvent.click(reopen);
+    expect(screen.getByRole("combobox", { name: /city or address/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /explore the map/i })).toHaveFocus();
+  });
+
+  it("connects each selected tab to its panel and guides an out-of-order comparison", async () => {
+    render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /explore an example/i })); });
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    expect(screen.getByRole("tabpanel", { name: "Overview" })).toHaveAttribute("id", overview.getAttribute("aria-controls"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose a storm" }));
+    expect(screen.getByRole("tab", { name: "Storm" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("slider", { name: /rainfall depth/i })).toHaveValue("50");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Compare" }), { button: 0, ctrlKey: false });
+    const guidance = screen.getByRole("region", { name: "Study guidance" });
+    expect(guidance).toHaveTextContent(/start by routing a storm/i);
+    fireEvent.click(within(guidance).getByRole("button", { name: "Choose a storm" }));
+    const storm = screen.getByRole("tab", { name: "Storm" });
+    expect(screen.getByRole("tabpanel", { name: "Storm" })).toHaveAttribute("id", storm.getAttribute("aria-controls"));
+  });
+
+  it("restores the current step and keyboard focus after collapsing the study", async () => {
+    render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /explore an example/i })); });
+    fireEvent.click(screen.getByRole("button", { name: "Choose a storm" }));
+    fireEvent.change(screen.getByRole("slider", { name: /rainfall depth/i }), { target: { value: "75" } });
+    fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+    expect(screen.getByRole("button", { name: /show study/i })).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: /show study/i }));
+    expect(screen.getByRole("tab", { name: "Storm" })).toHaveFocus();
+    expect(screen.getByRole("slider", { name: /rainfall depth/i })).toHaveValue("75");
+  });
+
+  it("keeps a routed study until the user confirms starting over", async () => {
+    render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /explore an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: /route 50 mm/i }));
+    await screen.findByText(/of the rain ran off instead of soaking in/i);
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+    expect(screen.getByRole("button", { name: /export current study/i })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Keep working" }));
+    expect(screen.getByText("50 mm in 60 min")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start new study" }));
+    expect(screen.getByRole("button", { name: /explore an example/i })).toBeVisible();
+    expect(screen.queryByText("50 mm in 60 min")).not.toBeInTheDocument();
+  });
+
   it("opens an example without a ready map or analysis request and resets cleanly", () => {
     render(<MemoryRouter><SensorOpticsProvider><Analyze /></SensorOpticsProvider></MemoryRouter>);
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");

@@ -12,12 +12,16 @@ This is a reproducible calculation, not a measured site outcome or a screenshot.
 
 ## Start with a place
 
+New visitors can open **Explore an example** before the satellite feed is ready. **Explore the map** clears the setup panel; **Choose a study area** brings it back. Place search announces loading, clears old results when you type a new query, and offers a retry if the service fails or times out.
+
 1. Open the map and choose **Explore an example**. The fixture works without an AI classification request; its status stays visible in exports.
 2. In **Overview**, inspect the composition, historical reconstruction where available, and vegetation–pavement sensitivity. Live scans also expose the captured imagery.
 3. In **Storm**, choose rainfall and resolution, then route a one-hour design event. Its forcing is sealed for the comparison.
 4. In **Mitigation**, ask Catalyst what a target and budget permit. Then draw supported interventions on the actual study extent.
 5. Rerun the sealed storm and compare **NOW / POSSIBLE** with the synchronized map view. Then read **where the water moved**: the cells that carry less water on the redesigned surface, the drawing's own footprint on the grid, and how far downstream the change reaches.
 6. Export the study or its **experiment evidence JSON**, including inputs, drawings, coefficients, forcing, routed results and the spatial difference. **Open an experiment file** reopens it: every identity is verified and the pair is routed again by the running build before anything is shown.
+
+Each study tab explains the next step based on the work actually completed. You can visit tabs in any order; Compare points you to the missing storm, drawing or rerun. **Locate study on map** returns to the analyzed extent, and **Show study** restores a collapsed panel without clearing your inputs. Tabs expose their content to assistive technology and keep keyboard focus when panels reopen. Resetting a study with a storm, drawings or reopened evidence offers JSON export before clearing the workspace.
 
 Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. The terrain loader also rejects partially downloaded tiles or non-finite samples rather than filling missing cells with the regional mean and calling the result observed. Historical storm events are drawn from complete, contiguous UTC hourly records; missing precipitation is not silently replaced with zero, and drizzle within an event contributes to the same depth used by its hyetograph. Unavailable archive requests can be retried. Example land cover never becomes a measurement merely because the terrain loaded successfully.
 

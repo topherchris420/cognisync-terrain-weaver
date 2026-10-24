@@ -107,6 +107,17 @@ import { MapKey } from "@/components/analyze/MapKey";
 import { EXAMPLE_ANALYSIS } from "@/lib/example-analysis";
 import "@/styles/atlas.css";
 import { AnalysisLaunchPanel } from "@/components/analyze/AnalysisLaunchPanel";
+import { StudyGuide, type StudyTab } from "@/components/analyze/StudyGuide";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import type { StormDefinition, RealitySurface } from "@/lib/counterfactual/types";
 import type { SimulationRequestV2 } from "@/lib/simulation-types";
@@ -304,8 +315,30 @@ export default function Analyze() {
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "simulation" | "mitigation" | "compare" | "export">("overview");
+  const [introOpen, setIntroOpen] = useState(true);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [activeTab, setActiveTab] = useState<StudyTab>("overview");
   const workbenchScrollRef = useRef<HTMLDivElement>(null);
+  const workbenchRef = useRef<HTMLElement>(null);
+  const panelToggleRef = useRef<HTMLButtonElement>(null);
+  const introToggleRef = useRef<HTMLButtonElement>(null);
+  const introMapButtonRef = useRef<HTMLButtonElement>(null);
+  const introHasClosed = useRef(false);
+
+  // Collapsing a panel must not leave keyboard focus inside hidden content.
+  useEffect(() => {
+    if (!drawerOpen) panelToggleRef.current?.focus({ preventScroll: true });
+    else workbenchRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
+  }, [drawerOpen]);
+  useEffect(() => {
+    if (!introOpen) {
+      introHasClosed.current = true;
+      introToggleRef.current?.focus({ preventScroll: true });
+    } else if (introHasClosed.current) {
+      introMapButtonRef.current?.focus({ preventScroll: true });
+      introHasClosed.current = false;
+    }
+  }, [introOpen]);
 
   // Each tab is its own page of the study; arriving mid-scroll from the last
   // one hides its heading and its first control.
@@ -519,6 +552,8 @@ export default function Analyze() {
     setCapturedTile(null);
     setScenarioExport(null);
     setActiveTab("overview");
+    setIntroOpen(true);
+    setConfirmReset(false);
     setSimResult(null);
     setStormExtent(null);
     setFutureSimResult(null);
@@ -604,7 +639,7 @@ export default function Analyze() {
   };
 
   const runAnalysis = async () => {
-    if (pendingRequest.current || !mapReady) return;
+    if (result || pendingRequest.current || !mapReady) return;
     setAnalysisError(null);
     resetScan();
     const generation = requestGeneration.current;
@@ -887,7 +922,7 @@ export default function Analyze() {
       <AppNav />
 
       {/* 2. Main GIS Viewport Area */}
-      <main id="main" className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", (!result || (drawerOpen && workflow.state !== "COMPARE")) && "atlas-workspace--docked", workflow.state === "COMPARE" && "atlas-workspace--comparing")}>
+      <main id="main" className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", ((!result && introOpen) || (result && drawerOpen && workflow.state !== "COMPARE")) && "atlas-workspace--docked", workflow.state === "COMPARE" && "atlas-workspace--comparing")}>
         {/* Full-bleed Map Canvas */}
         <div className="atlas-map absolute inset-0 h-full">
           <MapView
@@ -1112,8 +1147,11 @@ export default function Analyze() {
           showDifference={difference?.status === "controlled" && showDifference && workflow.state !== "COMPARE"}
           rainfallMm={simResult ? nowSeal?.storm.rainfallDepthMm : undefined}
         />
-        {!result && workflow.state !== "ANALYZING" && (
-          <aside className="atlas-intro" aria-label="Start a resilience study">
+        {!result && introOpen && workflow.state !== "ANALYZING" && (
+          <aside id="study-start" className="atlas-intro" aria-label="Start a resilience study">
+            <button ref={introMapButtonRef} type="button" className="atlas-map-switch" aria-controls="study-start" aria-expanded="true" onClick={() => setIntroOpen(false)}>
+              <Compass size={16} aria-hidden="true" /> Explore the map <ChevronLeft size={14} aria-hidden="true" />
+            </button>
             <div>
               <h1>A better future <br />starts with <br /><em>the ground.</em></h1>
               <p className="atlas-intro-copy">See how your city absorbs rain.{" "}<br />Explore the changes that could help it absorb more.</p>
@@ -1132,6 +1170,11 @@ export default function Analyze() {
             </div>
             <div className="atlas-process"><span>Land cover</span><ArrowRight size={12} /><span>Rainfall</span><ArrowRight size={12} /><span>Possibilities</span></div>
           </aside>
+        )}
+        {!result && !introOpen && workflow.state !== "ANALYZING" && (
+          <button ref={introToggleRef} type="button" className="atlas-panel-toggle" aria-controls="study-start" aria-expanded="false" onClick={() => setIntroOpen(true)}>
+            <Compass size={17} aria-hidden="true" /> Choose a study area <ChevronRight size={16} aria-hidden="true" />
+          </button>
         )}
 
         {/* 4. Live Bottom-Right GPS Status Readout */}
@@ -1247,6 +1290,8 @@ export default function Analyze() {
         {/* 8. Docked Collapsible Workbench Drawer (When Analysis Results Exist) */}
         {result && (
           <aside
+            id="study-workbench"
+            ref={workbenchRef}
             aria-label="Urban Resilience Workbench"
             hidden={!drawerOpen || workflow.state === "COMPARE"}
             className={cn(
@@ -1262,13 +1307,20 @@ export default function Analyze() {
                   {simResult ? ` · ${simResult.metadata.elevation_status === "observed" ? "observed" : "illustrative"} terrain` : ""}
                   {reopened ? " · reopened evidence" : ""}
                 </p>
+                {analyzedBBox && <button type="button" className="atlas-locate-study" onClick={() => {
+                  mapRef.current?.fitBounds(analyzedBBox, 50);
+                  if (window.innerWidth < 768) setDrawerOpen(false);
+                }}><Compass size={13} aria-hidden="true" /> Locate study on map</button>}
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={resetScan}
+                  onClick={() => {
+                    if (simResult || interventionFeatures.length > 0 || reopened) setConfirmReset(true);
+                    else resetScan();
+                  }}
                   className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
                   title="Reset and clear analysis"
                 >
@@ -1282,6 +1334,8 @@ export default function Analyze() {
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   title="Collapse panel"
                   aria-label="Collapse panel"
+                  aria-controls="study-workbench"
+                  aria-expanded="true"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -1293,9 +1347,10 @@ export default function Analyze() {
             <Tabs
               value={activeTab}
               onValueChange={(val) => setActiveTab(val as typeof activeTab)}
-              className="atlas-steps shrink-0"
+              className="atlas-workbench flex min-h-0 flex-1 flex-col"
             >
-              <TabsList className="atlas-steps-list">
+              <div className="atlas-steps shrink-0">
+              <TabsList className="atlas-steps-list" aria-label="Study steps">
                 {([
                   { value: "overview", label: "Overview", done: true },
                   { value: "simulation", label: "Storm", done: Boolean(simResult) },
@@ -1303,7 +1358,7 @@ export default function Analyze() {
                   { value: "compare", label: "Compare", done: Boolean(catalystFuture) },
                   { value: "export", label: "Export", done: false },
                 ] as const).map((step) => (
-                  <TabsTrigger key={step.value} value={step.value} className="atlas-step" data-done={step.done || undefined}>
+                  <TabsTrigger key={step.value} value={step.value} className="atlas-step" data-study-step={step.value} data-done={step.done || undefined}>
                     <span className="atlas-step-mark" aria-hidden="true">
                       {step.done && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
                     </span>
@@ -1311,9 +1366,21 @@ export default function Analyze() {
                   </TabsTrigger>
                 ))}
               </TabsList>
-            </Tabs>
+              </div>
 
-            <div ref={workbenchScrollRef} className="atlas-results-body flex-1 overflow-y-auto">
+            <TabsContent ref={workbenchScrollRef} value={activeTab} className="atlas-results-body mt-0 min-h-0 flex-1 overflow-y-auto" tabIndex={0}>
+              <StudyGuide
+                tab={activeTab}
+                hasStorm={Boolean(simResult)}
+                hasDrawings={hasEligibleDrawing}
+                hasComparison={Boolean(catalystFuture)}
+                busy={workflow.state === "STORM" || workflow.state === "RERUN_STORM"}
+                onNavigate={(tab) => {
+                  setActiveTab(tab);
+                  workbenchRef.current?.querySelector<HTMLElement>(`[data-study-step="${tab}"]`)?.focus({ preventScroll: true });
+                  if (tab === "mitigation") workflow.advance("REDESIGN");
+                }}
+              />
               {activeTab === "overview" && (
                 <div className="atlas-tab">
                   {isExample && <p className="atlas-section-note">{result.ai_notes}</p>}
@@ -1799,10 +1866,7 @@ export default function Analyze() {
                     ) : (
                       <div className="atlas-empty mt-5">
                         <p>Nothing to compare yet.</p>
-                        <p>Draw at least one intervention in Mitigation, then rerun the same storm on the redesign.</p>
-                        <Button variant="outline" size="sm" className="mt-4" onClick={() => setActiveTab("mitigation")}>
-                          Go to Mitigation
-                        </Button>
+                        <p>{!simResult ? "Route a baseline storm first, then draw interventions and rerun the same storm. Follow the next step above to get started." : "Draw at least one intervention in Mitigation, then rerun the same storm on the redesign. Follow the next step above to continue."}</p>
                       </div>
                     )}
                   </section>
@@ -1872,23 +1936,41 @@ export default function Analyze() {
                   </section>
                 </div>
               )}
-            </div>
+            </TabsContent>
+            </Tabs>
           </aside>
         )}
 
         {/* Expand Sidebar Tab Handle (when drawer is collapsed) */}
         {result && !drawerOpen && workflow.state !== "COMPARE" && (
           <button
+            ref={panelToggleRef}
+            type="button"
             onClick={() => setDrawerOpen(true)}
-            className="absolute top-20 left-0 z-30 flex items-center gap-1.5 rounded-r-lg border border-l-0 border-border bg-card/95 px-3 py-2 text-xs font-medium text-foreground shadow-xl hover:bg-muted transition-colors backdrop-blur-md"
-            title="Open Analysis Panel"
+            className="atlas-panel-toggle"
+            aria-controls="study-workbench"
+            aria-expanded="false"
+            title="Show study results and controls"
           >
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <span>Analysis Panel</span>
+            <span>Show study</span>
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
       </main>
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new study?</AlertDialogTitle>
+            <AlertDialogDescription>This clears the current storm, drawings and comparison from this workspace. Export experiment JSON first if you want to reopen your work later.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <Button variant="outline" onClick={handleExportExperiment}><FileJson size={16} className="mr-2" aria-hidden="true" /> Export current study (JSON)</Button>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep working</AlertDialogCancel>
+            <AlertDialogAction onClick={resetScan}>Start new study</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
