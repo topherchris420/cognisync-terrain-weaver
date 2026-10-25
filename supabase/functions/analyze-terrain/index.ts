@@ -11,16 +11,13 @@
 // Configured with verify_jwt = false so anonymous visitors can submit scans.
 // See security memory: this is an intentional public-demo posture.
 
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { createClient } from "npm:@supabase/supabase-js@2.110.2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2.110.2/cors";
+import { generateRecommendations } from "../_shared/recommendations.ts";
 
 import { validateLandCover } from "../_shared/land-cover.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const CLAUDE_MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-5";
 
 // Prefer Google's Gemini API so the project can use the Gemini free tier directly.
 // Keep the Lovable gateway as a backward-compatible fallback for existing deployments.
@@ -182,7 +179,8 @@ async function callGemini(payload: Record<string, unknown>, provider: AIProvider
     if (res.status !== 503) break;
     await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
   }
-  return res!;
+  if (!res) throw new Error("Gemini request did not complete");
+  return res;
 }
 
 async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
@@ -199,8 +197,7 @@ async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
         });
 
   if (!res.ok) {
-    const text = await res.text();
-    console.error(`${provider.name} AI ${res.status}:`, text);
+    console.error(`${provider.name} AI request failed with status ${res.status}`);
     throw new Response(
       JSON.stringify({
         error:
@@ -210,7 +207,6 @@ async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
             ? "AI credits exhausted. Add credits to your workspace."
             : "AI request failed.",
         status: res.status,
-        details: text,
       }),
       {
         status: res.status,
@@ -228,7 +224,7 @@ async function callAI(payload: Record<string, unknown>, provider: AIProvider) {
       : data?.choices?.[0]?.message?.content;
   if (!content) {
     throw new Response(
-      JSON.stringify({ error: "AI returned no content.", raw: data }),
+      JSON.stringify({ error: "AI returned no content." }),
       { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
@@ -398,12 +394,13 @@ Return STRICT JSON only, no prose, no code fence:
     const recPrompt = `You are an urban climate-adaptation advisor.
 
 Given this site:
-- Location: ${body.location_label ?? `${body.center_lat!.toFixed(4)}, ${body.center_lng!.toFixed(4)}`}
+- Location: ${body.location_label ?? `${body.center_lat?.toFixed(4)}, ${body.center_lng?.toFixed(4)}`}
 - Land cover: pavement ${cover.pavement}%, buildings ${cover.buildings}%, vegetation ${cover.vegetation}%, water ${cover.water}%, soil ${cover.soil}%
 - Urban Absorption Score: ${score}/100
 - Flood risk band: ${risk}
 
 Recommend 4 climate-adaptation interventions that would meaningfully improve permeability, reduce runoff, and mitigate flooding for THIS site profile.
+Treat the score as a screening estimate, not a validated flood forecast. Do not invent drainage capacity, GIS observations, costs, or quantified improvement claims not supplied above.
 
 Return STRICT JSON only:
 {"recommendations":[
@@ -412,19 +409,21 @@ Return STRICT JSON only:
 
 Use category "green" for vegetation/bioswales, "blue" for water storage/drainage, "gray" for engineered concrete solutions.`;
 
-    const recRaw = await callAI(
+    const advice = await generateRecommendations({
+      prompt: recPrompt,
+      apiKey: Deno.env.get("ANTHROPIC_API_KEY"),
+      model: CLAUDE_MODEL,
+      fallbackProvider: aiProvider.name,
+      fallback: () => callAI(
       {
         messages: [{ role: "user", content: recPrompt }],
         response_format: { type: "json_object" },
         temperature: 0.5,
       },
       aiProvider,
-    );
-
-    const recParsed = safeParseJson<{ recommendations?: unknown }>(recRaw);
-    const recommendations = Array.isArray(recParsed?.recommendations)
-      ? recParsed.recommendations
-      : [];
+      ),
+    });
+    const recommendations = advice.recommendations;
 
     // ----- 3. Persist -----
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -454,7 +453,11 @@ Use category "green" for vegetation/bioswales, "blue" for water storage/drainage
       return jsonError(500, "Failed to persist analysis.", dbError.message);
     }
 
-    return new Response(JSON.stringify({ analysis: inserted }), {
+    return new Response(JSON.stringify({
+      analysis: inserted,
+      providers: { classification: aiProvider.name, classification_model: aiProvider.model,
+        recommendations: advice.provider, recommendation_model: advice.model ?? aiProvider.model },
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
