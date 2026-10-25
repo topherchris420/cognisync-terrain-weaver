@@ -11,8 +11,8 @@
 // Configured with verify_jwt = false so anonymous visitors can submit scans.
 // See security memory: this is an intentional public-demo posture.
 
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2.110.2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2.110.2/cors";
 import { generateRecommendations } from "../_shared/recommendations.ts";
 
 import { validateLandCover } from "../_shared/land-cover.ts";
