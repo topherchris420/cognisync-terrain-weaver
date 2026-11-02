@@ -231,7 +231,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open [http://127.0.0.1:43147](http://127.0.0.1:43147). Create a local, **uncommitted** \`.env.local\` with the browser-safe project settings:
+Open [http://127.0.0.1:43147](http://127.0.0.1:43147). Create a local, **uncommitted** `.env.local` with the browser-safe project settings:
 
 ~~~dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -240,7 +240,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-public-publishable-key
 VITE_SUPABASE_PROJECT_ID=your-project-id
 ~~~
 
-These values must refer to a Supabase project you control. The example study avoids a live AI classification call, but the frontend still constructs a Supabase client. **Never put a service-role key, Gemini key, or other server secret into a \`VITE_\` variable.** Browser configuration must contain only public keys; classifier/service secrets belong in Supabase edge-function secrets. For live AI classification, set `GEMINI_API_KEY` to use Google's Gemini API directly; the default model is `gemini-3.8-flash` and can be overridden with `GEMINI_MODEL`. Existing deployments can continue using `LOVABLE_API_KEY` as a fallback through the Lovable gateway. The example skips the classifier request but the app still initializes its Supabase client. Deploying source changes to edge functions is a separate step from the frontend build.
+These values must refer to a Supabase project you control. The example study avoids a live AI classification call, but the frontend still constructs a Supabase client. **Never put a service-role key, Gemini key, or other server secret into a `VITE_` variable.** Classifier/service secrets belong in Supabase edge-function secrets. For live AI classification, set the server-side `GEMINI_API_KEY` to use Google's Gemini API directly; the default model is `gemini-3.8-flash` and can be overridden with `GEMINI_MODEL`. Existing deployments can continue using `LOVABLE_API_KEY` as a fallback through the Lovable gateway. Deploying source changes to edge functions is a separate step from the frontend build.
 
 ```bash
 npm test
@@ -301,7 +301,7 @@ npm run build
 npm run validate
 ~~~
 
-The validation command checks frozen experiments and the compiled urban substrate; the separate \`npm run experiment\` command **rewrites** reports and should be used intentionally. For technical context, read the [validation protocol](docs/validation-protocol.md), [experiment index](experiments/INDEX.md), [assumption tripwires](experiments/TRIPWIRES.md), and [revision record](experiments/REVISIONS.md).
+The validation command checks frozen experiments and the compiled urban substrate; the separate `npm run experiment` command **rewrites** reports and should be used intentionally. For technical context, read the [validation protocol](docs/validation-protocol.md), [experiment index](experiments/INDEX.md), [assumption tripwires](experiments/TRIPWIRES.md), and [revision record](experiments/REVISIONS.md).
 
 ## Scientific boundary
 
