@@ -82,6 +82,18 @@ beforeEach(() => {
 });
 
 describe("EraCompare", () => {
+  it("centers the 1609 and 1924 panes on the map position supplied at opening", async () => {
+    renderCompare({ center: { lat: 40.7075, lng: -74.009 }, zoom: 15, initialEraIds: ["1609", "1924", "today"] });
+    await flush();
+    for (const map of panes.maps) {
+      expect(map.getCenter()).toEqual({ lat: 40.7075, lng: -74.009 });
+      expect(map.getZoom()).toBe(15);
+      expect(map.resizeCount).toBeGreaterThan(0);
+    }
+    expect(eraLayers(panes.maps[0])).toEqual(["era-1609-layer"]);
+    expect(eraLayers(panes.maps[1])).toEqual(["era-1924-layer"]);
+  });
+
   it("gives each pane its own year, imagery and provenance", async () => {
     renderCompare();
     await flush();

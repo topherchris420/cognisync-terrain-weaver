@@ -198,6 +198,23 @@ describe("EraRasterLayer: switching years", () => {
 });
 
 describe("EraRasterLayer: style reloads", () => {
+  it.each(["1609", "1924"])("installs %s inside a pane whose style becomes ready at load or idle", async (id) => {
+    map.style._loaded = false;
+    render(<EraRasterLayer map={map.asMap()} era={getEra(id)} />);
+    await flush();
+    expect(eraLayers(map)).toEqual([]);
+    map.style._loaded = true;
+    act(() => map.emit("load"));
+    await flush();
+    expect(map.getLayer(`era-${id}-layer`)).toBeDefined();
+    if (id === "1609") expect(map.getLayer("welikia-1609-blocks-fill")).toBeDefined();
+    map.resetStyle();
+    act(() => map.emit("idle"));
+    await flush();
+    expect(map.getLayer(`era-${id}-layer`)).toBeDefined();
+    if (id === "1609") expect(map.getLayer("welikia-1609-blocks-fill")).toBeDefined();
+  });
+
   it("reinstalls after an imagery provider swap wipes the style", async () => {
     render(<EraRasterLayer map={map.asMap()} era={getEra("1924")} onStatusChange={onStatus} />);
     await flush();

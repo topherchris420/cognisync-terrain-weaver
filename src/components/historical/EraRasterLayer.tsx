@@ -156,6 +156,7 @@ export function EraRasterLayer({ map, era, onStatusChange, retryToken = 0 }: Pro
       if (errorSourceId(event) === sourceId) dispatch({ type: "tile-failed" });
     };
     const onIdle = () => {
+      install();
       if (hasSource(map, sourceId)) dispatch({ type: "idle" });
     };
 
@@ -163,6 +164,7 @@ export function EraRasterLayer({ map, era, onStatusChange, retryToken = 0 }: Pro
     holdBaseAsContext();
     map.on("styledata", install);
     map.on("style.load", install);
+    map.on("load", install);
     map.on("sourcedata", onSourceData);
     map.on("error", onError);
     map.on("idle", onIdle);
@@ -182,6 +184,7 @@ export function EraRasterLayer({ map, era, onStatusChange, retryToken = 0 }: Pro
       clearTimeout(timer);
       map.off("styledata", install);
       map.off("style.load", install);
+      map.off("load", install);
       map.off("sourcedata", onSourceData);
       map.off("error", onError);
       map.off("idle", onIdle);

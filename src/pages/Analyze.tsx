@@ -313,6 +313,7 @@ export default function Analyze() {
     [eraId]
   );
   const [compareEras, setCompareEras] = useState(false);
+  const [compareView, setCompareView] = useState({ lat: initialView.lat, lng: initialView.lng, zoom: initialView.zoom });
   const pdfPending = useRef(false);
   const [exportingPDF, setExportingPDF] = useState(false);
 
@@ -1003,7 +1004,15 @@ export default function Analyze() {
             <EraTimeline
               eraId={eraId}
               onChange={setEraId}
-              onCompare={() => setCompareEras(true)}
+              onCompare={() => {
+                const center = mapRef.current?.getCenter();
+                setCompareView({
+                  lat: center?.lat ?? view.lat,
+                  lng: center?.lng ?? view.lng,
+                  zoom: mapRef.current?.getZoom() ?? view.zoom,
+                });
+                setCompareEras(true);
+              }}
               center={{ lat: view.lat, lng: view.lng }}
               status={
                 activeEra.kind === "live"
@@ -1020,8 +1029,8 @@ export default function Analyze() {
             open
             initialEraIds={[eraId === "today" ? "1609" : eraId, "today", "slr-3ft"]}
             onClose={() => setCompareEras(false)}
-            center={{ lat: view.lat, lng: view.lng }}
-            zoom={view.zoom}
+            center={{ lat: compareView.lat, lng: compareView.lng }}
+            zoom={compareView.zoom}
             terrainEnabled={terrainEnabled}
             terrainExaggeration={terrainExaggeration ?? undefined}
           />}
