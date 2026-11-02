@@ -19,8 +19,12 @@ vi.mock("@/hooks/useWelikia1609", () => ({ useWelikia1609: () => ({ status: "idl
 vi.mock("@/components/historical/Historical1609Panel", () => ({ Historical1609Panel: () => null }));
 vi.mock("@/components/MapView", async () => {
   const { forwardRef, useImperativeHandle } = await import("react");
-  return { MapView: forwardRef(function OfflineMap(_props, ref) {
-    useImperativeHandle(ref, () => ({ fitBounds: vi.fn(), getBounds: () => null, getMap: () => null }));
+  return { MapView: forwardRef(function OfflineMap(props: import("@/components/MapView").MapViewProps, ref) {
+    useImperativeHandle(ref, () => ({
+      fitBounds: vi.fn(), getBounds: () => null, getMap: () => null,
+      getCenter: () => ({ lng: props.initialCenter?.[0] ?? -73.985, lat: props.initialCenter?.[1] ?? 40.758 }),
+      getZoom: () => props.initialZoom ?? 15,
+    }));
     return <div aria-label="Offline map" />;
   }) };
 });

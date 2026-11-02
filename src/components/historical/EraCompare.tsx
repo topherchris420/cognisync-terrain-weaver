@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Map as MLMap } from "maplibre-gl";
 import { MapView } from "@/components/MapView";
+import { Button } from "@/components/ui/button";
 import { EraRasterLayer } from "@/components/historical/EraRasterLayer";
 import { EraStatusLine } from "@/components/historical/EraTimeline";
 import {
@@ -67,6 +68,10 @@ export function EraCompare({
 
   const register = useCallback((index: number, map: MLMap) => {
     // A slow pane must join the place already being explored, not its original camera.
+    map.resize();
+    if (!lastCamera.current) {
+      lastCamera.current = { center, zoom, bearing: map.getBearing(), pitch: map.getPitch() };
+    }
     if (lastCamera.current) map.jumpTo(lastCamera.current);
     setMapList((prev) => {
       if (prev[index] === map) return prev;
@@ -74,7 +79,7 @@ export function EraCompare({
       next[index] = map;
       return next;
     });
-  }, []);
+  }, [center.lat, center.lng, zoom]);
 
   useEffect(() => {
     const query = window.matchMedia(NARROW_QUERY);
@@ -163,14 +168,16 @@ export function EraCompare({
                 <span className="ml-2 normal-case tracking-normal">· flat on small screens</span>
               )}
             </Dialog.Title>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClose}
               className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
               Close
-            </button>
+            </Button>
           </div>
           <Dialog.Description className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
             Choose a year in each view. Pan or zoom any map to move all three together. Historical imagery uses present-day ground elevation.
@@ -183,7 +190,7 @@ export function EraCompare({
               const paneStatus = statuses[index];
               const status = paneStatus?.eraId === era.id ? paneStatus.status : undefined;
               return (
-                <div key={index} className="relative min-h-0" data-testid={`era-pane-${index}`}>
+                <div key={index} className="relative min-h-0 min-w-0 overflow-hidden" data-testid={`era-pane-${index}`}>
                   <MapView
                     initialCenter={[center.lng, center.lat]}
                     initialZoom={zoom}
