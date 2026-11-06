@@ -55,6 +55,11 @@
 .atlas-map-place { font-family: 'Lora', Georgia, serif; font-size: 17px; line-height: 1.25; letter-spacing: -.01em; color: hsl(var(--foreground)); }
 .atlas-results { width: var(--dock-width); }
 .atlas-results[hidden] { display: none; }
+/* Phone bottom sheet: the grip and the lowered-sheet legend exist only below 768px. */
+.atlas-sheet-grip, .atlas-sheet-legend { display: none; }
+/* The era strip scrolls sideways; fade its edges so a cut-off year reads as more to scroll, not a broken label. */
+.atlas-era-scroller { scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); }
+.atlas-era-scroller::-webkit-scrollbar { display: none; }
 .atlas-map-switch, .atlas-panel-toggle { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 500; color: hsl(var(--foreground)); background: hsl(var(--card) / .96); }
 .atlas-map-switch { align-self: flex-start; flex-shrink: 0; }
 .atlas-map-switch:hover, .atlas-panel-toggle:hover { border-color: hsl(var(--primary) / .6); color: hsl(var(--primary)); }
@@ -109,7 +114,7 @@
 .atlas-results [role=tablist] { height: 44px; }
 .atlas-results [role=tab] { font-size: 10px; padding-inline: 6px; }
 /* Clear the era timeline, which owns the top-right corner of the map. */
-.atlas-app .maplibregl-ctrl-top-right { top: 92px; right: 14px; }
+.atlas-app .maplibregl-ctrl-top-right { top: var(--era-clearance, 92px); right: 14px; }
 .atlas-workspace--comparing .maplibregl-ctrl-top-right { top: 22px; }
 .atlas-app .maplibregl-ctrl-group { border-radius: 5px; border-color: hsl(var(--border)); }
 .atlas-app .maplibregl-ctrl-group button { width: 36px; height: 36px; }
@@ -145,9 +150,22 @@
   .atlas-map-heading, .atlas-workspace--docked .atlas-map-heading { top: 12px; left: 12px; padding: 10px 12px; max-width: calc(100% - 75px); }
   .atlas-map-heading { display: none; }
   .atlas-era-caption { display: none; }
-  .atlas-app .maplibregl-ctrl-top-right { top: 62px; right: 0; }
+  .atlas-app .maplibregl-ctrl-top-right { top: var(--era-clearance, 62px); right: 0; }
   .atlas-map-status { display: none; }
-  .atlas-results { top: 14%; border-top: 1px solid hsl(var(--border)); border-radius: 14px 14px 0 0; }
+  /* Full sheet takes the whole workspace: the lowered state is how a phone sees the map. */
+  .atlas-results { top: 0; border-top: 1px solid hsl(var(--border)); border-radius: 14px 14px 0 0; }
+  .atlas-example-notice { flex-direction: row; flex-wrap: wrap; column-gap: 6px; padding-block: 9px; }
+  .atlas-sheet-grip { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 100%; height: 24px; margin-bottom: -6px; touch-action: none; cursor: grab; border-radius: 14px 14px 0 0; }
+  .atlas-sheet-grip span { width: 40px; height: 4px; border-radius: 2px; background: hsl(var(--muted-foreground) / .45); transition: background .15s; }
+  .atlas-sheet-grip:hover span, .atlas-sheet-grip:focus-visible span { background: hsl(var(--primary)); }
+  .atlas-sheet-grip:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+  /* Lowered: the place, its boundary and the next step stay; the reading pane waits for a tap or swipe up. */
+  .atlas-results[data-sheet=peek] { top: auto; max-height: 60%; animation: atlas-sheet-lower .26s cubic-bezier(.2, .8, .2, 1); box-shadow: 0 -12px 32px hsl(168 30% 3% / .45); }
+  .atlas-results[data-sheet=peek] .atlas-steps, .atlas-results[data-sheet=peek] .atlas-results-body, .atlas-results[data-sheet=peek] .atlas-example-notice span { display: none; }
+  .atlas-results[data-sheet=peek] .atlas-example-notice { padding-block: 8px; }
+  .atlas-results[data-sheet=peek] .atlas-results-head { padding-block: 4px 8px; }
+  .atlas-results[data-sheet=peek] .atlas-sheet-legend { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 16px; border-bottom: 1px solid hsl(var(--border)); font-size: 11px; line-height: 1.35; color: hsl(var(--muted-foreground)); }
+  .atlas-sheet-legend span { flex-shrink: 0; width: 22px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, hsl(199 89% 48% / .35), hsl(190 100% 85%)); box-shadow: 0 0 6px hsl(199 89% 60% / .7); }
   .atlas-panel-toggle { top: auto; bottom: max(28px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); white-space: nowrap; }
   .atlas-search input { font-size: 16px; padding-right: 44px; }
   .atlas-presets { gap: 6px; margin-top: 6px; }
@@ -161,6 +179,7 @@
 }
 @media (max-width: 380px) {
   .atlas-app .atlas-results { top: 0; border-radius: 0; }
+  .atlas-app .atlas-results[data-sheet=peek] { top: auto; border-radius: 14px 14px 0 0; }
   .atlas-app header .hud-value { font-size: 18px; }
   .atlas-app .nav-optics-controls { gap: 4px; }
   .atlas-app .nav-optics-mode { padding-inline: 8px; }
@@ -558,3 +577,5 @@
 .atlas-substrate > summary .atlas-section-title::after { content: " +"; color: hsl(var(--muted-foreground)); font-weight: 400; }
 .atlas-substrate[open] > summary .atlas-section-title::after { content: " −"; }
 .atlas-substrate small { color: hsl(var(--muted-foreground)); font-size: 10px; }
+@keyframes atlas-sheet-lower { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .atlas-results[data-sheet=peek] { animation: none; } }
