@@ -8,22 +8,20 @@ import {
 } from "react";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { area, bboxPolygon, difference, feature, featureCollection, intersect } from "@turf/turf";
+import { area, bboxPolygon } from "@turf/turf";
 import type {
   GeoJSONSource,
   IControl,
   Map as MapLibreMap,
   StyleImageInterface,
 } from "maplibre-gl";
-import { parseBBox } from "@/lib/geo";
 import {
   INTERVENTION_COLORS,
   type Scenario,
 } from "@/lib/scenario";
 import type { SpatialContextResult } from "@/lib/spatial-data/types";
 import type { LandCover } from "@/lib/types";
-import { evaluateEligibility } from "@/lib/counterfactual/eligibility";
-import { interventionParameters } from "@/lib/counterfactual/intervention-parameters";
+import { interventionFromGeometry, normalizedBbox } from "@/lib/counterfactual/intervention-feature";
 import { stableHash } from "@/lib/counterfactual/hashing";
 import { deriveScenarioFromFeatures } from "@/lib/counterfactual/projected-metrics";
 import { setMapDrawing } from "@/lib/map-drawing";
@@ -115,6 +113,12 @@ export interface MapEditorHandle {
   clear: () => void;
   /** Discard the shape in progress; leaving the tool otherwise keeps it. */
   cancelDraft: () => void;
+  /**
+   * Add shapes drawn by something other than the pointer (the starting
+   * sketch). They pass through the same eligibility and clipping as a hand
+   * drawing and join the undo history as one step. Returns what was added.
+   */
+  addShapes: (shapes: Array<{ id: string; type: InterventionType; geometry: PolygonGeometry }>) => InterventionFeature[];
 }
 
 export interface MapEditorProps {
@@ -161,44 +165,7 @@ function interventionFromDraft(
   context: SpatialContextResult | null,
   bounds: unknown
 ): InterventionFeature {
-  const eligibility = evaluateEligibility(draft.geometry, type, context);
-  const extent = normalizedBbox(bounds);
-  // One canonical clipped geometry drives both costs and grid modifiers.
-  if (eligibility.validGeometry) {
-    try {
-      const clipped = extent ? intersect(featureCollection([
-        feature(eligibility.validGeometry),
-        bboxPolygon([extent.west, extent.south, extent.east, extent.north]),
-      ])) : null;
-      const invalid = clipped
-        ? difference(featureCollection([feature(draft.geometry), clipped]))
-        : feature(draft.geometry);
-      eligibility.validGeometry = clipped?.geometry ?? null;
-      eligibility.invalidGeometry = invalid?.geometry ?? null;
-      eligibility.validAreaM2 = clipped ? area(clipped) : 0;
-      eligibility.invalidAreaM2 = invalid ? area(invalid) : 0;
-      eligibility.eligible = eligibility.validAreaM2 > 0;
-      if (eligibility.invalidAreaM2 > 0.01) {
-        eligibility.reasonCodes.push(eligibility.eligible ? "PARTIALLY_OUTSIDE_ELIGIBLE_SURFACE" : "OUTSIDE_ELIGIBLE_SURFACE");
-        eligibility.caveats.push("Only geometry inside the analyzed study footprint is modeled.");
-      }
-    } catch {
-      eligibility.eligible = false;
-      eligibility.validGeometry = null;
-      eligibility.validAreaM2 = 0;
-      eligibility.invalidGeometry = draft.geometry;
-      eligibility.caveats.push("The drawing could not be clipped to the study footprint.");
-    }
-  }
-  return {
-    id: featureId(draft),
-    type,
-    geometry: draft.geometry,
-    areaM2: eligibility.validAreaM2,
-    parameters: interventionParameters(type),
-    eligibility,
-    provenance: eligibility.provenance,
-  };
+  return interventionFromGeometry(draft.geometry, type, context, bounds, featureId(draft));
 }
 
 function drawFeature(candidate: InterventionFeature): GeoJSON.Feature {
@@ -207,26 +174,6 @@ function drawFeature(candidate: InterventionFeature): GeoJSON.Feature {
     id: candidate.id,
     geometry: candidate.geometry,
     properties: { interventionType: candidate.type },
-  };
-}
-
-function normalizedBbox(value: unknown): SimBBox | null {
-  if (
-    value &&
-    typeof value === "object" &&
-    ["north", "south", "east", "west"].every(
-      (key) => typeof (value as Record<string, unknown>)[key] === "number"
-    )
-  ) {
-    return value as SimBBox;
-  }
-  const parsed = parseBBox(value);
-  if (!parsed) return null;
-  return {
-    west: parsed[0][0],
-    south: parsed[0][1],
-    east: parsed[1][0],
-    north: parsed[1][1],
   };
 }
 
@@ -419,6 +366,16 @@ export const MapEditor = forwardRef<MapEditorHandle, MapEditorProps>(
           if (featuresRef.current.length === 0) return;
           commit([]);
           onFeedbackRef.current?.(null);
+        },
+        addShapes(shapes) {
+          const existing = new Set(featuresRef.current.map((candidate) => candidate.id));
+          const added = shapes
+            .filter((shape) => !existing.has(shape.id))
+            .map((shape) =>
+              interventionFromGeometry(shape.geometry, shape.type, contextRef.current, legacyProjectionRef.current.bbox, shape.id)
+            );
+          if (added.length > 0) commit([...featuresRef.current, ...added]);
+          return added;
         },
       }),
       [commit]

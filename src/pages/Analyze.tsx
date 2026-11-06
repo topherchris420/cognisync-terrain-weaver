@@ -39,7 +39,10 @@ import { substrateEvidence } from "@/lib/urban-substrate/evidence";
 import { publishedSubstrateBaseUrl } from "@/lib/urban-substrate/loader";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 import { controlledComparison } from "@/lib/counterfactual/controlled";
-import { spatialDifference } from "@/lib/counterfactual/difference";
+import { hasCells, spatialDifference } from "@/lib/counterfactual/difference";
+import { sketchAlongFlowPaths } from "@/lib/counterfactual/flow-sketch";
+import { FlowSketchOffer } from "@/components/analyze/FlowSketchOffer";
+import { SheetSummary } from "@/components/analyze/SheetSummary";
 import { ExperimentImportError, importExperiment, readFileText, type ImportedStudy } from "@/lib/experiment-import";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
@@ -917,6 +920,34 @@ export default function Analyze() {
     toast.success("GeoJSON boundary exported.");
   };
 
+  // The quick way past an empty map: bioswale strips along the baseline's own
+  // flow paths, added through the editor so they behave like hand drawings.
+  const canSketch = Boolean(mapReady && simResult && hasCells(simResult) && stormExtent && nowSeal && interventionFeatures.length === 0 && !catalystFuture);
+  const placeFlowSketch = () => {
+    if (!simResult || !hasCells(simResult) || !stormExtent || !nowSeal) return;
+    const size = LOCAL_GRID[nowSeal.storm.resolution];
+    const grid = cachedElevation(stormExtent, size, size);
+    if (!grid) {
+      toast.error("The routed terrain is no longer available.", { description: "Route the storm again to sketch along its flow paths." });
+      return;
+    }
+    const shapes = sketchAlongFlowPaths({ extent: stormExtent, elevation: grid.values, cells: simResult.cells, rainfallDepthMm: nowSeal.storm.rainfallDepthMm, visiblePaths: simResult.flow_paths });
+    if (shapes.length === 0) {
+      toast.info("No modeled flow path here is long enough to sketch along.", { description: "Choose a drawing tool and draw your own shapes instead." });
+      return;
+    }
+    const added = editorRef.current?.addShapes(shapes.map((shape) => ({ id: `flow-sketch-${stableHash(shape.geometry)}`, type: "bioswales" as const, geometry: shape.geometry }))) ?? [];
+    if (added.length === 0) {
+      toast.error("The sketch could not be placed.", { description: "The drawing tools need a working map." });
+      return;
+    }
+    const areaM2 = added.reduce((sum, feature) => sum + feature.areaM2, 0);
+    toast.success(`${added.length} bioswale strips sketched along the modeled flow paths.`, {
+      description: `${Math.round(areaM2).toLocaleString("en-US")} m² in all. Edit or delete them like your own drawings, then rerun the same storm.`,
+    });
+    if (isSheetViewport()) setSheetPeek(true);
+  };
+
   const handleExportExperiment = () => {
     if (!result) return;
     try {
@@ -1430,12 +1461,11 @@ export default function Analyze() {
             </div>
 
             {isExample && <div className="atlas-example-notice"><strong>Illustrative example</strong><span>Explore the tools with sample data. Not a site assessment.</span></div>}
-            {simResult && showFlowVectors && (
-              <p className="atlas-sheet-legend">
-                <span aria-hidden="true" />
-                Flow paths are brightest where modeled water gathers. Not flood depth.
-              </p>
-            )}
+            <SheetSummary
+              pair={catalystFuture && simResult && futureSimResult ? { nowM3: simResult.metadata.runoff_volume_m3, possibleM3: futureSimResult.metadata.runoff_volume_m3 } : null}
+              showDifference={difference?.status === "controlled" && showDifference}
+              showFlow={Boolean(simResult && showFlowVectors)}
+            />
 
             <Tabs
               value={activeTab}
@@ -1791,6 +1821,7 @@ export default function Analyze() {
               {activeTab === "mitigation" && (
                 <div className="atlas-tab">
                   <section className="atlas-section atlas-section--lead" aria-labelledby="mitigation-title">
+                    {canSketch && <FlowSketchOffer onSketch={placeFlowSketch} />}
                     <h3 id="mitigation-title" className="atlas-section-title mb-2">Drawing tools</h3>
 
                     {!mapReady && <p role="status" className="atlas-study-reading-basis mb-4">{mapAvailability === "unavailable" ? "The live map is unavailable." : "The live map is loading."} Drawing needs a working map. You can still explore planning assumptions below or reopen a saved experiment.</p>}
