@@ -1,10 +1,12 @@
 # Mannahatta
 
+[![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml)
+
 **An open-source instrument for urban memory, rainfall, and testable futures.**
 
 > **The land remembers. The city is not finished.**
 
-**What was. What is. What could be.** Mannahatta turns a place on the map into a reproducible question: *under the same rainfall, what changes if we change the ground?*
+**What was. What is. What could be.** Mannahatta turns a place on the map into a reproducible question: *under the same rainfall, what changes if we change the ground?* This is a research prototype (package version `0.5.0`), built to reveal what a model can and cannot support.
 
 Built by [Vers3Dynamics](https://vers3dynamics.com), the project brings historical ecological reconstruction, imagery-based land-cover estimates, terrain routing, intervention design, and verifiable experiment files into one map-based research workspace.
 
@@ -30,8 +32,8 @@ It is **not** a flood-warning system, a calibrated drainage model, or a claim th
 1. Start the workstation and select **Explore an example**. Its illustrative status remains attached to the study and exported evidence.
 2. Open **Overview** to inspect surface composition, provenance, score, and uncertainty.
 3. Open **Storm**, select rainfall and grid resolution, and run a one-hour event.
-4. Open **Mitigation** to explore budget and target constraints, then draw eligible trees or bioswales.
-5. Rerun the sealed event in **Compare**. Inspect both the change in runoff and **where the water moved** on the routing grid.
+4. Open **Mitigation** to explore budget and target constraints. Use **Sketch along the flow paths** for an editable bioswale starting point, or draw your own eligible interventions.
+5. Rerun the sealed event in **Compare**. Inspect both the change in runoff and **where the water moved** on the routing grid. On a phone, lower the study sheet to see the result on the map.
 6. Export **experiment evidence JSON** and reopen it in the browser, or verify it through the CLI.
 
 For every analysis, ask two questions: **what changed?** and **what remained identical?** If the storm, ground model, study extent, classification, or substrate identity changes, the project will not label the pair a controlled NOW/POSSIBLE comparison.
@@ -60,10 +62,10 @@ These are research findings, not embarrassing details to hide. The interface and
 
 ## Find your way around
 
-- **Using the instrument:** [Study workflow](#start-with-a-place) · [Historical view](#explore-and-share-a-historical-view) · [Three evidence frames](#three-questions-different-evidence)
+- **Using the instrument:** [Study workflow](#start-with-a-place) · [Guided flow-path sketch](#a-starting-sketch-not-a-site-plan) · [Historical view](#explore-and-share-a-historical-view) · [Three evidence frames](#three-questions-different-evidence)
 - **Planning and uncertainty:** [Catalyst allocation](#what-would-have-to-change) · [Classification sensitivity](#what-if-the-classification-is-wrong) · [Water models](#two-water-models-explicit-limits)
 - **Engineering and reproducibility:** [AI/code boundary](#ai-proposes-deterministic-code-decides) · [Urban substrate](#urban-substrate) · [Evidence and replay](#evidence-that-travels) · [Architecture](#architecture)
-- **Build and validation:** [Local development](#run-locally) · [Experiments](#how-we-test-the-model) · [Contributing](#contributing-to-the-instrument) · [Scientific boundary](#scientific-boundary)
+- **Build and validation:** [Local development](#run-locally) · [Experiments](#how-we-test-the-model) · [Research priorities](#research-priorities) · [Contributing](#contributing-to-the-instrument) · [Scientific boundary](#scientific-boundary)
 
 ---
 
@@ -76,13 +78,21 @@ New visitors can open **Explore an example** before the satellite feed is ready.
 1. Open the map and choose **Explore an example**. The fixture works without an AI classification request; its status stays visible in exports.
 2. In **Overview**, inspect the composition, historical reconstruction where available, and vegetation–pavement sensitivity. Live scans also expose the captured imagery.
 3. In **Storm**, choose rainfall and resolution, then route a one-hour design event. Its forcing is sealed for the comparison.
-4. In **Mitigation**, ask Catalyst what a target and budget permit. Then draw supported interventions on the actual study extent.
+4. In **Mitigation**, ask Catalyst what a target and budget permit. Start with **Sketch along the flow paths** or draw supported interventions yourself. Review each shape's clipped, eligible area before treating its modeled effect as meaningful.
 5. Rerun the sealed storm and compare **NOW / POSSIBLE** with the synchronized map view. Then read **where the water moved**: the cells that carry less water on the redesigned surface, the drawing's own footprint on the grid, and how far downstream the change reaches.
 6. Export the study or its **experiment evidence JSON**, including inputs, drawings, coefficients, forcing, routed results and the spatial difference. **Open an experiment file** reopens it: every identity is verified and the pair is routed again by the running build before anything is shown.
 
 Each study tab explains the next step based on the work actually completed. You can visit tabs in any order; Compare points you to the missing storm, drawing or rerun. **Locate study on map** returns to the analyzed extent, and **Show study** restores a collapsed panel without clearing your inputs. Tabs expose their content to assistive technology and keep keyboard focus when panels reopen. Resetting a study with a storm, drawings or reopened evidence offers JSON export before clearing the workspace.
 
+**On phones**, the study workbench is a bottom sheet, not a panel that permanently hides the map. After a storm routes or a starting sketch is placed, it lowers to show the spatial result. Tap the accessible grip (or swipe down/up) to lower or expand it. The lowered sheet retains a short legend: modeled flow concentration is **not flood depth**, and the controlled-pair summary reports the runoff difference under the **same storm**. Green means the modeled cells carry less water; amber means more. Small percentage changes remain visible rather than rounding to zero.
+
 Live imagery, historical rasters and elevation require their external services. If elevation cannot load, a deterministic slope is explicitly **illustrative**. The terrain loader also rejects partially downloaded tiles or non-finite samples rather than filling missing cells with the regional mean and calling the result observed. Historical storm events are drawn from complete, contiguous UTC hourly records; missing precipitation is not silently replaced with zero, and drizzle within an event contributes to the same depth used by its hyetograph. Unavailable archive requests can be retried. Example land cover never becomes a measurement merely because the terrain loaded successfully.
+
+### A starting sketch, not a site plan
+
+After a baseline storm is routed, **Mitigation → Sketch along the flow paths** can propose up to six editable bioswale strips (6 m wide by default) near the upper reaches of modeled paths. The same storm inputs produce the same sketch. The shapes enter the **ordinary intervention editor**, are checked and clipped by the same spatial eligibility rules as hand-drawn polygons, and can be edited, deleted, or extended before rerunning the sealed storm. If no usable paths or valid eligible area exist, the sketch cannot manufacture a feasible design.
+
+This is **a demonstration of the comparison instrument, not an optimized placement or flood-protection recommendation**. The current model changes the rain landing on a drawn surface; a bioswale shape does **not** intercept water routed into it from upstream. An upstream sketch mainly makes the modeled change easier to trace downstream. Routing hotspots themselves did not beat low elevation at locating reported flooding ([R5](experiments/routing/R5-311-association-holdout/REPORT.md)). The source and tests are in [`flow-sketch.ts`](src/lib/counterfactual/flow-sketch.ts) and [`flow-sketch.test.ts`](src/lib/counterfactual/flow-sketch.test.ts).
 
 ### Explore and share a historical view
 
@@ -151,7 +161,7 @@ Fixed coefficients yield linear responses: this model **cannot identify saturati
 
 ### Terrain routing
 
-The browser loads Terrarium elevation onto a finite grid and routes water with D8 over static **fill-and-spill** (routing v2): closed depressions hold up to their volume and spill the rest, and cells at or below 0 m are treated as receiving tidal water. The original D8 stranded a median 81% of routed water in single-cell pits and in Terrarium artefacts as deep as −14 km; the analytic pit and flat cases now pass ([R1](experiments/routing/R1-synthetic-terrains/REPORT.md), [R2](experiments/routing/R2-resolution-sensitivity/REPORT.md)). Intervention modifiers are weighted by the share of each cell a drawing covers, so credited area no longer depends on resolution. A synthetic slope is used and labeled if elevation is unavailable. NOW and POSSIBLE share rainfall, duration, resolution and elevation identity; edited futures invalidate the previous comparison. Surface identities include study bounds and classified cover.
+The browser loads Terrarium elevation onto a finite grid and routes water with D8 over static **fill-and-spill** (routing v2): closed depressions hold up to their volume and spill the rest, and cells at or below 0 m are treated as receiving tidal water. The original D8 stranded a median 81% of routed water in single-cell pits and in Terrarium artefacts as deep as −14 km; the analytic pit and flat cases now pass, although **the isolated-peak boundary case still fails** ([R1](experiments/routing/R1-synthetic-terrains/REPORT.md), [R2](experiments/routing/R2-resolution-sensitivity/REPORT.md)). Intervention modifiers are weighted by the share of each cell a drawing covers, so credited area no longer depends on resolution. A synthetic slope is used and labeled if elevation is unavailable. NOW and POSSIBLE share rainfall, duration, resolution and elevation identity; edited futures invalidate the previous comparison. Surface identities include study bounds and classified cover.
 
 A controlled pair is also subtracted cell by cell. The **difference layer** colours the cells through which the redesigned surface sends less water (and any through which it sends more), outlines the drawing's own cells, and reports how far downstream the change reaches; the ledger beside it keeps the avoided runoff, because water is counted at every cell it passes. A pair that differs in anything but the drawn surface has no difference layer, only a list of what differs. Like every routed quantity, it shows where this model sends water, not where flooding becomes less likely.
 
@@ -207,7 +217,9 @@ The same verification runs in the browser. **Open an experiment file** (on the i
 | Map and study orchestration | `src/pages/Analyze.tsx`, MapLibre, `MapEditor`, `DifferenceLayer` |
 | Aggregate physics and planning | `src/lib/absorption.ts`, `scenario.ts`, `paired-storm.ts`, `catalyst.ts` |
 | Sensitivity | `src/lib/land-cover-sensitivity.ts` |
-| Spatial constraints, identity and the spatial difference | `src/lib/counterfactual/` (`controlled.ts`, `difference.ts`) |
+| Spatial constraints, identity and the spatial difference | `src/lib/counterfactual/` (`controlled.ts`, `difference.ts`, `intervention-feature.ts`) |
+| Guided bioswale sketch | `src/lib/counterfactual/flow-sketch.ts`, `src/components/analyze/FlowSketchOffer.tsx` |
+| Responsive study controls | `src/components/analyze/SheetGrip.tsx`, `SheetSummary.tsx`; layout in `src/pages/Analyze.tsx` |
 | Local terrain routing | `src/lib/hydrology/` |
 | Historical reconstruction and era imagery | `src/lib/historical/`, `public/data/welikia-1609-blocks.json`; sources and verification in [docs/historical-imagery.md](docs/historical-imagery.md) |
 | Evidence that travels and returns | `experiment-export.ts`, `experiment-replay.ts`, `experiment-import.ts`, `geo.ts`, `pdf-export.ts` |
@@ -252,8 +264,11 @@ npm run build
 Tests cover coefficient synchronization, water balance, geometry constraints, paired identities, the spatial difference, async staleness, cost allocation, classification contracts, sensitivity, provenance, exports, replay and reopening. Passing tests establishes implementation consistency, **not empirical flood validation**. That is what the experiments are for:
 
 ```bash
-npm run validate        # re-run every experiment on frozen fixtures and recompile the substrate; fails if anything committed changed
-npm run experiment      # re-run and rewrite reports
+npm run validate        # check every frozen experiment and compiled substrate without rewriting reports
+npm run validate:routing # run just the routing experiments
+npm run validate:classification # run just classification experiments
+npm run substrate:check # check the compiled urban substrate
+npm run experiment      # intentionally re-run and rewrite experiment reports
 ```
 
 See [implementation evidence and remaining gaps](docs/counterfactual-instrument.md), [source ledger and validation protocol](docs/validation-protocol.md), [calibration](docs/absorption-calibration.md), and [prior delivery evidence](docs/elevation-delivery.md).
@@ -283,6 +298,17 @@ Other results, briefly:
 | Urban substrate | itself, recompiled under two clocks and a shuffled record order | 29 tiles byte-identical, 0 validation errors; moving one vertex 1 cm fails replay on that tile |
 
 Negative results stay in the record. [REVISIONS](experiments/REVISIONS.md) lists every change measurement caused and everything it did not fix.
+
+## Research priorities
+
+The next useful advance is **better independent evidence**, not a more confident map. These are open research directions, not promises that the current model already solves them:
+
+1. **Establish surface-cover accuracy.** Expand independently labeled imagery and resolve the repeat instability in [C1](experiments/classification/C1-nlcd-agreement/REPORT.md) and [C2](experiments/classification/C2-repeat-stability/REPORT.md). Populate the frozen synthetic scenes for [C4](experiments/classification/C4-synthetic-semantic-agreement/REPORT.md), keeping that diagnostic distinct from real-world accuracy.
+2. **Earn hydrologic credibility.** Revisit the linear retention assumptions flagged by [H2](experiments/hydrology/H2-curve-number-benchmark/REPORT.md), and resolve the analytic boundary failure in [R1](experiments/routing/R1-synthetic-terrains/REPORT.md). Compare against observed quantities where available rather than interpreting flow accumulation as flood depth.
+3. **Challenge the hazard proxy.** [R5](experiments/routing/R5-311-association-holdout/REPORT.md) did not outperform a low-ground baseline. Add independent datasets and explicit acceptance criteria before considering any stronger spatial-risk claim.
+4. **Make interventions defensible.** Source installation and maintenance costs, verify parcel eligibility and real interception effects, and repeat the uncertainty checks in [I1](experiments/interventions/I1-bioswale-1500m2/REPORT.md) and [I3](experiments/interventions/I3-classification-uncertainty/REPORT.md).
+
+Changes to claims should follow the [preregistration](experiments/PREREGISTRATION.md), [tripwires](experiments/TRIPWIRES.md), and [revision record](experiments/REVISIONS.md). A negative result is a useful result when it narrows what the instrument can honestly say.
 
 ## Contributing to the instrument
 
