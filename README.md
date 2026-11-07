@@ -265,8 +265,8 @@ Tests cover coefficient synchronization, water balance, geometry constraints, pa
 
 ```bash
 npm run validate        # check every frozen experiment and compiled substrate without rewriting reports
-npm run validate:routing # run just the routing experiments
-npm run validate:classification # run just classification experiments
+npm run validate:routing # regenerate only routing experiment reports (writes outputs)
+npm run validate:classification # regenerate only classification reports (writes outputs)
 npm run substrate:check # check the compiled urban substrate
 npm run experiment      # intentionally re-run and rewrite experiment reports
 ```
