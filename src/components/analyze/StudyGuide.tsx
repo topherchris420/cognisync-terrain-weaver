@@ -39,7 +39,7 @@ export function StudyGuide({ tab, hasStorm, hasDrawings, hasComparison, busy, on
           ? "Compare the two results, or keep drawing to explore another design. Editing clears the previous comparison."
           : hasDrawings
             ? "Your drawings are ready. Use the rerun control below to test them against the baseline storm."
-            : "Choose a drawing tool below, place points on the map, and close the shape to add an intervention.";
+            : "Start from a sketch along the modeled flow paths, or choose a drawing tool, place points on the map and close the shape.";
       if (!hasStorm) action = { label: "Choose a storm", tab: "simulation" };
       else if (hasComparison) action = { label: "Review comparison", tab: "compare" };
       break;

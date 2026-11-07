@@ -88,8 +88,8 @@ export function ScenarioStudio({ cover, bbox, scenario, activeIntervention, onIn
   return (
     <div className="space-y-4">
       <p className="atlas-section-note">
-        Pick a tool, then draw on the map. Each shape converts the ground beneath
-        it, and the projection below updates as you go.
+        Each shape converts the ground beneath it. The projection below updates
+        as you draw.
       </p>
       {/* Map tool shortcuts; geometry remains canonical. */}
       <div className="atlas-tools" role="group" aria-label="Green infrastructure tools">

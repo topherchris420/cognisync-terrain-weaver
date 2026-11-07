@@ -84,7 +84,7 @@ export function EraTimeline({
             e.preventDefault();
             select(target, true);
           }}
-          className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+          className="atlas-era-scroller flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
         >
           {ERAS.map((era, i) => {
             const isActive = era.id === active.id;

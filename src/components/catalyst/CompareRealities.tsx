@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { percentChange } from "@/lib/percent-change";
 import { ArrowLeftRight, X } from "lucide-react";
 import type { Map as MLMap } from "maplibre-gl";
 import { MapView } from "@/components/MapView";
@@ -95,7 +96,7 @@ export function CompareRealities({ open, onClose, baseMap, currentScore, futureS
   const reduction = validVolume(runoffBase) && runoffBase > 0 && validVolume(runoffFuture)
     ? (runoffBase - runoffFuture) / runoffBase * 100 : null;
   const headline = reduction === null || !Number.isFinite(reduction) ? "Runoff comparison unavailable"
-    : reduction === 0 ? "No change in runoff" : `${Math.abs(Math.round(reduction))}% ${reduction > 0 ? "less" : "more"} runoff`;
+    : reduction === 0 ? "No change in runoff" : `${percentChange(reduction)}% ${reduction > 0 ? "less" : "more"} runoff`;
   const illustrative = baseSimResult?.metadata?.elevation_status === "illustrative" || futureSimResult?.metadata?.elevation_status === "illustrative";
 
   return (

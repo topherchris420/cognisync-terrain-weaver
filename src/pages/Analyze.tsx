@@ -31,13 +31,18 @@ import { SubstrateLayer } from "@/components/analyze/SubstrateLayer";
 import { DifferenceLayer } from "@/components/analyze/DifferenceLayer";
 import { WhereTheWaterMoved } from "@/components/analyze/WhereTheWaterMoved";
 import { ReplayReadout } from "@/components/analyze/ReplayReadout";
+import { SheetGrip } from "@/components/analyze/SheetGrip";
+import { isSheetViewport } from "@/lib/viewport";
 import { useUrbanSubstrate } from "@/hooks/useUrbanSubstrate";
 import { substrateRunKey, type SubstrateEvidence } from "@/lib/urban-substrate/identity";
 import { substrateEvidence } from "@/lib/urban-substrate/evidence";
 import { publishedSubstrateBaseUrl } from "@/lib/urban-substrate/loader";
 import { ROUTED_ZONES_CAVEAT } from "@/lib/evidence/ledger";
 import { controlledComparison } from "@/lib/counterfactual/controlled";
-import { spatialDifference } from "@/lib/counterfactual/difference";
+import { hasCells, spatialDifference } from "@/lib/counterfactual/difference";
+import { sketchAlongFlowPaths } from "@/lib/counterfactual/flow-sketch";
+import { FlowSketchOffer } from "@/components/analyze/FlowSketchOffer";
+import { SheetSummary } from "@/components/analyze/SheetSummary";
 import { ExperimentImportError, importExperiment, readFileText, type ImportedStudy } from "@/lib/experiment-import";
 import { ScenarioStudio } from "@/components/ScenarioStudio";
 import { CompareRealities } from "@/components/catalyst/CompareRealities";
@@ -319,12 +324,16 @@ export default function Analyze() {
 
   // Workbench drawer state
   const [drawerOpen, setDrawerOpen] = useState(true);
+  /** Phones only: the study sheet is lowered so the map shows above it. */
+  const [sheetPeek, setSheetPeek] = useState(false);
   const [introOpen, setIntroOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [activeTab, setActiveTab] = useState<StudyTab>("overview");
   const workbenchScrollRef = useRef<HTMLDivElement>(null);
   const workbenchRef = useRef<HTMLElement>(null);
   const panelToggleRef = useRef<HTMLButtonElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
+  const eraControlsRef = useRef<HTMLDivElement>(null);
   const introToggleRef = useRef<HTMLButtonElement>(null);
   const introMapButtonRef = useRef<HTMLButtonElement>(null);
   const introHasClosed = useRef(false);
@@ -343,6 +352,23 @@ export default function Analyze() {
       introHasClosed.current = false;
     }
   }, [introOpen]);
+
+  // The era timeline grows with its caption and wraps on narrow screens; the
+  // map's zoom and locate controls sit beneath whatever height it has now.
+  useEffect(() => {
+    const timeline = eraControlsRef.current;
+    const workspace = workspaceRef.current;
+    if (!timeline || !workspace || typeof ResizeObserver === "undefined") return;
+    const place = () => {
+      // Hidden (side-by-side comparison): fall back to the stylesheet's offsets.
+      if (timeline.offsetHeight === 0) workspace.style.removeProperty("--era-clearance");
+      else workspace.style.setProperty("--era-clearance", `${Math.ceil(timeline.offsetTop + timeline.offsetHeight + 10)}px`);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(timeline);
+    return () => observer.disconnect();
+  }, []);
 
   // Each tab is its own page of the study; arriving mid-scroll from the last
   // one hides its heading and its first control.
@@ -552,6 +578,7 @@ export default function Analyze() {
 
   const resetScan = () => {
     invalidateRequests();
+    setSheetPeek(false);
     setAnalysisError(null);
     setResult(null);
     setCapturedTile(null);
@@ -842,6 +869,9 @@ export default function Analyze() {
         setNowSeal(seal);
         workflow.advance("STORM_COMPLETE");
         setActiveTab("simulation");
+        // On a phone the full sheet would hide the result: lower it so the
+        // routed water is what the visitor sees first.
+        if (isSheetViewport()) setSheetPeek(true);
         toast.success(
           `${stormDefinition.rainfallDepthMm} mm design storm routed on ${nowRun.elevationStatus} terrain.`
         );
@@ -890,6 +920,34 @@ export default function Analyze() {
     toast.success("GeoJSON boundary exported.");
   };
 
+  // The quick way past an empty map: bioswale strips along the baseline's own
+  // flow paths, added through the editor so they behave like hand drawings.
+  const canSketch = Boolean(mapReady && simResult && hasCells(simResult) && stormExtent && nowSeal && interventionFeatures.length === 0 && !catalystFuture);
+  const placeFlowSketch = () => {
+    if (!simResult || !hasCells(simResult) || !stormExtent || !nowSeal) return;
+    const size = LOCAL_GRID[nowSeal.storm.resolution];
+    const grid = cachedElevation(stormExtent, size, size);
+    if (!grid) {
+      toast.error("The routed terrain is no longer available.", { description: "Route the storm again to sketch along its flow paths." });
+      return;
+    }
+    const shapes = sketchAlongFlowPaths({ extent: stormExtent, elevation: grid.values, cells: simResult.cells, rainfallDepthMm: nowSeal.storm.rainfallDepthMm, visiblePaths: simResult.flow_paths });
+    if (shapes.length === 0) {
+      toast.info("No modeled flow path here is long enough to sketch along.", { description: "Choose a drawing tool and draw your own shapes instead." });
+      return;
+    }
+    const added = editorRef.current?.addShapes(shapes.map((shape) => ({ id: `flow-sketch-${stableHash(shape.geometry)}`, type: "bioswales" as const, geometry: shape.geometry }))) ?? [];
+    if (added.length === 0) {
+      toast.error("The sketch could not be placed.", { description: "The drawing tools need a working map." });
+      return;
+    }
+    const areaM2 = added.reduce((sum, feature) => sum + feature.areaM2, 0);
+    toast.success(`${added.length} bioswale strips sketched along the modeled flow paths.`, {
+      description: `${Math.round(areaM2).toLocaleString("en-US")} m² in all. Edit or delete them like your own drawings, then rerun the same storm.`,
+    });
+    if (isSheetViewport()) setSheetPeek(true);
+  };
+
   const handleExportExperiment = () => {
     if (!result) return;
     try {
@@ -936,6 +994,7 @@ export default function Analyze() {
       setActiveIntervention(null);
     }
     setActiveTab(tab);
+    setSheetPeek(false);
     workbenchRef.current?.querySelector<HTMLElement>(`[data-study-step="${tab}"]`)?.focus({ preventScroll: true });
     if (tab === "mitigation" && !stormBusy) workflow.advance("REDESIGN");
   };
@@ -965,7 +1024,7 @@ export default function Analyze() {
       <AppNav />
 
       {/* 2. Main GIS Viewport Area */}
-      <main id="main" className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", ((!result && introOpen) || (result && drawerOpen && workflow.state !== "COMPARE")) && "atlas-workspace--docked", workflow.state === "COMPARE" && "atlas-workspace--comparing")}>
+      <main id="main" ref={workspaceRef} className={cn("atlas-workspace relative flex-1 min-h-0 w-full overflow-hidden", ((!result && introOpen) || (result && drawerOpen && workflow.state !== "COMPARE")) && "atlas-workspace--docked", workflow.state === "COMPARE" && "atlas-workspace--comparing")}>
         {/* Full-bleed Map Canvas */}
         <div className="atlas-map absolute inset-0 h-full">
           <MapView
@@ -1000,7 +1059,7 @@ export default function Analyze() {
           )}
 
           {/* Historical timeline: 1609 → today → projected future */}
-          <div className="atlas-era-controls absolute right-4 top-3 z-30 max-w-[calc(100vw-2rem)]">
+          <div ref={eraControlsRef} className="atlas-era-controls absolute right-4 top-3 z-30 max-w-[calc(100vw-2rem)]">
             <EraTimeline
               eraId={eraId}
               onChange={setEraId}
@@ -1351,11 +1410,13 @@ export default function Analyze() {
             ref={workbenchRef}
             aria-label="Urban Resilience Workbench"
             hidden={!drawerOpen || workflow.state === "COMPARE"}
+            data-sheet={sheetPeek ? "peek" : "full"}
             className={cn(
               "atlas-results absolute top-0 bottom-0 left-0 z-30 border-r border-border bg-card flex flex-col",
               drawerOpen ? "translate-x-0" : "-translate-x-full"
             )}
           >
+            <SheetGrip peek={sheetPeek} onPeekChange={setSheetPeek} controls="study-workbench" />
             <div className="atlas-results-head">
               <div className="min-w-0">
                 <h2 className="atlas-results-title">{result.location_label || result.name}</h2>
@@ -1366,7 +1427,7 @@ export default function Analyze() {
                 </p>
                 {analyzedBBox && <button type="button" className="atlas-locate-study" onClick={() => {
                   mapRef.current?.fitBounds(analyzedBBox, 50);
-                  if (window.innerWidth < 768) setDrawerOpen(false);
+                  if (isSheetViewport()) setSheetPeek(true);
                 }}><Compass size={13} aria-hidden="true" /> Locate study on map</button>}
               </div>
 
@@ -1400,6 +1461,11 @@ export default function Analyze() {
             </div>
 
             {isExample && <div className="atlas-example-notice"><strong>Illustrative example</strong><span>Explore the tools with sample data. Not a site assessment.</span></div>}
+            <SheetSummary
+              pair={catalystFuture && simResult && futureSimResult ? { nowM3: simResult.metadata.runoff_volume_m3, possibleM3: futureSimResult.metadata.runoff_volume_m3 } : null}
+              showDifference={difference?.status === "controlled" && showDifference}
+              showFlow={Boolean(simResult && showFlowVectors)}
+            />
 
             <Tabs
               value={activeTab}
@@ -1755,7 +1821,8 @@ export default function Analyze() {
               {activeTab === "mitigation" && (
                 <div className="atlas-tab">
                   <section className="atlas-section atlas-section--lead" aria-labelledby="mitigation-title">
-                    <h3 id="mitigation-title" className="atlas-section-title mb-2">Give the water somewhere to go</h3>
+                    {canSketch && <FlowSketchOffer onSketch={placeFlowSketch} />}
+                    <h3 id="mitigation-title" className="atlas-section-title mb-2">Drawing tools</h3>
 
                     {!mapReady && <p role="status" className="atlas-study-reading-basis mb-4">{mapAvailability === "unavailable" ? "The live map is unavailable." : "The live map is loading."} Drawing needs a working map. You can still explore planning assumptions below or reopen a saved experiment.</p>}
                     <ScenarioStudio

@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { SensorOpticsProvider } from "@/lib/sensor-optics-context";
+import { useIsMobile } from "@/hooks/use-mobile";
 // Route-level code splitting: Analyze pulls in MapLibre GL (~800 kB) and
 // Dashboard pulls in the feed UI — neither should weigh down the landing page.
 const Analyze = lazy(() => import("./pages/Analyze"));
@@ -27,15 +28,23 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * The design system is dark-only; without an explicit theme, sonner follows the
+ * OS and renders white toasts over the dark UI on light-mode machines. On a
+ * phone the study's next-step button is pinned to the bottom of the screen, so
+ * notifications drop from the top there instead of covering it.
+ */
+function Notifications() {
+  const isMobile = useIsMobile();
+  return <Sonner theme="dark" position={isMobile ? "top-center" : "bottom-center"} offset={isMobile ? 12 : 20} />;
+}
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        {/* The design system is dark-only; without this, sonner follows the OS
-            theme and renders white toasts over the dark UI on light-mode
-            machines (no ThemeProvider is mounted to say otherwise). */}
-        <Sonner theme="dark" position="bottom-center" offset={20} />
+        <Notifications />
         <SensorOpticsProvider>
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ScrollToTop />
