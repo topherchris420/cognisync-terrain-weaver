@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml/badge.svg)](https://github.com/topherchris420/cognisync-terrain-weaver/actions/workflows/ci.yml)
 
-**An open-source instrument for urban memory, rainfall, and testable futures.**
+**Under the same rainfall, what changes when we change the ground?**
 
-> **The land remembers. The city is not finished.**
-
-**What was. What is. What could be.** Mannahatta turns a place on the map into a reproducible question: *under the same rainfall, what changes if we change the ground?* This is a research prototype (package version `0.5.0`), built to reveal what a model can and cannot support.
+Mannahatta gives that question a place on the map. Use the research prototype
+(package version `0.5.0`) to compare terrain and land-cover assumptions and
+save the inputs behind each scenario.
 
 Built by [Vers3Dynamics](https://vers3dynamics.com), the project brings historical ecological reconstruction, imagery-based land-cover estimates, terrain routing, intervention design, and verifiable experiment files into one map-based research workspace.
 
