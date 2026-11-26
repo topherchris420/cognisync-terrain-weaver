@@ -55,8 +55,9 @@ export function sampleTerrarium(buffer: PixelBuffer, x: number, y: number): numb
   const y0 = Math.min(buffer.height - 1, Math.max(0, Math.floor(y)));
   const x1 = Math.min(buffer.width - 1, x0 + 1);
   const y1 = Math.min(buffer.height - 1, y0 + 1);
-  const tx = x - x0;
-  const ty = y - y0;
+  // Out-of-bounds coordinates should sample the edge, not extrapolate beyond it.
+  const tx = Math.min(1, Math.max(0, x - x0));
+  const ty = Math.min(1, Math.max(0, y - y0));
   const z00 = pixelElevation(buffer, x0, y0);
   const z10 = pixelElevation(buffer, x1, y0);
   const z01 = pixelElevation(buffer, x0, y1);

@@ -31,10 +31,17 @@ export interface StormDefinition {
   id: string;
   rainfallDepthMm: number;
   durationMinutes: number;
-  distribution: "uniform";
+  /** "uniform" = synthetic design storm; "observed" = real recorded event. */
+  distribution: "uniform" | "observed";
   resolution: "low" | "medium" | "high";
-  includeDrainage: false;
+  includeDrainage: boolean;
   hash: string;
+  /** Present only for observed storms: where the rainfall was recorded. */
+  source?: "design" | "observed";
+  eventLabel?: string;
+  eventStart?: string;
+  /** Real hourly rainfall within the event (minutes from start). Hashed. */
+  hyetograph?: Array<{ tMin: number; rainMm: number }>;
 }
 
 export type InterventionType =
@@ -115,6 +122,11 @@ export interface WaterBalance {
    * (static fill-and-spill). Absent for results from routing model v1.
    */
   pondedM3?: number;
+  /**
+   * Runoff intercepted by real drainage infrastructure (e.g. NYC catch
+   * basins) before overland routing. Absent when no inventory was wired.
+   */
+  drainedM3?: number;
 }
 
 export interface RealitySimulation {

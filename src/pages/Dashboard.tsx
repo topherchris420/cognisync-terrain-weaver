@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { withCurrentScore } from "@/lib/score-integrity";
+import { fetchDashboardFeed } from "@/lib/dashboard-feed";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AppNav } from "@/components/AppNav";
@@ -59,64 +60,28 @@ const SORTERS: Record<SortKey, (a: AnalysisRecord, b: AnalysisRecord) => number>
   "score-asc": (a, b) => Number(a.absorption_score) - Number(b.absorption_score),
 };
 
-// Bound each attempt so a stalled connection surfaces the error/retry UI
-// instead of leaving the feed on skeletons forever. Paired with retry: 1 on
-// the query, the worst-case wait before the error state is ~2 × this (plus
-// backoff) — around 20s, down from the ~48s of three 15s attempts.
+// Bound each attempt so a stalled connection leads to the snapshot rather
+// than leaving the public feed on its loading skeleton.
 const FEED_TIMEOUT_MS = 10_000;
 
-interface Feed {
-  rows: AnalysisRecord[];
-  /** Set when the live feed was unreachable and the bundled snapshot is shown. */
-  snapshot?: { retrievedAt: string; reason: string };
-}
-
 async function fetchLiveAnalyses(signal: AbortSignal): Promise<AnalysisRecord[]> {
-  const { data, error } = await supabase
-    .from("analyses")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50)
-    .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(FEED_TIMEOUT_MS)]));
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as AnalysisRecord[]).map(withCurrentScore);
-}
-
-// When the live backend is unreachable, show the frozen read-only snapshot of
-// the feed (experiments/data/scan-feed.json) instead of an empty error state.
-// The snapshot omits name, imagery, notes and recommendations; fill neutral
-// defaults so every row renders.
-async function loadSnapshot(): Promise<{ rows: AnalysisRecord[]; retrievedAt: string }> {
-  const { default: feed } = await import("../../experiments/data/scan-feed.json");
-  const rows = (feed.data as Array<Partial<AnalysisRecord>>)
-    .map(
-      (r) =>
-        ({
-          name: "",
-          image_data_url: null,
-          recommendations: [],
-          ai_notes: null,
-          ...r,
-        }) as AnalysisRecord
-    )
-    .map(withCurrentScore)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  return { rows, retrievedAt: feed.provenance.retrievedAt };
-}
-
-async function fetchAnalyses(signal: AbortSignal): Promise<Feed> {
+  signal.throwIfAborted();
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort(signal.reason);
+  const timeout = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
+  signal.addEventListener("abort", forwardAbort, { once: true });
   try {
-    return { rows: await fetchLiveAnalyses(signal) };
-  } catch (err) {
-    // A query cancelled by React Query (unmount, refetch) is not an outage.
-    if (signal.aborted) throw err;
-    const reason = err instanceof Error ? err.message : String(err);
-    try {
-      const { rows, retrievedAt } = await loadSnapshot();
-      return { rows, snapshot: { retrievedAt, reason } };
-    } catch {
-      throw err;
-    }
+    const { data, error } = await supabase
+      .from("analyses")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .abortSignal(controller.signal);
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as unknown as AnalysisRecord[]).map(withCurrentScore);
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener("abort", forwardAbort);
   }
 }
 
@@ -131,14 +96,16 @@ export default function Dashboard() {
   const {
     data: feed,
     isPending,
+    isFetching,
     isError,
     error,
     refetch,
   } = useQuery({
     queryKey: ["analyses"],
-    queryFn: ({ signal }) => fetchAnalyses(signal),
-    // One retry, not the app-wide default of two: a public feed should reach
-    // its error+Retry state in ~20s on a dead network, not sit on skeletons.
+    queryFn: ({ signal }) => fetchDashboardFeed(signal, fetchLiveAnalyses),
+    // Let the read-only fallback run even when the browser detects an outage.
+    networkMode: "always",
+    // Retry only if both the live request and snapshot fail.
     retry: 1,
   });
   const rows = feed?.rows;
@@ -189,15 +156,16 @@ export default function Dashboard() {
 
   const exportFeed = (format: "geojson" | "csv", records: AnalysisRecord[]) => {
     if (records.length === 0) return;
+    const filename = snapshot ? "mannahatta-snapshot-sites" : "mannahatta-sites";
     if (format === "geojson") {
       downloadTextFile(
-        exportFilename("mannahatta-sites", "geojson"),
+        exportFilename(filename, "geojson"),
         JSON.stringify(analysesToGeoJSON(records), null, 2),
         "application/geo+json"
       );
     } else {
       downloadTextFile(
-        exportFilename("mannahatta-sites", "csv"),
+        exportFilename(filename, "csv"),
         analysesToCSV(records),
         "text/csv"
       );
@@ -265,12 +233,12 @@ export default function Dashboard() {
           <div className="atlas-index-hint" role="status">
             <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
             <span className="flex-1">
-              The live feed is unreachable ({snapshot.reason}). Showing a read-only snapshot from{" "}
-              {new Date(snapshot.retrievedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}.
+              The live feed is unavailable. Showing a read-only snapshot captured on{" "}
+              {new Date(snapshot.retrievedAt).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" })}.
             </span>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()}>
+            <Button variant="outline" size="sm" className="gap-2" disabled={isFetching} onClick={() => refetch()}>
               <RotateCcw className="h-4 w-4" />
-              Retry
+              {isFetching ? "Retrying…" : "Retry"}
             </Button>
           </div>
         )}

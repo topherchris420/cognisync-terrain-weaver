@@ -1,12 +1,26 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { GeoJSONSource, Map as MLMap } from "maplibre-gl";
 import { loadFloodplain } from "@/lib/historical/futureFloodplains";
+import type { ImageryStatus } from "@/lib/historical/era-imagery";
+import {
+  eraLayerAnchor,
+  hasLayer,
+  hasSource,
+  removeLayers,
+  removeSource,
+  styleReady,
+} from "@/lib/map-layers";
 
 interface Props {
   map: MLMap | null;
   /** Era id, e.g. `fp-2050`. */
   scenarioId: string;
+  /** Timeline label, for status messages. */
+  label?: string;
   opacity?: number;
+  onStatusChange?: (status: ImageryStatus) => void;
+  /** Bump to refetch after an error. */
+  retryToken?: number;
 }
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -18,96 +32,76 @@ const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: 
  * and refreshed as the map moves, so a whole borough can be inspected without
  * loading the entire city at once.
  */
-function safeHasStyle(map: MLMap | null | undefined): boolean {
-  if (!map) return false;
-  try {
-    return Boolean(!map.getStyle || map.getStyle());
-  } catch {
-    return false;
-  }
-}
-
-function safeGetLayer(map: MLMap | null | undefined, id: string) {
-  if (!map) return undefined;
-  try {
-    if (map.getStyle && !map.getStyle()) return undefined;
-    return map.getLayer(id);
-  } catch {
-    return undefined;
-  }
-}
-
-function safeGetSource(map: MLMap | null | undefined, id: string) {
-  if (!map) return undefined;
-  try {
-    if (map.getStyle && !map.getStyle()) return undefined;
-    return map.getSource(id);
-  } catch {
-    return undefined;
-  }
-}
-
-function safeRemoveLayer(map: MLMap | null | undefined, id: string) {
-  if (!map) return;
-  try {
-    if (map.getStyle && !map.getStyle()) return;
-    if (map.getLayer(id)) map.removeLayer(id);
-  } catch {
-    // Ignore if map or style was already destroyed
-  }
-}
-
-function safeRemoveSource(map: MLMap | null | undefined, id: string) {
-  if (!map) return;
-  try {
-    if (map.getStyle && !map.getStyle()) return;
-    if (map.getSource(id)) map.removeSource(id);
-  } catch {
-    // Ignore if map or style was already destroyed
-  }
-}
-
-export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
+export function FloodplainLayer({
+  map,
+  scenarioId,
+  label = scenarioId,
+  opacity = 0.45,
+  onStatusChange,
+  retryToken = 0,
+}: Props) {
   const sourceId = `floodplain-${scenarioId}-src`;
   const fillId = `floodplain-${scenarioId}-fill`;
   const lineId = `floodplain-${scenarioId}-line`;
+  const onStatusRef = useRef(onStatusChange);
+  onStatusRef.current = onStatusChange;
 
   useEffect(() => {
     if (!map) return;
     let removed = false;
+    // A slow response for a view the user has left must not overwrite the
+    // polygons for where they are now.
+    let generation = 0;
+    const report = (status: ImageryStatus) => {
+      if (!removed) onStatusRef.current?.(status);
+    };
 
     const install = () => {
-      if (removed || !safeHasStyle(map) || !map.isStyleLoaded()) return;
-      if (!safeGetSource(map, sourceId)) {
-        map.addSource(sourceId, { type: "geojson", data: EMPTY });
+      if (removed || !styleReady(map)) return;
+      try {
+        let added = false;
+        if (!hasSource(map, sourceId)) {
+          map.addSource(sourceId, { type: "geojson", data: EMPTY });
+          added = true;
+        }
+        const anchor = eraLayerAnchor(map, "overlay");
+        if (!hasLayer(map, fillId)) {
+          map.addLayer(
+            {
+              id: fillId,
+              type: "fill",
+              source: sourceId,
+              paint: {
+                "fill-color": "hsl(205, 85%, 55%)",
+                "fill-opacity": opacity,
+              },
+            },
+            anchor
+          );
+        }
+        if (!hasLayer(map, lineId)) {
+          map.addLayer(
+            {
+              id: lineId,
+              type: "line",
+              source: sourceId,
+              paint: {
+                "line-color": "hsl(195, 95%, 70%)",
+                "line-width": 0.8,
+              },
+            },
+            anchor
+          );
+        }
+        if (added) void refresh();
+      } catch (error) {
+        console.warn(`Floodplain ${scenarioId} not installed yet`, error);
       }
-      if (!safeGetLayer(map, fillId)) {
-        map.addLayer({
-          id: fillId,
-          type: "fill",
-          source: sourceId,
-          paint: {
-            "fill-color": "hsl(205, 85%, 55%)",
-            "fill-opacity": opacity,
-          },
-        });
-      }
-      if (!safeGetLayer(map, lineId)) {
-        map.addLayer({
-          id: lineId,
-          type: "line",
-          source: sourceId,
-          paint: {
-            "line-color": "hsl(195, 95%, 70%)",
-            "line-width": 0.8,
-          },
-        });
-      }
-      void refresh();
     };
 
     const refresh = async () => {
-      if (removed || !safeHasStyle(map)) return;
+      if (removed || !styleReady(map)) return;
+      const request = ++generation;
       const b = map.getBounds();
       try {
         const data = await loadFloodplain(scenarioId, {
@@ -116,32 +110,42 @@ export function FloodplainLayer({ map, scenarioId, opacity = 0.45 }: Props) {
           east: b.getEast(),
           north: b.getNorth(),
         });
-        if (removed || !safeHasStyle(map)) return;
-        const source = safeGetSource(map, sourceId) as GeoJSONSource | undefined;
+        if (removed || request !== generation) return;
+        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
         source?.setData(data);
+        report(
+          data.features.length > 0
+            ? { phase: "ready" }
+            : {
+                phase: "empty",
+                message: `The ${label} floodplain does not reach this view.`,
+              }
+        );
       } catch {
-        // The timeline caption already names the source; the map stays bare.
+        if (removed || request !== generation) return;
+        report({
+          phase: "error",
+          message: `The ${label} floodplain could not be loaded from NYC Open Data. Check the connection and retry.`,
+          retriable: true,
+        });
       }
     };
 
+    report({ phase: "loading" });
     install();
     map.on("styledata", install);
-    map.on("load", install);
-    map.on("idle", install);
+    map.on("style.load", install);
     map.on("moveend", refresh);
 
     return () => {
       removed = true;
       map.off("styledata", install);
-      map.off("load", install);
-      map.off("idle", install);
+      map.off("style.load", install);
       map.off("moveend", refresh);
-      for (const id of [lineId, fillId]) {
-        safeRemoveLayer(map, id);
-      }
-      safeRemoveSource(map, sourceId);
+      removeLayers(map, [lineId, fillId]);
+      removeSource(map, sourceId);
     };
-  }, [map, scenarioId, sourceId, fillId, lineId, opacity]);
+  }, [map, scenarioId, label, sourceId, fillId, lineId, opacity, retryToken]);
 
   return null;
 }

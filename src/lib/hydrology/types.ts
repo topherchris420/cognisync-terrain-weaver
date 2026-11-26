@@ -62,6 +62,22 @@ export interface LocalStormInput {
    * substrate geometry. Omitted means no substrate was consulted.
    */
   substrateHash?: string;
+  /**
+   * Real recorded hourly rainfall for an observed storm (minutes from event
+   * start). When present it drives the hydrograph shape instead of the
+   * synthetic triangular distribution.
+   */
+  hyetograph?: Array<{ tMin: number; rainMm: number }>;
+  /**
+   * Real drainage inventory rasterised onto the sim grid (catch basins).
+   * Per-cell capacity is subtracted from generated runoff before routing.
+   */
+  drainage?: {
+    status: "observed" | "unavailable";
+    basins: number;
+    capacityM3: number[][];
+    sourceLabel: string;
+  };
 }
 
 /**

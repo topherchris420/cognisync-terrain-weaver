@@ -41,6 +41,8 @@ function seedFromStorm(storm: {
   distribution: string;
   resolution: string;
   includeDrainage: boolean;
+  source?: string;
+  hyetograph?: Array<{ tMin: number; rainMm: number }>;
 }): string {
   const hash = stableHash({
     rainfallDepthMm: storm.rainfallDepthMm,
@@ -48,6 +50,8 @@ function seedFromStorm(storm: {
     distribution: storm.distribution,
     resolution: storm.resolution,
     includeDrainage: storm.includeDrainage,
+    source: storm.source ?? "design",
+    hyetograph: storm.hyetograph ?? null,
   });
   return hash.replace(/^fnv1a64:/, "");
 }

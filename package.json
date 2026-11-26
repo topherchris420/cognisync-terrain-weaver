@@ -24,6 +24,7 @@
     "substrate:compile": "vite-node scripts/substrate.ts compile",
     "substrate:check": "vite-node scripts/substrate.ts check",
     "benchmark:synthetic": "vite-node scripts/synthetic-benchmark.ts",
+    "eras:check": "vite-node scripts/check-era-imagery.ts",
     "preview": "vite preview"
   },
   "dependencies": {

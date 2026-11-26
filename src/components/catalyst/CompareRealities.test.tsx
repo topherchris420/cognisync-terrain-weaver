@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CompareRealities } from "./CompareRealities";
+import { percentChange } from "@/lib/percent-change";
 import type { SimulationResponse } from "@/lib/simulation-types";
 
 vi.mock("@/components/MapView", () => ({ MapView: () => <div data-testid="future-map" /> }));
@@ -36,6 +37,16 @@ describe("comparison workbench", () => {
     render(<CompareRealities {...props} baseSimResult={result(1000)} futureSimResult={result(750)} />);
     expect(screen.getByText("25% less runoff")).toBeInTheDocument();
     expect(screen.getByText(/Illustrative terrain/)).toBeInTheDocument();
+  });
+  it("keeps a small real change from reading as zero", () => {
+    render(<CompareRealities {...props} baseSimResult={result(30300)} futureSimResult={result(30210)} />);
+    expect(screen.getByText("0.3% less runoff")).toBeInTheDocument();
+  });
+  it("formats percentages by magnitude", () => {
+    expect(percentChange(24.6)).toBe("25");
+    expect(percentChange(-1.2)).toBe("1");
+    expect(percentChange(0.297)).toBe("0.3");
+    expect(percentChange(0.01)).toBe("<0.1");
   });
   it("does not manufacture a percentage for missing or invalid runoff", () => {
     render(<CompareRealities {...props} baseSimResult={result(NaN)} futureSimResult={result(750)} />);

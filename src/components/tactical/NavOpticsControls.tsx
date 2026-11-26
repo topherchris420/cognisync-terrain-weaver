@@ -22,14 +22,16 @@ export function NavOpticsControls() {
   } = useSensorOptics();
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="nav-optics-controls flex items-center gap-1.5">
       {/* Optic Mode Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 gap-1.5 font-mono text-xs border-border/80 bg-muted/20"
+            className="nav-optics-mode h-8 gap-1.5 font-mono text-xs border-border/80 bg-muted/20"
+            aria-label={`Map display: ${opticConfig.label}`}
+            title={`Map display: ${opticConfig.label}`}
           >
             <Eye className="h-3.5 w-3.5" style={{ color: opticConfig.accentColor }} />
             <span className="hidden sm:inline">{opticConfig.label}</span>

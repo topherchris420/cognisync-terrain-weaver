@@ -5,6 +5,7 @@ interface AnalysisLaunchPanelProps {
   location: string;
   areaKm2: number;
   mapReady: boolean;
+  mapUnavailable?: boolean;
   onAnalyze: () => void;
   onExample?: () => void;
   /** Reopen an exported experiment file: verified and replayed before anything is shown. */
@@ -13,11 +14,18 @@ interface AnalysisLaunchPanelProps {
 
 const isApple = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, onExample, onOpenFile }: AnalysisLaunchPanelProps) {
+export function AnalysisLaunchPanel({ location, areaKm2, mapReady, mapUnavailable, onAnalyze, onExample, onOpenFile }: AnalysisLaunchPanelProps) {
   return (
     <section aria-labelledby="analysis-launch-title" className="atlas-launch">
-      <p className="mb-3 text-sm font-medium">The land remembers.</p>
-      <p className="mb-4 text-xs text-muted-foreground">What was. What is. What could be. Inspect the ground, run a storm, then test a different design.</p>
+      {onExample && (
+        <div className="atlas-example-start">
+          <p>First visit? Try the complete workflow.</p>
+          <button type="button" onClick={onExample}>
+            Explore an example <ArrowRight size={15} aria-hidden="true" />
+          </button>
+          <small>Illustrative data. No scan or account needed.</small>
+        </div>
+      )}
       <div className="atlas-target">
         <MapPin size={16} aria-hidden="true" />
         <div className="min-w-0 flex-1">
@@ -31,8 +39,8 @@ export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, on
       </div>
       <Button type="button" onClick={onAnalyze} disabled={!mapReady} className="atlas-primary group h-12 w-full justify-between px-4 text-sm">
         <span className="flex items-center gap-2">
-          {mapReady ? <Layers3 size={16} /> : <Loader2 size={16} className="animate-spin" />}
-          {mapReady ? "Scan this area" : "Acquiring satellite feed"}
+          {mapReady || mapUnavailable ? <Layers3 size={16} /> : <Loader2 size={16} className="animate-spin" />}
+          {mapReady ? "Scan this area" : mapUnavailable ? "Live map unavailable" : "Acquiring satellite feed"}
         </span>
         {mapReady && (
           <span className="flex items-center gap-2">
@@ -43,18 +51,11 @@ export function AnalysisLaunchPanel({ location, areaKm2, mapReady, onAnalyze, on
           </span>
         )}
       </Button>
-      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">AI reads the satellite image in frame and sorts every surface into five kinds of ground. Pan or zoom to change what gets scanned. Results are estimates.</p>
-      {onExample && (
-        <div className="atlas-example-link">
-          <button type="button" onClick={onExample} className="flex w-full items-center justify-between text-sm font-medium hover:text-primary">
-            Explore an example <ArrowRight size={15} aria-hidden="true" />
-          </button>
-          <p className="mt-1 text-[11px] text-muted-foreground">Illustrative data. No scan or account needed.</p>
-        </div>
-      )}
+      {mapUnavailable && <p role="status" className="mt-3 text-xs leading-relaxed text-muted-foreground">Reconnect the map to scan a place. The example and saved experiment files are still available.</p>}
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">AI estimates five surface types from the satellite image in frame. Pan or zoom to change the study area. Results are estimates.</p>
       {onOpenFile && (
         <div className="atlas-example-link atlas-open-link">
-          <label className="flex w-full cursor-pointer items-center justify-between text-sm font-medium hover:text-primary">
+          <label className="flex min-h-11 w-full cursor-pointer items-center justify-between text-sm font-medium hover:text-primary focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-primary">
             <span>Open an experiment file</span>
             <input
               type="file"

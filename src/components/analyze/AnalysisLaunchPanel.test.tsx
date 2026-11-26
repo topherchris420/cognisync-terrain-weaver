@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { AnalysisLaunchPanel } from "./AnalysisLaunchPanel";
 
 describe("AnalysisLaunchPanel", () => {
+  it("explains a failed map without leaving an endless loading indicator", () => {
+    render(<AnalysisLaunchPanel location="Manhattan" areaKm2={0} mapReady={false} mapUnavailable onAnalyze={vi.fn()} onExample={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Live map unavailable" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(/example and saved experiment files are still available/i);
+    expect(screen.getByRole("button", { name: /explore an example/i })).toBeEnabled();
+  });
   it("summarizes the footprint and launches a ready analysis", () => {
     const onAnalyze = vi.fn();
     render(
